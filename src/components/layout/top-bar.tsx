@@ -1,0 +1,142 @@
+'use client';
+
+import { useState } from 'react';
+import { FilePlus2, Settings2, Columns2 } from 'lucide-react';
+import { useT, usePreferences, type Locale, type Theme } from '@/lib/preferences';
+import { Button, IconButton, Modal, SegmentedGroup, TextInput, StatusDot } from '@/components/ui';
+
+export function TopBar({
+  projectName,
+  projectSlug,
+  onDocumentCreated,
+  focusMode,
+  onToggleFocusMode,
+}: {
+  projectName: string;
+  projectSlug: string;
+  onDocumentCreated: (path: string) => void;
+  focusMode: boolean;
+  onToggleFocusMode: () => void;
+}) {
+  const t = useT();
+  const { locale, theme, setLocale, setTheme } = usePreferences();
+  const [newDocOpen, setNewDocOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const createDocument = async () => {
+    if (!title.trim()) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectSlug)}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? 'Gagal membuat dokumen');
+        return;
+      }
+      setNewDocOpen(false);
+      setTitle('');
+      onDocumentCreated(data.document.path);
+    } catch {
+      setError('Gagal terhubung ke server');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <header className="flex h-11 items-center justify-between border-b border-neutral-200 px-3 dark:border-neutral-800">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold tracking-tight">⌗ {projectName}</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {/* Export menu — aktif di fase 4 */}
+        <Button variant="ghost" disabled title="Fase 4">
+          Export ▾
+        </Button>
+        <IconButton onClick={onToggleFocusMode} title="Focus mode (Esc)" className={focusMode ? 'text-blue-500' : ''}>
+          <Columns2 size={15} />
+        </IconButton>
+        <Button variant="subtle" onClick={() => setNewDocOpen(true)}>
+          <FilePlus2 size={15} />
+          {t('common.newDocument')}
+        </Button>
+        <IconButton onClick={() => setSettingsOpen(true)} title={t('common.settings')}>
+          <Settings2 size={16} />
+        </IconButton>
+        <StatusDot tone="amber" title={`OpenCode: ${t('chat.statusOff')} (fase 2)`} />
+      </div>
+
+      {/* Dialog dokumen baru */}
+      <Modal open={newDocOpen} onClose={() => setNewDocOpen(false)} title={t('common.newDocument')}>
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="new-doc-title" className="mb-1 block text-sm font-medium">
+              {t('newDoc.label')}
+            </label>
+            <TextInput
+              id="new-doc-title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder={t('newDoc.placeholder')}
+              autoFocus
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && title.trim()) void createDocument();
+              }}
+            />
+            <p className="mt-1 text-xs text-neutral-500">{t('newDoc.hint')}</p>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setNewDocOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={() => void createDocument()} disabled={creating || !title.trim()}>
+              {creating ? '…' : t('common.create')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Dialog pengaturan */}
+      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title={t('settings.title')}>
+        <div className="space-y-5">
+          <div>
+            <p className="mb-1.5 text-sm font-medium">{t('settings.language')}</p>
+            <SegmentedGroup
+              options={[
+                { value: 'id', label: 'Indonesia' },
+                { value: 'en', label: 'English' },
+              ]}
+              active={locale}
+              onSelect={(value) => setLocale(value as Locale)}
+            />
+          </div>
+          <div>
+            <p className="mb-1.5 text-sm font-medium">{t('settings.theme')}</p>
+            <SegmentedGroup
+              options={[
+                { value: 'light', label: t('settings.themeLight') },
+                { value: 'dark', label: t('settings.themeDark') },
+                { value: 'system', label: t('settings.themeSystem') },
+              ]}
+              active={theme}
+              onSelect={(value) => setTheme(value as Theme)}
+            />
+          </div>
+          <p className="border-t border-neutral-200 pt-3 text-xs text-neutral-500 dark:border-neutral-700">
+            Default citation style & persona agent → fase 2/4.
+          </p>
+        </div>
+      </Modal>
+    </header>
+  );
+}

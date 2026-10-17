@@ -1,26 +1,222 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --border: #e5e5e5;
+}
+
+.dark {
+  --background: #0f0f0f;
+  --foreground: #ededed;
+  --muted: #1c1c1c;
+  --muted-foreground: #a3a3a3;
+  --border: #2e2e2e;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Kertas editor (feel-Word: serif 12pt-ish, spasi longgar) ──────────────── */
+
+.paper {
+  font-family: "Times New Roman", ui-serif, Georgia, serif;
+  font-size: 16px;
+  line-height: 1.9;
+  color: var(--foreground);
+}
+
+.paper h1 {
+  font-size: 1.35em;
+  font-weight: 700;
+  margin: 1.2em 0 0.6em;
+  text-align: center;
+}
+
+.paper h2 {
+  font-size: 1.18em;
+  font-weight: 700;
+  margin: 1.1em 0 0.5em;
+}
+
+.paper h3 {
+  font-size: 1.05em;
+  font-weight: 700;
+  margin: 1em 0 0.4em;
+}
+
+.paper p {
+  margin: 0 0 0.75em;
+  text-align: justify;
+}
+
+.paper blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.9em;
+  margin: 0.8em 0;
+  color: var(--muted-foreground);
+}
+
+.paper ul,
+.paper ol {
+  padding-left: 1.6em;
+  margin: 0.6em 0;
+}
+
+.paper ul {
+  list-style: disc;
+}
+
+.paper ol {
+  list-style: decimal;
+}
+
+.paper code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--muted);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+}
+
+.paper pre {
+  background: var(--muted);
+  padding: 0.75em 1em;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+
+.paper hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.4em 0;
+}
+
+.paper table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.92em;
+}
+
+.paper th,
+.paper td {
+  border: 1px solid var(--border);
+  padding: 0.4em 0.7em;
+  min-width: 60px;
+}
+
+.paper th {
+  background: var(--muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+.paper .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(59 130 246 / 0.12);
+  pointer-events: none;
+}
+
+.paper th,
+.paper td {
+  position: relative;
+}
+
+.paper ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.4em;
+}
+
+.paper ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.55em;
+  align-items: flex-start;
+}
+
+.paper ul[data-type="taskList"] input {
+  margin-top: 0.45em;
+}
+
+.paper .tiptap {
+  outline: none;
+  min-height: 55vh;
+  padding-bottom: 30vh;
+}
+
+/* Placeholder Tiptap */
+.paper .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: light-dark(#a3a3a3, #5f5f5f);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  font-style: italic;
+}
+
+/* ── Bubble menu (toolbar seleksi ala-Word) ───────────────────────────────── */
+
+.bubble {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  flex-wrap: wrap;
+  max-width: 340px;
+}
+
+.bubble-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: var(--foreground);
+}
+
+.bubble-btn:hover:not(:disabled) {
+  background: var(--muted);
+}
+
+.bubble-btn.is-active {
+  background: rgb(59 130 246 / 0.16);
+  color: rgb(37 99 235);
+}
+
+.bubble-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bubble-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 3px;
 }

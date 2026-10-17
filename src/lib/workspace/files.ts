@@ -1,0 +1,193 @@
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+
+// ── Guard & resolusi file dalam folder project ───────────────────────────────
+// Base project FOLDER sudah di-verifikasi realpath saat attach (paths.ts),
+// jadi jangkar di sini = direktori nyata di disk.
+
+export type TreeEntry = {
+  path: string; // relatif dari root project, selalu pakai '/'
+  name: string;
+  type: 'dir' | 'file';
+  size: number;
+};
+
+const SKIP_DIRS = new Set(['.opencode', 'node_modules', '.git']);
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB batas file teks editor
+const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.json', '.jsonc', '.csv', '.ris', '.bib', '.tex']);
+
+export class WorkspaceError extends Error {
+  constructor(public code: string) {
+    super(code);
+    this.name = 'WorkspaceError';
+  }
+}
+
+/** Resolve path relatif; lempar INVALID_PATH kalau mau keluar dari root (anti traversal). */
+function safeResolve(baseReal: string, relative: string): string {
+  if (typeof relative !== 'string' || relative.length === 0 || relative.includes('\0')) {
+    throw new WorkspaceError('INVALID_PATH');
+  }
+  const resolved = path.resolve(baseReal, relative);
+  if (resolved !== baseReal && !resolved.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+  return resolved;
+}
+
+function toRel(baseReal: string, abs: string): string {
+  return path.relative(baseReal, abs).split(path.sep).join('/');
+}
+
+/** Daftar semua file/folder (flat, sudah diurut: dir dulu, lalu nama). */
+export async function listTree(baseReal: string): Promise<TreeEntry[]> {
+  const entries: TreeEntry[] = [];
+  const stack: string[] = [baseReal];
+
+  while (stack.length > 0) {
+    const dirAbs = stack.pop()!;
+    const dirents = await fsp.readdir(dirAbs, { withFileTypes: true });
+    for (const dirent of dirents) {
+      if (SKIP_DIRS.has(dirent.name)) continue;
+      const abs = path.join(dirAbs, dirent.name);
+      const rel = toRel(baseReal, abs);
+      if (dirent.isDirectory()) {
+        entries.push({ path: rel, name: dirent.name, type: 'dir', size: 0 });
+        stack.push(abs);
+      } else if (dirent.isFile()) {
+        const size = (await fsp.stat(abs)).size;
+        entries.push({ path: rel, name: dirent.name, type: 'file', size });
+      }
+    }
+  }
+
+  entries.sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+    return a.path.localeCompare(b.path);
+  });
+  return entries;
+}
+
+/** Baca file teks (untuk editor). */
+export async function readTextFile(baseReal: string, relative: string): Promise<{ content: string; mtime: number }> {
+  const abs = safeResolve(baseReal, relative);
+  let real = abs;
+  try {
+    real = fs.realpathSync(abs);
+  } catch {
+    throw new WorkspaceError('FILE_NOT_FOUND');
+  }
+  // Anti symlink-escape: file nyata harus tetap di dalam root project.
+  if (real !== baseReal && !real.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+  const stat = await fsp.stat(real);
+  if (!stat.isFile()) throw new WorkspaceError('FILE_NOT_FOUND');
+  if (stat.size > MAX_FILE_SIZE) throw new WorkspaceError('FILE_TOO_BIG');
+  if (!TEXT_EXTENSIONS.has(path.extname(real).toLowerCase())) throw new WorkspaceError('UNSUPPORTED_TYPE');
+  const content = await fsp.readFile(real, 'utf8');
+  return { content, mtime: stat.mtimeMs };
+}
+
+/** Tulis file teks (autosave dari editor / manual ⌘S). */
+export async function writeTextFile(baseReal: string, relative: string, content: string): Promise<{ mtime: number }> {
+  const abs = safeResolve(baseReal, relative);
+  if (path.extname(abs).toLowerCase() !== '.md') throw new WorkspaceError('UNSUPPORTED_TYPE');
+
+  const parent = path.dirname(abs);
+  fs.mkdirSync(parent, { recursive: true });
+  // Verifikasi folder induk gak ngelewat symlink ke luar project.
+  const parentReal = fs.realpathSync(parent);
+  if (parentReal !== baseReal && !parentReal.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+
+  try {
+    const targetStat = fs.lstatSync(abs);
+    if (targetStat.isSymbolicLink()) throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+
+  await fsp.writeFile(abs, content, 'utf8');
+  return { mtime: (await fsp.stat(abs)).mtimeMs };
+}
+
+/** Hapus file (bukan folder). */
+export async function deleteFile(baseReal: string, relative: string): Promise<void> {
+  const abs = safeResolve(baseReal, relative);
+  let real: string;
+  try {
+    real = fs.realpathSync(abs);
+  } catch {
+    throw new WorkspaceError('FILE_NOT_FOUND');
+  }
+  if (real !== baseReal && !real.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+  if (await fsp.stat(real).then((s) => s.isDirectory())) {
+    throw new WorkspaceError('INVALID_PATH');
+  }
+  await fsp.rm(real);
+}
+
+/** Slug nama file untuk dokumen baru. */
+function slugifyName(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  return slug || 'dokumen';
+}
+
+/** Buat dokumen baru di dokumen/ sebagai "bab next" — file existing tidak disentuh. */
+export async function createDocument(baseReal: string, title: string): Promise<{ path: string; name: string }> {
+  const dokumenDir = path.join(baseReal, 'dokumen');
+  fs.mkdirSync(dokumenDir, { recursive: true });
+  const parentReal = fs.realpathSync(dokumenDir);
+  if (parentReal !== baseReal && !parentReal.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+
+  // Nomor bab berikutnya: scan file bab{n}-*.md di dokumen/
+  let nextNumber = 1;
+  const existing = await fsp.readdir(dokumenDir);
+  for (const name of existing) {
+    const match = /^bab(\d+)-/.exec(name);
+    if (match) nextNumber = Math.max(nextNumber, Number(match[1]) + 1);
+  }
+
+  const fileName = `bab${nextNumber}-${slugifyName(title)}.md`;
+  const relPath = `dokumen/${fileName}`;
+  // Kalau nama bentrok → suffix nomor (meski nomor bab beda)
+  let finalRel = relPath;
+  if (fs.existsSync(path.join(baseReal, finalRel))) {
+    finalRel = relPath.replace(/\.md$/, `-2.md`);
+  }
+
+  const content = [
+    `# BAB ${romanize(nextNumber)} · ${title}`,
+    '',
+    'Mulai tulis di sini…',
+    '',
+  ].join('\n');
+  await fsp.writeFile(path.join(baseReal, finalRel), content, 'utf8');
+
+  return { path: finalRel, name: fileName };
+}
+
+function romanize(n: number): string {
+  const map: Array<[number, string]> = [
+    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+  ];
+  let result = '';
+  for (const [value, symbol] of map) {
+    while (n >= value) {
+      result += symbol;
+      n -= value;
+    }
+  }
+  return result;
+}

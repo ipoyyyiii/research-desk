@@ -1,0 +1,76 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "create": "Create",
+    "newDocument": "New document",
+    "settings": "Settings",
+    "close": "Close",
+    "projectNotFound": "Project not found"
+  },
+  "tabs": {
+    "file": "Files",
+    "journal": "Journals",
+    "library": "Library"
+  },
+  "tree": {
+    "empty": "Project folder is empty. Create a document first ✍️",
+    "deleteConfirm": "Delete file \"{name}\"?",
+    "fase3Hint": "This file opens later in phase 3 (viewer/PDF)."
+  },
+  "editor": {
+    "noFile": "No document open",
+    "noFileHint": "Pick a .md in the left panel, or create one via [+ Document] above.",
+    "words": "words",
+    "saved": "Saved ✓",
+    "saving": "Saving…",
+    "startTyping": "Start writing…",
+    "unsaved": "Unsaved changes",
+    "saveFailed": "Save failed",
+    "untitled": "Untitled"
+  },
+  "toolbar": {
+    "bold": "Bold",
+    "italic": "Italic",
+    "strike": "Strike",
+    "heading": "Heading",
+    "list": "List",
+    "table": "Table",
+    "cite": "Cite",
+    "ask": "Ask-AI",
+    "citeHint": "Phase 4",
+    "askHint": "Phase 2"
+  },
+  "chat": {
+    "title": "Chat",
+    "statusOff": "OpenCode not connected",
+    "statusOn": "Connected",
+    "placeholder": "Ask anything about your chapters… (live in phase 2)",
+    "comingSoon": "Phase 2: streaming chat + tool timeline wired to OpenCode."
+  },
+  "newDoc": {
+    "label": "New document title",
+    "placeholder": "e.g. Introduction",
+    "hint": "File is created under dokumen/ as the next chapter."
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "Follow system"
+  },
+  "left": {
+    "journalComing": "Phase 3: journal search (OpenAlex + Crossref) shows up here.",
+    "libraryComing": "Phase 3-4: references.bib list + PDF viewer show up here."
+  },
+  "api": {
+    "invalidRequest": "Invalid data",
+    "fileOutsideProject": "File outside the project folder",
+    "fileNotFound": "File not found",
+    "fileTooBig": "File too large",
+    "unsupportedType": "This file type cannot be opened yet"
+  }
+}

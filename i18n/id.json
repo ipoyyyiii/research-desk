@@ -1,0 +1,76 @@
+{
+  "common": {
+    "save": "Simpan",
+    "cancel": "Batal",
+    "delete": "Hapus",
+    "create": "Buat",
+    "newDocument": "Dokumen baru",
+    "settings": "Pengaturan",
+    "close": "Tutup",
+    "projectNotFound": "Project tidak ditemukan"
+  },
+  "tabs": {
+    "file": "File",
+    "journal": "Jurnal",
+    "library": "Lib"
+  },
+  "tree": {
+    "empty": "Folder project masih kosong. Buat dokumen baru dulu ✍️",
+    "deleteConfirm": "Hapus file \"{name}\"?",
+    "fase3Hint": "Buka file ini nanti di fase 3 (viewer/PDF)."
+  },
+  "editor": {
+    "noFile": "Belum ada dokumen terbuka",
+    "noFileHint": "Pilih .md di panel kiri, atau buat dokumen baru lewat tombol [+ Dokumen] di atas.",
+    "words": "kata",
+    "saved": "Tersimpan ✓",
+    "saving": "Menyimpan…",
+    "startTyping": "Mulai menulis…",
+    "unsaved": "Belum disimpan",
+    "saveFailed": "Gagal simpan",
+    "untitled": "Tanpa judul"
+  },
+  "toolbar": {
+    "bold": "Tebal",
+    "italic": "Miring",
+    "strike": "Coret",
+    "heading": "Judul",
+    "list": "List",
+    "table": "Tabel",
+    "cite": "Cite",
+    "ask": "Tanya-AI",
+    "citeHint": "Fase 4",
+    "askHint": "Fase 2"
+  },
+  "chat": {
+    "title": "Chat",
+    "statusOff": "OpenCode belum disambung",
+    "statusOn": "Terhubung",
+    "placeholder": "Tanya apa aja soal bab kamu… (aktif di fase 2)",
+    "comingSoon": "Fase 2: chat streaming + tool timeline nyambung ke OpenCode."
+  },
+  "newDoc": {
+    "label": "Judul dokumen baru",
+    "placeholder": "mis. Pendahuluan",
+    "hint": "File dibuat di dokumen/ sebagai bab berikutnya."
+  },
+  "settings": {
+    "title": "Pengaturan",
+    "language": "Bahasa",
+    "theme": "Tema",
+    "themeLight": "Terang",
+    "themeDark": "Gelap",
+    "themeSystem": "Ikut sistem"
+  },
+  "left": {
+    "journalComing": "Fase 3: pencarian jurnal (OpenAlex + Crossref) muncul di sini.",
+    "libraryComing": "Fase 3-4: daftar referensi.bib + PDF viewer muncul di sini."
+  },
+  "api": {
+    "invalidRequest": "Data tidak valid",
+    "fileOutsideProject": "File di luar folder project",
+    "fileNotFound": "File tidak ditemukan",
+    "fileTooBig": "File terlalu besar",
+    "unsupportedType": "Tipe file ini belum bisa dibuka"
+  }
+}
