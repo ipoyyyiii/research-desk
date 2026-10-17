@@ -1,7 +1,7 @@
 # MEMORY — Riwayat & Keputusan Sesi (private context)
 
 > File memori sesi. Kalau context hilang/session baru, BACA DULU file ini + `planning.md` sebelum kerja apapun di repo ini.
-> Last updated: sesi pembuatan repo (baseline — belum ada fase 0).
+> Last updated: planning.md + memory.md sudah dibuat & di-push ke GitHub (commit `8da7fa4`). Fase 0 belum dimulai.
 
 ---
 
