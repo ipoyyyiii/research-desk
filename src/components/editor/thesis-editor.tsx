@@ -84,6 +84,8 @@ function EditorSurface({
   filePathRef.current = filePath;
 
   const editor = useEditor({
+    // Wajib utk Next.js SSR — cegah hydration mismatch (editor dirender client-side)
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Markdown.configure({ markedOptions: { gfm: true } }),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, File as FileIcon, FolderClosed, FolderOpen } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Button, Modal } from '@/components/ui';
@@ -65,10 +65,28 @@ function useFileTree(slug: string, version: number) {
     void fetchTree();
   }, [fetchTree, version]);
 
+  // Refetch saat window fokus KEMBALI (bukan tiap fokus-event) + throttle 3 detik,
+  // biar gak numpuk request saat tab fwd VS Code flicker.
+  const lastFetchRef = useRef(Date.now());
   useEffect(() => {
-    const onFocus = () => void fetchTree();
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    let visible = true;
+    const maybeFetch = () => {
+      if (!visible || document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastFetchRef.current < 3000) return;
+      lastFetchRef.current = now;
+      void fetchTree();
+    };
+    const onVisibility = () => {
+      visible = document.visibilityState === 'visible';
+      maybeFetch();
+    };
+    window.addEventListener('focus', maybeFetch);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', maybeFetch);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [fetchTree]);
 
   return { entries, loading, error };
