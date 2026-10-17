@@ -16,7 +16,9 @@
 | **Fase 0: Node 24.22 + pnpm 12.14 + scaffold Next.js 15.5.28 + DB + attach-folder** | ✅ **BERES** (commit `2a00117`) |
 | **Fase 1: layout 3-panel + Tiptap autosave→md + i18n id/en + file tree** | ✅ **BERES** (commit `c307d93`) |
 | **Fase 1 polish: ribbon ala-Word + gambar (upload/paste/drop→`gambar/`, serve via `/raw`, `.md` tetap relatif) + prefs tampilan + tabel/link/align** | ✅ **BERES** (commit `ce0472a`) |
-| Fase 2: chat ↔ OpenCode (session per project, streaming, tool timeline) | ⏳ berikutnya |
+| Fase 2: chat ↔ OpenCode (session per project, streaming, tool timeline, edit terbatas folder project) | ⏳ berikutnya |
+| Fase 2.5: panel "Kemampuan AI" — toggle MCP/skills tepercaya (websearch, search_literature OpenAlex/Crossref/Semantic Scholar) | ⏳ |
+| Fase 3: jurnal/library + PDF viewer + galeri gambar (tab Gambar: browse, insert ulang, hapus) | ⏳ |
 
 Lingkungan mesin: Ubuntu di AWS (VS Code Remote SSH, user `ubuntu`). Akses browser app nanti via **port forwarding VS Code** (`:3000`) — tidak ada expose publik. Push git HTTPS sudah terbukti jalan (via VS Code askpass).
 
@@ -168,7 +170,7 @@ settings: { locale ("id"|"en"), theme, default_citation_style,
 
 **Flow A — "tambahin 2 jurnal RAG ke bab 2":**
 1. Chat → UI → `opencode` session.prompt (session per project)
-2. Agent → MCP `search_literature("RAG evaluation")` → hasil merge/dedup
+2. Agent → MCP `search_literature("RAG evaluation")` → **OpenAlex + Crossref + Semantic Scholar** (merge, dedup DOI)
 3. Agent pilih 2 → MCP `update_bibliography` → `references.bib` +2 (cek duplikat DOI)
 4. Agent → tool edit built-in → sisip `[@karimi2024]` di bab2.md
 5. SSE events → chat render + kartu tool; UI reload file → editor + Lib re-render
@@ -188,6 +190,9 @@ settings: { locale ("id"|"en"), theme, default_citation_style,
 - **Permissions**: edit/glob dalam folder project = `allow`; **bash = `deny`**; delete berbahaya = `ask`; `.opencode/` = `deny`
 - **Model**: default dari login (ChatGPT); bisa override per project
 - Fair-use: batas token per session/turn dikonfigurasi (Plus = usage-based, bukan unlimited)
+- **Konteks otomatis** (mau user: "dia udah paham konteks yang gue kerjain"): tiap turn dikirim dossier ringkas — judul project, daftar bab + status, jumlah bibliografi, file aktif — tanpa user ngulang prompt
+- **Extendable** (mau user: "add skills/MCP"): MCP via `.opencode/opencode.jsonc` per project; app sediakan galeri MCP/skills tepercaya + toggle (fase 2.5) — websearch, search_literature
+- **Sumber jurnal kredibel**: OpenAlex + Crossref + Semantic Scholar (API resmi, gratis, punya DOI/abstrak/metrik) — "dipredalam, gak asal comot" = agent wajib baca abstrak sebelum nambahin + bisa ambil PDF open-access. Google Scholar: gak punya API resmi & anti-scrape → pakai equivalen resmi di atas + websearch MCP utk sisanya
 
 ---
 
