@@ -6,6 +6,7 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import Image from '@tiptap/extension-image';
+import TextAlign from '@tiptap/extension-text-align';
 import Placeholder from '@tiptap/extension-placeholder';
 import TaskItem from '@tiptap/extension-task-item';
 import TaskList from '@tiptap/extension-task-list';
@@ -14,20 +15,24 @@ import {
   Bold,
   Italic,
   Strikethrough,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
+  Underline as UnderlineIcon,
   TextQuote,
-  Table as TableIcon,
   BookMarked,
   Sparkles,
 } from 'lucide-react';
 import { useT } from '@/lib/preferences';
+import { Ribbon, readViewPrefs, uploadProjectImage, type ViewPrefs } from './ribbon';
 
 type SaveStatus = 'clean' | 'dirty' | 'saving' | 'error';
 
 const AUTOSAVE_DELAY_MS = 800;
+
+/** Spasi baris pilihan user → multiplier CSS di kertas (tampilan saja). */
+const SPACING_CSS: Record<string, string> = {
+  '1': '1.45',
+  '1.5': '1.9',
+  '2': '2.35',
+};
 
 export function ThesisEditor({ slug, filePath }: { slug: string; filePath: string }) {
   const [markdown, setMarkdown] = useState<string | null>(null);
@@ -79,9 +84,22 @@ function EditorSurface({
   const [status, setStatus] = useState<SaveStatus>('clean');
   const [words, setWords] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [imgError, setImgError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filePathRef = useRef(filePath);
   filePathRef.current = filePath;
+
+  // Prefs tampilan (font/ukuran/spasi) — ke server gak ikut disimpan (md = konten).
+  const [prefs, setPrefsState] = useState<ViewPrefs>(() => readViewPrefs());
+  const setPrefs = useCallback((p: ViewPrefs) => {
+    setPrefsState(p);
+    localStorage.setItem('editor:font', p.fontFamily.value);
+    localStorage.setItem('editor:fontSize', String(p.fontSize));
+    localStorage.setItem('editor:lineSpacing', p.lineSpacing);
+  }, []);
+
+  // Dipanggil editorProps.handlePaste / handleDrop — disetel setelah editor siap.
+  const insertRef = useRef<((files: File[]) => void) | null>(null);
 
   const editor = useEditor({
     // Wajib utk Next.js SSR — cegah hydration mismatch (editor dirender client-side)
@@ -89,7 +107,10 @@ function EditorSurface({
     extensions: [
       StarterKit,
       Markdown.configure({ markedOptions: { gfm: true } }),
-      Image,
+      // Override render: src relatif di .md (gambar/x.png) → URL raw API utk tampilan;
+      // keluaran markdown tetap path relatif.
+      createMappedImage(slug),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Placeholder.configure({ placeholder: t('editor.startTyping') }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -103,6 +124,21 @@ function EditorSurface({
       attributes: {
         class: 'tiptap paper outline-none',
       },
+      handlePaste: (_view, event) => {
+        const files = [...(event.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+        if (files.length === 0) return false;
+        event.preventDefault();
+        insertRef.current?.(files);
+        return true;
+      },
+      handleDrop: (_view, event, _slice, moved) => {
+        if (moved) return false;
+        const files = [...(event.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+        if (files.length === 0) return false;
+        event.preventDefault();
+        insertRef.current?.(files);
+        return true;
+      },
     },
     onUpdate: ({ editor }) => {
       setStatus('dirty');
@@ -110,6 +146,24 @@ function EditorSurface({
       scheduleSave();
     },
   });
+
+  // Handler upload + sisip gambar (dipakai paste & drag-drop).
+  useEffect(() => {
+    if (!editor) return;
+    insertRef.current = async (files: File[]) => {
+      for (const file of files) {
+        const result = await uploadProjectImage(slug, file);
+        if (result.ok) {
+          editor.chain().focus().setImage({ src: result.path }).run();
+        } else {
+          setImgError(result.error);
+        }
+      }
+    };
+    return () => {
+      insertRef.current = null;
+    };
+  }, [editor, slug]);
 
   const save = useCallback(async () => {
     if (!editor || editor.isDestroyed) return;
@@ -161,10 +215,22 @@ function EditorSurface({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <FixedToolbar editor={editor} />
+      <Ribbon editor={editor} slug={slug} prefs={prefs} setPrefs={setPrefs} />
+      {imgError && (
+        <p className="shrink-0 bg-red-50 px-3 py-1 text-[11px] text-red-600 dark:bg-red-950/40">
+          {t('toolbar.uploadFailed')}: {imgError}
+        </p>
+      )}
       <SelectionBubbleMenu editor={editor} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="paper-wrap mx-auto my-6 max-w-[820px] rounded-lg bg-white px-12 py-10 shadow-sm ring-1 ring-neutral-200/70 dark:bg-neutral-900 dark:ring-neutral-800">
+        <div
+          className="paper-wrap mx-auto my-6 max-w-[820px] rounded-lg bg-white px-12 py-10 shadow-sm ring-1 ring-neutral-200/70 dark:bg-neutral-900 dark:ring-neutral-800"
+          style={{
+            fontFamily: prefs.fontFamily.css,
+            fontSize: `${prefs.fontSize}pt`,
+            lineHeight: SPACING_CSS[prefs.lineSpacing] ?? '1.9',
+          }}
+        >
           <EditorContent editor={editor} />
         </div>
       </div>
@@ -197,59 +263,29 @@ function countWords(editor: Editor): number {
   return matches ? matches.length : 0;
 }
 
-/** Tombol toolbar dipakai di fixed bar + bubble menu. */
-function ToolbarButtons({ editor }: { editor: Editor }) {
+/** Bubble menu ringan saat seleksi teks (ribbon sudah menangani sisanya). */
+function SelectionBubbleMenu({ editor }: { editor: Editor }) {
   const t = useT();
-  const btn = (active: boolean) =>
-    `bubble-btn ${active ? 'is-active' : ''}`;
-
+  const btn = (active: boolean) => `bubble-btn ${active ? 'is-active' : ''}`;
   const disabledPhase = (hint: string) => ({ disabled: true, title: hint });
 
   return (
-    <>
+    <BubbleMenu editor={editor} className="bubble">
       <button type="button" className={btn(editor.isActive('bold'))} title={t('toolbar.bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
         <Bold size={14} />
       </button>
       <button type="button" className={btn(editor.isActive('italic'))} title={t('toolbar.italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
         <Italic size={14} />
       </button>
+      <button type="button" className={btn(editor.isActive('underline'))} title={t('toolbar.underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+        <UnderlineIcon size={14} />
+      </button>
       <button type="button" className={btn(editor.isActive('strike'))} title={t('toolbar.strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
         <Strikethrough size={14} />
       </button>
       <span className="bubble-sep" />
-      <button
-        type="button"
-        className={btn(editor.isActive('heading', { level: 2 }))}
-        title={`${t('toolbar.heading')} 2`}
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-      >
-        <Heading2 size={14} />
-      </button>
-      <button
-        type="button"
-        className={btn(editor.isActive('heading', { level: 3 }))}
-        title={`${t('toolbar.heading')} 3`}
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-      >
-        <Heading3 size={14} />
-      </button>
-      <span className="bubble-sep" />
-      <button type="button" className={btn(editor.isActive('bulletList'))} title={t('toolbar.list')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
-        <List size={14} />
-      </button>
-      <button type="button" className={btn(editor.isActive('orderedList'))} title="1." onClick={() => editor.chain().focus().toggleOrderedList().run()}>
-        <ListOrdered size={14} />
-      </button>
       <button type="button" className={btn(editor.isActive('blockquote'))} title="❝" onClick={() => editor.chain().focus().toggleBlockquote().run()}>
         <TextQuote size={14} />
-      </button>
-      <button
-        type="button"
-        className={btn(false)}
-        title={t('toolbar.table')}
-        onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-      >
-        <TableIcon size={14} />
       </button>
       <span className="bubble-sep" />
       <button type="button" className="bubble-btn" {...disabledPhase(t('toolbar.citeHint'))} title={`${t('toolbar.cite')} · ${t('toolbar.citeHint')}`}>
@@ -258,25 +294,27 @@ function ToolbarButtons({ editor }: { editor: Editor }) {
       <button type="button" className="bubble-btn" {...disabledPhase(t('toolbar.askHint'))} title={`${t('toolbar.ask')} · ${t('toolbar.askHint')}`}>
         <Sparkles size={14} />
       </button>
-    </>
-  );
-}
-
-function FixedToolbar({ editor }: { editor: Editor }) {
-  return (
-    <div className="flex h-9 shrink-0 items-center justify-center border-b border-neutral-200 bg-white/60 px-3 dark:border-neutral-800 dark:bg-neutral-900/60">
-      <div className="bubble !shadow-none">
-        <ToolbarButtons editor={editor} />
-      </div>
-    </div>
-  );
-}
-
-/** Bubble menu muncul saat seleksi teks (ala Word). */
-export function SelectionBubbleMenu({ editor }: { editor: Editor }) {
-  return (
-    <BubbleMenu editor={editor} className="bubble">
-      <ToolbarButtons editor={editor} />
     </BubbleMenu>
   );
+}
+
+/** Extension Image dengan mapping src → URL raw API (tampilan), .md tetap relatif. */
+function createMappedImage(slug: string) {
+  return Image.extend({
+    renderHTML({ node, HTMLAttributes }) {
+      const src: string = (HTMLAttributes.src as string) ?? (node.attrs.src as string) ?? '';
+      // Path relatif workspace (gambar/xxx.png) → serve via raw API.
+      if (src && !/^(https?:\/\/|data:|blob:|\/)/i.test(src)) {
+        return [
+          'img',
+          {
+            ...HTMLAttributes,
+            src: `/api/projects/${encodeURIComponent(slug)}/raw?path=${encodeURIComponent(src)}`,
+            'data-workspace-src': src,
+          },
+        ];
+      }
+      return ['img', HTMLAttributes];
+    },
+  });
 }

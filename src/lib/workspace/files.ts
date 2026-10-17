@@ -16,6 +16,78 @@ export type TreeEntry = {
 const SKIP_DIRS = new Set(['.opencode', 'node_modules', '.git']);
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB batas file teks editor
 const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.json', '.jsonc', '.csv', '.ris', '.bib', '.tex']);
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+export const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
+
+export function isImageFile(name: string): boolean {
+  return IMAGE_EXTENSIONS.has(path.extname(name).toLowerCase());
+}
+
+const FILE_MIME: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.pdf': 'application/pdf',
+  '.md': 'text/markdown; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.json': 'application/json',
+  '.jsonc': 'application/json',
+  '.csv': 'text/csv; charset=utf-8',
+  '.bib': 'text/plain; charset=utf-8',
+  '.ris': 'text/plain; charset=utf-8',
+  '.tex': 'text/plain; charset=utf-8',
+};
+
+export function guessMime(name: string): string {
+  return FILE_MIME[path.extname(name).toLowerCase()] ?? 'application/octet-stream';
+}
+
+/** Simpan gambar upload ke gambar/ — nama di-sanitize + timestamp biar unik. */
+export async function saveUploadedImage(
+  baseReal: string,
+  fileName: string,
+  data: Buffer,
+): Promise<{ path: string; name: string }> {
+  if (!isImageFile(fileName)) throw new WorkspaceError('UNSUPPORTED_TYPE');
+  if (data.byteLength > MAX_UPLOAD_SIZE) throw new WorkspaceError('FILE_TOO_BIG');
+
+  const targetDir = path.join(baseReal, 'gambar');
+  fs.mkdirSync(targetDir, { recursive: true });
+  const dirReal = fs.realpathSync(targetDir);
+  if (dirReal !== baseReal && !dirReal.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+
+  const safe = path
+    .basename(fileName)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+/, '');
+  const name = `${Date.now()}-${safe || 'gambar.png'}`;
+  await fsp.writeFile(path.join(targetDir, name), data);
+  return { path: `gambar/${name}`, name };
+}
+
+/** Baca file (binary ok — utk gambar/PDF viewer). Guard realpath + dalam project. */
+export async function readBinaryFile(baseReal: string, relative: string): Promise<{ buffer: Buffer; mime: string }> {
+  const abs = safeResolve(baseReal, relative);
+  let real: string;
+  try {
+    real = fs.realpathSync(abs);
+  } catch {
+    throw new WorkspaceError('FILE_NOT_FOUND');
+  }
+  if (real !== baseReal && !real.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+  const stat = await fsp.stat(real);
+  if (!stat.isFile()) throw new WorkspaceError('FILE_NOT_FOUND');
+  if (stat.size > MAX_UPLOAD_SIZE) throw new WorkspaceError('FILE_TOO_BIG');
+  const buffer = await fsp.readFile(real);
+  return { buffer, mime: guessMime(real) };
+}
 
 export class WorkspaceError extends Error {
   constructor(public code: string) {

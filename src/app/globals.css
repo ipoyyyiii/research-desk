@@ -103,6 +103,12 @@ body {
   margin: 0.8em 0;
 }
 
+.paper img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
 .paper hr {
   border: none;
   border-top: 1px solid var(--border);
