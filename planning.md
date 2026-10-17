@@ -13,7 +13,8 @@
 | Remote GitHub: `ipoyyyiii/research-desk` (push sukses) | ✅ BERES |
 | Identitas commit nyambung akun (Arrivo Arsa Mevano · `263784365+ipoyyyiii@users.noreply.github.com`) | ✅ BERES |
 | Session OpenCode + VS Code → folder research-desk | ✅ BERES |
-| Upgrade Node 18 → 24 + pnpm + scaffold app | ⏳ Fase 0 |
+| **Fase 0: Node 24.22 + pnpm 12.14 + scaffold Next.js 15.5.28 + DB + attach-folder** | ✅ **BERES** (commit `2a00117`) |
+| Fase 1: layout 3-panel + Tiptap + i18n | ⏳ berikutnya |
 
 Lingkungan mesin: Ubuntu di AWS (VS Code Remote SSH, user `ubuntu`). Akses browser app nanti via **port forwarding VS Code** (`:3000`) — tidak ada expose publik. Push git HTTPS sudah terbukti jalan (via VS Code askpass).
 

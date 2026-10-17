@@ -21,7 +21,9 @@
 - Remote: `https://github.com/ipoyyyiii/research-desk.git` (push `-u origin main` SUKSES)
 - Identity git: diset **local per repo** (user.name `Arrivo Arsa Mevano`, email noreply) — global masih kosong, machine default "Ubuntu@..." dipakai di repo lama
 - Session OpenCode sudah di-`session_move` ke `/home/ubuntu/research-desk`; user juga diarahkan membuka folder yang sama di VS Code
-- **Status: fase 0 belum mulai.** Langkah berikutnya menurut user: nyebut "gas fase 0" (Node 24 + pnpm → scaffold Next.js → fase 1 layout+editor)
+- **Status: FASE 0 BERES** (commit `2a00117`, sudah push): Node 24.22.0 + pnpm 12.14.0 · Next.js 15.5.28 (React 19.1, Tailwind 4.3.3, TS, src-dir, dev borong turbopack bind 127.0.0.1) · DB better-sqlite3 13 + Drizzle (projects, settings) di `data/app.db` · API `/api/projects` (GET list + POST attach dengan guard anti-traversal/symlink) · `/workspace` page attach + root redirect · `pnpm build` ✅ `pnpm lint` ✅ · folder demo `~/Documents/skripsi` sudah terpasang (subfolder baku dibuat)
+- **Gotcha fase 0** (biar gak kena lagi): pnpm 12 blokir postinstall native → allowlist di `pnpm-workspace.yaml` `onlyBuiltDependencies` + `pnpm approve-builds --all`; guard realpath jangan jalan sebelum mkdir (sudah difix di `src/lib/workspace/paths.ts`)
+- Langkah berikutnya: **fase 1** — 3-panel (File/Jurnal/Lib | Tiptap autosave→md | chat), topbar, focus mode, i18n id/en, shadcn init
 - ❗ `socautomation` (repo lama, `/home/ubuntu/socautomation`) = project <> lain, **JANGAN disentuh**
 
 ## 3. Topik yang dibahas dalam sesi (kronologi)
