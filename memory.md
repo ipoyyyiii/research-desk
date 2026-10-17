@@ -1,7 +1,7 @@
 # MEMORY — Riwayat & Keputusan Sesi (private context)
 
 > File memori sesi. Kalau context hilang/session baru, BACA DULU file ini + `planning.md` sebelum kerja apapun di repo ini.
-> Last updated: planning.md + memory.md sudah dibuat & di-push ke GitHub (commit `8da7fa4`). Fase 0 belum dimulai.
+> Last updated: agentmemory lokal terpasang & semua pembahasan sesi ini sudah tersimpan DI DUA tempat (file ini + agentmemory, 9 entri baseline). Fase 0 belum dimulai.
 
 ---
 
@@ -74,3 +74,13 @@
 2. **Fase 0**: nvm install 24 · corepack pnpm · scaffold Next.js+TS+Tailwind+shadcn · drizzle schema (projects/settings) · `/workspace` attach-folder flow · default folder demo
 3. Setelah itu ikut `planning.md` fase 1-4 → user setiap fase punya checklist DONE
 4. Setiap fase: commit kecil-kali kecil push ke `origin/main`
+
+## 8. agentmemory (lokal) — pipeline memori ganda
+
+User memasang **agentmemory lokal** (REST `http://localhost:3111`, data `~/.local/share/agentmemory`, zero-LLM: BM25 + MiniLM on-device + graph fusion). Sejak sesi ini:
+
+- **Setiap keputusan/pembahasan penting → wajib save di DUA tempat**: file `memory.md` ini (commit/push) **dan** agentmemory via `memory_save` (dengan concept tags spesifik biar gampang di-retrieval).
+- Sesi ini sudah di-backfill **9 entri** ke agentmemory (project identity, repo/GitHub status, AI engine decision, format dokumen, sitasi stack, beeblio reference + lisensi, REA/socautomation decisions, fase 0 status, agentmemory setup).
+- Aturan operasional (dari AGENTS.md): awal tugas → `memory_recall` dulu · keputusan/gotcha/preferensi → save segera · ❌ dilarang simpan secret · server mati → skill `memory-ops` untuk start.
+- Session ini di-rename: *"research-desk: setup repo + planning + memory"*.
+- Legacy mem0 cloud (`user_832d0ce7df56`) = arsip saja, jangan dipakai.
