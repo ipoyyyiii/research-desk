@@ -15,6 +15,7 @@
 | Session OpenCode + VS Code → folder research-desk | ✅ BERES |
 | **Fase 0: Node 24.22 + pnpm 12.14 + scaffold Next.js 15.5.28 + DB + attach-folder** | ✅ **BERES** (commit `2a00117`) |
 | **Fase 1: layout 3-panel + Tiptap autosave→md + i18n id/en + file tree** | ✅ **BERES** (commit `c307d93`) |
+| **Fase 1 polish: ribbon ala-Word + gambar (upload/paste/drop→`gambar/`, serve via `/raw`, `.md` tetap relatif) + prefs tampilan + tabel/link/align** | ✅ **BERES** (commit `ce0472a`) |
 | Fase 2: chat ↔ OpenCode (session per project, streaming, tool timeline) | ⏳ berikutnya |
 
 Lingkungan mesin: Ubuntu di AWS (VS Code Remote SSH, user `ubuntu`). Akses browser app nanti via **port forwarding VS Code** (`:3000`) — tidak ada expose publik. Push git HTTPS sudah terbukti jalan (via VS Code askpass).

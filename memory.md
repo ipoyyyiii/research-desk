@@ -88,3 +88,18 @@ User memasang **agentmemory lokal** (REST `http://localhost:3111`, data `~/.loca
 - Aturan operasional (dari AGENTS.md): awal tugas → `memory_recall` dulu · keputusan/gotcha/preferensi → save segera · ❌ dilarang simpan secret · server mati → skill `memory-ops` untuk start.
 - Session ini di-rename: *"research-desk: setup repo + planning + memory"*.
 - Legacy mem0 cloud (`user_832d0ce7df56`) = arsip saja, jangan dipakai.
+
+## 9. Fase 1 polish — editor ala-Word (commit `ce0472a`, 2026-10-17)
+
+**Konteks keputusan:** user ke loncatan komponen Word/GDocs lalu nanya "kenapa gak pake GDocs/Word beneran di dalam". Dibahas jujur:
+- Embed editor Google/Office **ditolak via header** mereka sendiri (`x-frame-options: DENY`, CSP) — bukan keterbatasan coding. API mereka = OAuth restricted scope (verifikasi bulan-bulan) / WOPI partner resmi — overkill utk 1 mahasiswa, file pindah ke cloud mereka, agent gak bisa nulis presisi.
+- **OnlyOffice** (embed self-hosted, .docx real) = escape hatch fase 6 opsional. Tradeoff: AI presisi turun (docx = ZIP berisi XML; teks dipecah jadi "runs", diff gak kebaca, risiko korup senyap). Edit presisi md = tetap standar.
+- **Keputusan: tetap jalur md (Tiptap di-polish); OnlyOffice tetap terbuka** kalau nanti mesin di-upgrade dan user masih pengen feel-Word 100%. Mesin 2GB RAM: OnlyOffice kemungkinan gak muat tanpa swap.
+
+Yang dibuat di polish:
+- `ribbon.tsx` (baru): ribbon penuh — undo/redo, gaya paragraf (Normal/BAB/H2/H3), **font family/ukuran pt/spasi baris (tampilan sisir localStorage; `.md` gak ikut simpan — formatting final otomatis saat export pandoc)**, B/I/U/S, rata kiri/tengah/kanan/justify, list 3 jenis + indent/outdent, tabel (insert + baris/kolom), tautan (modal), gambar, hr, hapus format.
+- Gambar: `POST /api/projects/[slug]/upload` → `gambar/` (max 10MB, whitelist mime, nama di-sanitize) · tampil via `GET /raw?path=` (guard) · **paste & drag-drop langsung ke editor** · `.md` menyimpan path relatif (`![alt](gambar/x.png)`), extension Image di-override `renderHTML` mapping src→URL raw (keluaran md tetap relatif).
+- Bubble menu dipringankan krn ribbon mengangkat operasi utama.
+- Styling: `.paper img { max-width:100% }`, kertas apply `fontFamily/fontSize(pt)/lineHeight` dari prefs.
+
+Gotcha build: `unsetAllFormatting` gak ada di StarterKit-only (pakai `clearNodes().unsetAllMarks()`); `TextAlign` perlu `@tiptap/extension-text-align` (terpasang). Smoke test: upload→serve `200 image/png`, guard `..%2F..%2Fetc/passwd` ditolak, roundtrip md path relatif utuh ✓. Root `bab1.md` sempat ketimpa smoke test → pulih ke stub (file asli user di `dokumen/bab1-pendahuluan.md` aman).
