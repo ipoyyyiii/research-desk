@@ -89,6 +89,30 @@ User memasang **agentmemory lokal** (REST `http://localhost:3111`, data `~/.loca
 - Session ini di-rename: *"research-desk: setup repo + planning + memory"*.
 - Legacy mem0 cloud (`user_832d0ce7df56`) = arsip saja, jangan dipakai.
 
+## 10. Fase 2 inti beres — chat AI ↔ OpenCode (commit `d3005b5`, 2026-10-17)
+
+**Arsitektur yang ketemu di lapangan (FAKTUR, bukan tebakan):**
+- OpenCode menjalankan **background service** 1 per mesin (`opencode serve --service`, PID 550850, port acak).
+- Discovery: `~/.local/state/opencode/service.json` → `{ url, password, pid, version }`.
+- Auth ke server = **Basic header** `Basic opencode:<password>` — SDK `@opencode/client@2.0.32` (persis versi CLI v2.0.32).
+- `opencode auth login openai --method chatgpt-token-sharing` = **"Sign in with ChatGPT"** (GPT Plus) — CLI nyetak URL OAuth `auth.openai.com`, nunggu callback di `127.0.0.1:<port-acak>`.
+- Event bus: `client.event.subscribe()` → `session.text.delta` (data: sessionID, assistantMessageID, ordinal, delta), `session.tool.*` (called/progress/success/failed), `session.step.*`, `session.idle`, `permission.asked` (data.id = requestId), `filesystem.changed` (data.file).
+- Prompt: `client.session.prompt({ sessionID, text, files?: [{uri: 'file://abso', name}] })` — **promise, streaming via event bus**.
+- Session per project: `session.create({ location: { directory }, agent: 'thesis', model? })`; list by `session.list({ directory, order:'desc' })`; remove pakai `{ sessionID }` (BENERAN beda key dgn create!).
+- Model gratis utk tes: provider `opencode` — glm-5.3-flash-free dll. Connected-deteksi = provider selain `opencode` ada di `provider.list()`.
+- Persona project: `<project>/.opencode/opencode.json` (agent.thesis prompt) + `AGENTS.md` — otomatis ditulis app.
+
+**Gotchas fase 2 (PENTING buat sisi depan):**
+1. `@opencode/client` event.subscribe & `Promise.withResolvers` butuh **Node 24** — jangan lupa sourcing `nvm use 24` di shell.
+2. `session.remove({ sessionID })` — BUKAN `{ id }` (typo = `Expected string starting with "ses"`).
+3. `auth.json` awal gak ada → belum connected; UI = state "Hubungkan ChatGPT".
+4. Cron/VS Code port-forward: callback OAuth redirect ke `127.0.0.1:<port>` — bila browser user nolak, butuh forward port tambahan (VS Code auto-forward kebanyakan sabar; kalau gagal, user harus pastikan link auth dibuka & dapprove).
+5. `OPENCODE_SERVER_PASSWORD` env gak dipakai usaha app (discovery file sudah ada password) — jangan bingung.
+6. Criticize test: prompt "Sebutkan satu kata doang: kopi" → jawab streaming "kopi" — pipeline End-to-End VALID.
+7. Status page: `/api/ai/status` → `{ connected:false, providers:['opencode'] }` — indikator UI CTA connect.
+
+**Yang masih hidden di fase 2 sisa:** riwayat chat loading pas buka ulang app (session export/list messages belum diwalikan), model picker manual, tab aktivitas live tiap tool detail, "tugas aktif" batching, token meter.
+
 ## 9. Fase 1 polish — editor ala-Word (commit `ce0472a`, 2026-10-17)
 
 **Konteks keputusan:** user ke loncatan komponen Word/GDocs lalu nanya "kenapa gak pake GDocs/Word beneran di dalam". Dibahas jujur:

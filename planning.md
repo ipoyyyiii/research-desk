@@ -16,7 +16,7 @@
 | **Fase 0: Node 24.22 + pnpm 12.14 + scaffold Next.js 15.5.28 + DB + attach-folder** | ✅ **BERES** (commit `2a00117`) |
 | **Fase 1: layout 3-panel + Tiptap autosave→md + i18n id/en + file tree** | ✅ **BERES** (commit `c307d93`) |
 | **Fase 1 polish: ribbon ala-Word + gambar (upload/paste/drop→`gambar/`, serve via `/raw`, `.md` tetap relatif) + prefs tampilan + tabel/link/align** | ✅ **BERES** (commit `ce0472a`) |
-| Fase 2: chat ↔ OpenCode (session per project, streaming, tool timeline, edit terbatas folder project) | ⏳ berikutnya |
+| Fase 2: chat ↔ OpenCode (session per project, streaming, tool timeline, edit terbatas folder project) | ✅ **BERES inti** (commit d3005b5) — sisa: riwayat chat persisten + model picker |
 | Fase 2.5: panel "Kemampuan AI" — toggle MCP/skills tepercaya (websearch, search_literature OpenAlex/Crossref/Semantic Scholar) | ⏳ |
 | Fase 3: jurnal/library + PDF viewer + galeri gambar (tab Gambar: browse, insert ulang, hapus) | ⏳ |
 
