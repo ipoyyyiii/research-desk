@@ -82,6 +82,28 @@
     "placeholder": "Tanya apa aja soal bab kamu… (aktif di fase 2)",
     "comingSoon": "Fase 2: chat streaming + tool timeline nyambung ke OpenCode."
   },
+  "ai": {
+    "chat": "Chat",
+    "activity": "Aktivitas",
+    "send": "Kirim",
+    "placeholder": "Tanya apa aja soal bab ini…",
+    "connect": "Hubungkan ChatGPT",
+    "connectHint": "Hubungkan ChatGPT lewat OpenCode dulu, abis itu chat di sini jalan.",
+    "connected": "Terhubung",
+    "disconnected": "Belum sambung",
+    "typing": "Ngetik…",
+    "contextFile": "konteks: {file}",
+    "empty": "Belum ada pesan. Mulai tanya apa aja soal bab kamu ✍️",
+    "startSession": "Mulai sesi",
+    "sessionReady": "Sesi siap",
+    "error": "Waduh, ada yang gagal. Coba lagi ya.",
+    "activityEmpty": "Belum ada aktivitas tool.",
+    "waitingAuth": "Buka link ini di browser kamu buat login:",
+    "waitingAuthHint": "Login dulu di sana, halaman ini berhenti sendiri pas udah nempel. Jangan tutup.",
+    "permissionAsk": "Agent minta izin:",
+    "permissionAllow": "Izinkan sekali",
+    "permissionReject": "Tolak"
+  },
   "newDoc": {
     "label": "Judul dokumen baru",
     "placeholder": "mis. Pendahuluan",

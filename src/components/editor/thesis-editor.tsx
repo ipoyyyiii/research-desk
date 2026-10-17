@@ -165,6 +165,42 @@ function EditorSurface({
     };
   }, [editor, slug]);
 
+  // Agent mengubah file → refetch (hidup: file yang sama, gak lagi berhas edit)
+  useEffect(() => {
+    const onAgentChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ file?: string }>).detail;
+      const changed = detail?.file ?? '';
+      if (!changed) return;
+      // event server biasanya path absolut; cocokkan ekornya
+      if (!changed.endsWith(filePath)) return;
+      if (status !== 'clean') return; // user lagi ngetik → jangan timpah
+      let cancelled = false;
+      const refetch = async () => {
+        try {
+          const res = await fetch(
+            `/api/projects/${encodeURIComponent(slug)}/file?path=${encodeURIComponent(filePath)}`,
+          );
+          const data = await res.json();
+          if (cancelled || !res.ok || !editor) return;
+          const md = (data.content ?? '') as string;
+          const current = editor.getMarkdown();
+          if (md === current) return;
+          editor.commands.setContent(md, { emitUpdate: false });
+          setStatus('clean');
+          setWords(countWords(editor));
+        } catch {
+          // diamkan — autosave nanti
+        }
+      };
+      void refetch();
+      return () => {
+        cancelled = true;
+      };
+    };
+    window.addEventListener('workspace:agent-change', onAgentChange);
+    return () => window.removeEventListener('workspace:agent-change', onAgentChange);
+  }, [editor, slug, filePath, status]);
+
   const save = useCallback(async () => {
     if (!editor || editor.isDestroyed) return;
     const md = editor.getMarkdown();

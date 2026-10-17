@@ -1,3 +1,7 @@
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@opencode/client@2.0.32'
+  - '@opencode/protocol@2.0.32'
+  - '@opencode/schema@2.0.32'

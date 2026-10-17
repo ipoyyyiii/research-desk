@@ -82,6 +82,28 @@
     "placeholder": "Ask anything about your chapters… (live in phase 2)",
     "comingSoon": "Phase 2: streaming chat + tool timeline wired to OpenCode."
   },
+  "ai": {
+    "chat": "Chat",
+    "activity": "Activity",
+    "send": "Send",
+    "placeholder": "Ask anything about this chapter…",
+    "connect": "Connect ChatGPT",
+    "connectHint": "Connect ChatGPT via OpenCode first — chat will work after that.",
+    "connected": "Connected",
+    "disconnected": "Not connected",
+    "typing": "Typing…",
+    "contextFile": "context: {file}",
+    "empty": "No messages yet. Ask anything about your chapter ✍️",
+    "startSession": "Start session",
+    "sessionReady": "Session ready",
+    "error": "Oops, something failed. Try again.",
+    "activityEmpty": "No tool activity yet.",
+    "waitingAuth": "Open this link in your browser to sign in:",
+    "waitingAuthHint": "Sign in there; this page stops waiting automatically once connected. Keep it open.",
+    "permissionAsk": "Agent is asking permission:",
+    "permissionAllow": "Allow once",
+    "permissionReject": "Reject"
+  },
   "newDoc": {
     "label": "New document title",
     "placeholder": "e.g. Introduction",

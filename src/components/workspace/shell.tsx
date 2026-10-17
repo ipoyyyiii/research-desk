@@ -20,10 +20,13 @@ export function WorkspaceShell({
   const [focusMode, setFocusMode] = useState(false);
   const [treeVersion, setTreeVersion] = useState(0);
 
-  // Esc = focus mode (sembunyikan panel samping)
+  // Esc = focus mode (sembunyikan panel samping). Jangan ke-toggle pas lagi ngetik di chat/form.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented) setFocusMode((v) => !v);
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable === true;
+      if (event.key === 'Escape' && !event.defaultPrevented && !typing) setFocusMode((v) => !v);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -80,7 +83,7 @@ export function WorkspaceShell({
             <>
               <Separator className="w-1 bg-neutral-200 transition-colors hover:bg-blue-400 dark:bg-neutral-800" />
               <Panel id="right" defaultSize="27" minSize="18" maxSize="42" className="min-w-0">
-                <ChatPanel />
+                <ChatPanel slug={slug} projectTitle={projectName} activeFilePath={openFile} />
               </Panel>
             </>
           )}
