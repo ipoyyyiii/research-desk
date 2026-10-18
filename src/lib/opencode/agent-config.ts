@@ -83,11 +83,26 @@ export function ensureProjectAgentConfig(
     const dir = path.join(folderPath, '.opencode');
     fs.mkdirSync(dir, { recursive: true });
 
-    const config = {
-      $schema: 'https://opencode.ai/config.json',
-      'research-desk': { capabilities: caps },
-      agent: {
-        thesis: {
+    // Baca config existing dulu — app CUMA pegang $schema, research-desk, dan
+    // agent.thesis. Semua key lain (mcp, skills, plugins, provider, dsb.) yang
+    // ditulis manual/user/instaler HARUS kejaga — jangan full-replace.
+    const configPath = path.join(dir, 'opencode.json');
+    let previous: Record<string, unknown> = {};
+    try {
+      previous = JSON.parse(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>;
+    } catch {
+      previous = {};
+    }
+
+    const config: Record<string, unknown> = { ...previous };
+    config['$schema'] = 'https://opencode.ai/config.json';
+    config['research-desk'] = {
+      ...((previous['research-desk'] as Record<string, unknown> | undefined) ?? {}),
+      capabilities: caps,
+    };
+    config.agent = {
+      ...((previous.agent as Record<string, unknown> | undefined) ?? {}),
+      thesis: {
           description: 'Asisten penulis skripsi — baca/tulis berkas project, cari jurnal, pasang sitasi',
           prompt:
             'Kamu "Thesis", asisten penulis skripsi di aplikasi research-desk. ' +
@@ -107,10 +122,9 @@ export function ensureProjectAgentConfig(
           // websearch ngikutin toggle panel Kemampuan AI (explicit true/false).
           tools: { question: false, websearch: caps.websearch },
         },
-      },
-    };
+      };
 
-    fs.writeFileSync(path.join(dir, 'opencode.json'), JSON.stringify(config, null, 2), 'utf8');
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
 
     // AGENTS.md = instruksi level project. Blok "Kemampuan AI" DITIMPA idempotent
     // (marker start/end), konten lain di luar marker tetap utuh.
