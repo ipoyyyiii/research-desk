@@ -7,6 +7,47 @@ import { LeftPanel } from '@/components/panels/left-panel';
 import { CenterPanel } from '@/components/panels/center-panel';
 import { ChatPanel } from '@/components/panels/chat-panel';
 
+// ── State tab panel tengah (sumber kebenaran satu-satunya) ───────────────────
+
+export type CenterTab =
+  | { id: string; kind: 'file'; path: string; version: number }
+  | { id: string; kind: 'web'; url: string };
+
+interface CenterState {
+  tabs: CenterTab[];
+  activeId: string | null;
+}
+
+// Tab file ID-nya path (unik per file); tab web pakai counter modul biar ID
+// stabil & deterministik (double-invoke updater Strict Mode gak konkuren).
+let webTabSeq = 0;
+const fileTabId = (path: string) => `file:${path}`;
+
+/** Buka file di tab: sudah ada → activate + bump version (remount editor); belum → tab baru. */
+function openFileTabState(prev: CenterState, path: string): CenterState {
+  const id = fileTabId(path);
+  const exists = prev.tabs.some((tab) => tab.kind === 'file' && tab.path === path);
+  if (!exists) {
+    return { tabs: [...prev.tabs, { id, kind: 'file' as const, path, version: 0 }], activeId: id };
+  }
+  return {
+    tabs: prev.tabs.map((tab) =>
+      tab.id === id && tab.kind === 'file' ? { ...tab, version: tab.version + 1 } : tab,
+    ),
+    activeId: id,
+  };
+}
+
+/** Tutup tab; kalau tab aktif yang ditutup → activate tetangganya (kanan, fallback kiri). */
+function closeTabState(prev: CenterState, id: string): CenterState {
+  const closedIndex = prev.tabs.findIndex((tab) => tab.id === id);
+  if (closedIndex === -1) return prev;
+  const tabs = prev.tabs.filter((tab) => tab.id !== id);
+  if (prev.activeId !== id) return { tabs, activeId: prev.activeId };
+  const next = tabs[closedIndex] ?? tabs[closedIndex - 1] ?? null;
+  return { tabs, activeId: next ? next.id : null };
+}
+
 export function WorkspaceShell({
   slug,
   projectName,
@@ -14,11 +55,13 @@ export function WorkspaceShell({
   slug: string;
   projectName: string;
 }) {
-  const [openFile, setOpenFile] = useState<string | null>(null);
-  // Tambah versi biar editor reload kalau file yang sama dibuka ulang (mis. hasil buat dokumen baru)
-  const [openVersion, setOpenVersion] = useState(0);
+  const [center, setCenter] = useState<CenterState>({ tabs: [], activeId: null });
   const [focusMode, setFocusMode] = useState(false);
   const [treeVersion, setTreeVersion] = useState(0);
+
+  // Path tab file yang aktif — dipakai LeftPanel (highlight) & ChatPanel (konteks).
+  const activeTab = center.tabs.find((tab) => tab.id === center.activeId) ?? null;
+  const openFile = activeTab?.kind === 'file' ? activeTab.path : null;
 
   // Catat project ini sebagai yang terakhir dibuka — dipakai /workspace auto-redirect.
   useEffect(() => {
@@ -43,15 +86,39 @@ export function WorkspaceShell({
 
   const refreshTree = () => setTreeVersion((v) => v + 1);
 
-  const handleDocumentCreated = (path: string) => {
-    refreshTree();
-    setOpenFile(path);
-    setOpenVersion((v) => v + 1);
+  const openFileTab = (path: string) => setCenter((prev) => openFileTabState(prev, path));
+  const activateTab = (id: string) => setCenter((prev) => ({ ...prev, activeId: id }));
+  const closeTab = (id: string) => setCenter((prev) => closeTabState(prev, id));
+
+  const newWebTab = () => {
+    const id = `web-${++webTabSeq}`;
+    setCenter((prev) => ({ tabs: [...prev.tabs, { id, kind: 'web' as const, url: '' }], activeId: id }));
   };
 
+  const setWebUrl = (id: string, url: string) =>
+    setCenter((prev) => ({
+      ...prev,
+      tabs: prev.tabs.map((tab) => (tab.id === id && tab.kind === 'web' ? { ...tab, url } : tab)),
+    }));
+
+  // Dokumen baru dari TopBar tree yang di-refresh + SELALU buka tab (kalau tab
+  // path itu sudah ada → bump version, editor remount dan fetch konten baru).
+  const handleDocumentCreated = (path: string) => {
+    refreshTree();
+    openFileTab(path);
+  };
+
+  // Kontrak LeftPanel cuma kasih wasOpen (file terhapus = tab file yang aktif
+  // sekarang), jadi yang bisa ditutup itu tab aktif saja — tab non-aktif yang
+  // ternyata buka file sama gak terdeteksi dari param ini.
   const handleDeleteFile = (wasOpen: boolean) => {
     refreshTree();
-    if (wasOpen) setOpenFile(null);
+    if (!wasOpen) return;
+    setCenter((prev) => {
+      const active = prev.tabs.find((tab) => tab.id === prev.activeId);
+      if (!active || active.kind !== 'file') return prev;
+      return closeTabState(prev, active.id);
+    });
   };
 
   return (
@@ -73,10 +140,7 @@ export function WorkspaceShell({
                   slug={slug}
                   treeVersion={treeVersion}
                   openFile={openFile}
-                  onOpenFile={(filePath) => {
-                    setOpenFile(filePath);
-                    setOpenVersion((v) => v + 1);
-                  }}
+                  onOpenFile={openFileTab}
                   onFileDeleted={handleDeleteFile}
                 />
               </Panel>
@@ -85,7 +149,15 @@ export function WorkspaceShell({
           )}
 
           <Panel id="center" minSize="30" className="min-w-0">
-            <CenterPanel slug={slug} openFile={openFile} openVersion={openVersion} />
+            <CenterPanel
+              slug={slug}
+              tabs={center.tabs}
+              activeId={center.activeId}
+              onActivate={activateTab}
+              onClose={closeTab}
+              onNewWeb={newWebTab}
+              onWebUrl={setWebUrl}
+            />
           </Panel>
 
           {!focusMode && (

@@ -237,5 +237,16 @@
     "attach": "Pasang folder",
     "attaching": "Memasang…",
     "attachHint": "Subfolder baku (dokumen/, gambar/, referensi/papers/, export/) dibuat otomatis kalau belum ada. File lama tidak disentuh."
+  },
+  "center": {
+    "webPlaceholder": "Ketik alamat web — mis. arxiv.org/abs/…",
+    "webGo": "Buka",
+    "webEmpty": "Masukkan alamat lalu tekan Enter.",
+    "openExternal": "Buka di tab browser",
+    "closeTab": "Tutup tab",
+    "newWeb": "Tab web",
+    "workspaceFile": "Berkas workspace",
+    "webPage": "Halaman web",
+    "blockedHint": "Banyak situs (Google, Scholar, dsb.) larang tampil dalam frame — pakai tombol ↗ kalau blank."
   }
 }

@@ -237,5 +237,16 @@
     "attach": "Attach folder",
     "attaching": "Attaching…",
     "attachHint": "Standard subfolders (dokumen/, gambar/, referensi/papers/, export/) are created automatically if missing. Existing files are untouched."
+  },
+  "center": {
+    "webPlaceholder": "Type a web address — e.g. arxiv.org/abs/…",
+    "webGo": "Go",
+    "webEmpty": "Enter an address then press Enter.",
+    "openExternal": "Open in browser tab",
+    "closeTab": "Close tab",
+    "newWeb": "Web tab",
+    "workspaceFile": "Workspace file",
+    "webPage": "Web page",
+    "blockedHint": "Many sites (Google, Scholar, etc.) refuse in-frame display — use the ↗ button if blank."
   }
 }
