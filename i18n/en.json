@@ -132,7 +132,13 @@
     "activityReadEdit": "Read/Edit",
     "activityRun": "Run",
     "activitySteps": "{n} steps",
-    "usageTokens": "Tokens"
+    "usageTokens": "Tokens",
+    "capabilities": "AI capabilities",
+    "capWebsearch": "Web search",
+    "capWebsearchDesc": "Lets the agent use the websearch tool for current facts (with sources).",
+    "capLiterature": "Journal search",
+    "capLiteratureDesc": "Lets the agent call OpenAlex/Crossref/Semantic Scholar APIs — shows title, authors, year, DOI, citations.",
+    "capabilitiesNote": "Applies from the next chat turn. Stored in project config (.opencode), not in the cloud."
   },
   "newDoc": {
     "label": "New document title",

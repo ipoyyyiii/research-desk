@@ -67,6 +67,7 @@ export function AgentView({
   const [currentModel, setCurrentModel] = useState<ModelEntryView | null>(null);
   const [providerPicks, setProviderPicks] = useState<ProviderPickView[]>([]);
   const [usage, setUsage] = useState<{ input: number; output: number } | null>(null);
+  const [capabilities, setCapabilities] = useState<{ websearch: boolean; literature: boolean } | null>(null);
 
   const sessionRef = useRef<string | null>(null);
   const assistantRef = useRef<string | null>(null); // assistantMessageID aktif
@@ -347,6 +348,54 @@ export function AgentView({
     [pushSystem, refreshProviders, refreshModels],
   );
 
+  // ── panel Kemampuan AI (fase 2.5): toggle websearch/jurnal ───────────────────
+  const refreshCapabilities = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai/capabilities?slug=${encodeURIComponent(slug)}`);
+      const data = (await res.json()) as { websearch?: boolean; literature?: boolean };
+      setCapabilities({ websearch: Boolean(data.websearch), literature: Boolean(data.literature) });
+    } catch {
+      setCapabilities(null);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    void refreshCapabilities();
+  }, [refreshCapabilities]);
+
+  const toggleCapability = useCallback(
+    (key: 'websearch' | 'literature', enabled: boolean) => {
+      setCapabilities((prev) => ({ websearch: false, literature: false, ...prev, [key]: enabled }));
+      void (async () => {
+        try {
+          const res = await fetch('/api/ai/capabilities', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug, [key]: enabled }),
+          });
+          const data = (await res.json()) as { websearch?: boolean; literature?: boolean; error?: string };
+          if (data.error) {
+            pushSystem(`Gagal nyimpan kemampuan: ${data.error}`);
+          } else {
+            setCapabilities({ websearch: Boolean(data.websearch), literature: Boolean(data.literature) });
+            pushSystem(
+              enabled
+                ? key === 'websearch'
+                  ? 'Web search nyala — agent bisa pakai tool websearch.'
+                  : 'Pencarian jurnal nyala — agent boleh manggil API OpenAlex/Crossref/Semantic Scholar.'
+                : key === 'websearch'
+                  ? 'Web search mati.'
+                  : 'Pencarian jurnal mati.',
+            );
+          }
+        } catch {
+          pushSystem('Gagal nyimpan kemampuan.');
+        }
+      })();
+    },
+    [slug, pushSystem],
+  );
+
   // ── ensure session per project + buka stream (JALAN TANPA LOGIN — model gratis) ──
   useEffect(() => {
     let cancelled = false;
@@ -576,6 +625,8 @@ export function AgentView({
         currentModel={currentModel}
         onSelectModel={(model) => void selectModel(model)}
         usage={usage}
+        capabilities={capabilities}
+        onToggleCapability={toggleCapability}
         providerPicks={providerPicks}
         onProviderConnect={(integrationID, key) => connectProvider(integrationID, key)}
         onProviderDisconnect={(integrationID) => disconnectProvider(integrationID)}

@@ -14,14 +14,78 @@ import { listTree, type TreeEntry } from '@/lib/workspace/files';
 
 export type { TreeEntry };
 
-/** Tulis ulang persona/permissions project (idempotent, dipanggil saat ensure session). */
-export function ensureProjectAgentConfig(folderPath: string): void {
+/** Toggles kemampuan per project (disimpan di opencode.json, bukan DB — ini config agent). */
+export type AgentCapabilities = { websearch: boolean; literature: boolean };
+
+const CAPS_DEFAULT: AgentCapabilities = { websearch: false, literature: false };
+
+/** Baca toggles dari opencode.json existing (aman kalau file belum ada). */
+export function readProjectCapabilities(folderPath: string): AgentCapabilities {
   try {
+    const file = path.join(folderPath, '.opencode', 'opencode.json');
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+      agent?: { thesis?: { tools?: Record<string, boolean> } };
+      'research-desk'?: { capabilities?: Partial<AgentCapabilities> };
+    };
+    const caps = parsed['research-desk']?.capabilities ?? {};
+    return {
+      websearch: caps.websearch ?? parsed.agent?.thesis?.tools?.websearch ?? CAPS_DEFAULT.websearch,
+      literature: caps.literature ?? CAPS_DEFAULT.literature,
+    };
+  } catch {
+    return { ...CAPS_DEFAULT };
+  }
+}
+
+/** Blok kemampuan dikelola app di AGENTS.md (antara marker ini, boleh ditimpa). */
+function capabilitiesBlock(caps: AgentCapabilities): string[] {
+  const head = '<!-- research-desk:capabilities:start -->';
+  const tail = '<!-- research-desk:capabilities:end -->';
+  const lines: string[] = [head, '## Kemampuan AI (dikelola research-desk)'];
+  if (caps.literature) {
+    lines.push(
+      '- **Pencarian jurnal AKTIF.** Pakai tool shell/execute untuk HTTP GET ke API publik:',
+      '  - OpenAlex: `https://api.openalex.org/works?search=<kata-kunci>&per-page=5`',
+      '  - Crossref: `https://api.crossref.org/works?query=<kata-kunci>&rows=5`',
+      '  - Semantic Scholar: `https://api.semanticscholar.org/graph/v1/paper/search?fields=title,authors,year,externalIds,citationCount,abstract&query=<kata-kunci>`',
+      '  - WAJIB sebut: judul, penulis, tahun, DOI, jumlah sitasi. JANGAN mengarang metadata; kalau data gak ada, bilang gak ada.',
+      '  - Kalau ada abstrak, BACA dulu baru rekomendasiin (jangan asal judul).',
+    );
+  } else {
+    lines.push(
+      '- **Pencarian jurnal MATI.** Kalau user minta nyari jurnal, bilang bahwa fitur itu belum dinyalakan dan sarankan menyalakannya di panel "Kemampuan AI" (ikon slider di header chat). JANGAN manggil API jurnal.',
+    );
+  }
+  if (caps.websearch) {
+    lines.push(
+      '- **Web search AKTIF.** Tool `websearch` boleh dipakai buat fakta umum terkini. Sertakan sumber/URL di jawaban.',
+    );
+  } else {
+    lines.push('- **Web search MATI.** Jangan pakai tool `websearch`.');
+  }
+  lines.push(tail);
+  return lines;
+}
+
+/** Tulis ulang persona/permissions project (idempotent, dipanggil saat ensure session). */
+export function ensureProjectAgentConfig(
+  folderPath: string,
+  capsInput?: Partial<AgentCapabilities>,
+): AgentCapabilities {
+  try {
+    // Toggles: param (dari UI) > file existing > default. Merge biar gak ada yang balik default diam-diam.
+    const existing = readProjectCapabilities(folderPath);
+    const caps: AgentCapabilities = {
+      websearch: capsInput?.websearch ?? existing.websearch,
+      literature: capsInput?.literature ?? existing.literature,
+    };
+
     const dir = path.join(folderPath, '.opencode');
     fs.mkdirSync(dir, { recursive: true });
 
     const config = {
       $schema: 'https://opencode.ai/config.json',
+      'research-desk': { capabilities: caps },
       agent: {
         thesis: {
           description: 'Asisten penulis skripsi — baca/tulis berkas project, cari jurnal, pasang sitasi',
@@ -32,18 +96,22 @@ export function ensureProjectAgentConfig(folderPath: string): void {
             '(2) Untuk merevisi isi dokumen, edit file markdown di folder dokumen/ secara konservatif (replace terhadap teks yang ada, bukan tulis ulang seluruh bab) dan sebut nama file yang kamu ubah. ' +
             '(3) Sebelum menambah jurnal, tampilkan singkat: judul, penulis, tahun, DOI, jumlah sitasi — jangan asal comot. ' +
             '(4) Kamu boleh membaca/mengubah berkas di dalam folder project ini saja. ' +
-            '(5) Jawab singkat dan terstruktur; kalau konteks dari dossier tidak jelas, tanyakan lewat TEKS jawaban biasa — tool `question` sudah DIMATIKAN karena app belum bisa menjawabnya (bikin turn gantung selamanya).',
+            '(5) Jawab singkat dan terstruktur; kalau konteks dari dossier tidak jelas, tanyakan lewat TEKS jawaban biasa — tool `question` sudah DIMATIKAN karena app belum bisa menjawabnya (bikin turn gantung selamanya). ' +
+            'Kemampuan web/jurnal ikuti blok "Kemampuan AI" di AGENTS.md — kalau dimatikan, jangan coba-coba.',
+          // Tool `question` gak boleh dipakai: app chat gak punya mekanisme jawab
+          // → turn nge-gantung + semua prompt berikut ngantre (kasus nyata 2026-10-18).
+          // websearch ngikutin toggle panel Kemampuan AI (explicit true/false).
+          tools: { question: false, websearch: caps.websearch },
         },
-        // Tool `question` gak boleh dipakai: app chat gak punya mekanisme jawab
-        // → turn nge-gantung + semua prompt berikut ngantre (kasus nyata 2026-10-18).
-        tools: { question: false },
       },
     };
 
     fs.writeFileSync(path.join(dir, 'opencode.json'), JSON.stringify(config, null, 2), 'utf8');
 
-    // AGENTS.md = instruksi level project (dibaca opencode saat start di folder itu)
+    // AGENTS.md = instruksi level project. Blok "Kemampuan AI" DITIMPA idempotent
+    // (marker start/end), konten lain di luar marker tetap utuh.
     const agentsDoc = path.join(folderPath, 'AGENTS.md');
+    const block = capabilitiesBlock(caps).join('\n');
     if (!fs.existsSync(agentsDoc)) {
       fs.writeFileSync(
         agentsDoc,
@@ -54,12 +122,28 @@ export function ensureProjectAgentConfig(folderPath: string): void {
           'Gunakan agent "thesis" untuk konsultasi, revisi isi, dan sitasi.',
           'Jangan mengubah file di luar folder project. Jangan menjalankan perintah shell.',
           '',
+          block,
+          '',
         ].join('\n'),
         'utf8',
       );
+    } else {
+      const raw = fs.readFileSync(agentsDoc, 'utf8');
+      const start = raw.indexOf('<!-- research-desk:capabilities:start -->');
+      const end = raw.indexOf('<!-- research-desk:capabilities:end -->');
+      let next: string;
+      if (start >= 0 && end > start) {
+        next = raw.slice(0, start) + block + raw.slice(end + '<!-- research-desk:capabilities:end -->'.length);
+      } else {
+        next = raw.trimEnd() + '\n\n' + block + '\n';
+      }
+      fs.writeFileSync(agentsDoc, next, 'utf8');
     }
+    return caps;
   } catch (error) {
     console.error('[agent-config] gagal menulis config:', error);
+    // Gagal nulis → balikin state yang paling akurat: file existing atau default.
+    return readProjectCapabilities(folderPath);
   }
 }
 

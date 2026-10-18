@@ -132,7 +132,13 @@
     "activityReadEdit": "Baca/Edit",
     "activityRun": "Jalankan",
     "activitySteps": "{n} langkah",
-    "usageTokens": "Token"
+    "usageTokens": "Token",
+    "capabilities": "Kemampuan AI",
+    "capWebsearch": "Web search",
+    "capWebsearchDesc": "Agent boleh pakai tool websearch buat fakta terkini (sertakan sumber).",
+    "capLiterature": "Pencarian jurnal",
+    "capLiteratureDesc": "Agent boleh manggil API OpenAlex/Crossref/Semantic Scholar — tampil judul, penulis, tahun, DOI, sitasi.",
+    "capabilitiesNote": "Dipakai agent mulai chat berikutnya. Disimpan di config project (.opencode), bukan cloud."
   },
   "newDoc": {
     "label": "Judul dokumen baru",

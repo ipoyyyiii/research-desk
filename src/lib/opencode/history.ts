@@ -103,6 +103,10 @@ function toolLabel(name: string, stateInput: unknown): { title: string; detail?:
       const shown = clean.length > 48 ? `${clean.slice(0, 48)}…` : clean;
       return { title: shown ? `Jalankan ${shown}` : 'Jalankan perintah', detail: shown || undefined };
     }
+    case 'websearch': {
+      const q = typeof input.query === 'string' ? input.query : '';
+      return { title: 'Cari web', detail: q || undefined };
+    }
     case 'permission':
       return { title: 'Minta izin', detail: input.description || undefined };
     case 'question': {
@@ -166,7 +170,8 @@ function tokensOf(item: RawItem): { input: number; output: number } | null {
 function mapItem(item: RawItem, index: number): HistoryMessage | null {
   const type = item?.type;
   // Type aneh (model-switched, compaction, pathway lain) dibuang — gak ada nilai UI.
-  if (type !== 'user' && type !== 'assistant' && type !== 'system') return null;
+  // 'system' ("The instructions changed…") juga internal plumbing — user gak perlu liat.
+  if (type !== 'user' && type !== 'assistant') return null;
 
   const toolEvents: HistoryToolEvent[] = [];
   if (type === 'assistant' && Array.isArray(item.content)) {
@@ -191,7 +196,6 @@ function mapItem(item: RawItem, index: number): HistoryMessage | null {
   // Pesan sakit/kosong dibuang biar gak ada bubble hampa di UI.
   const text = type === 'user' ? userDisplayText(fullTextOf(item)) : fullTextOf(item);
   if (type === 'user' && !text) return null;
-  if (type === 'system' && !text) return null;
   if (type === 'assistant' && !text && toolEvents.length === 0) return null;
 
   const model = item.model;

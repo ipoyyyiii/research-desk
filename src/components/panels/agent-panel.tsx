@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { Check, ChevronDown, FileText, SendHorizontal, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, FileText, SendHorizontal, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Button, SegmentedGroup, StatusDot } from '@/components/ui';
 
@@ -55,6 +55,9 @@ export type AgentPanelProps = {
   onProviderDisconnect: (integrationID: string) => Promise<void>;
   /** Meter token sesi (opsional — nanti di-wire agent-view); undefined → tampil "—". */
   usage?: { input: number; output: number } | null;
+  /** Kemampuan AI (fase 2.5): toggle websearch/jurnal; null = belum ke-load. */
+  capabilities: { websearch: boolean; literature: boolean } | null;
+  onToggleCapability: (key: 'websearch' | 'literature', enabled: boolean) => void;
 };
 
 const TOOL_DOT_TONE: Record<ChatToolEvent['status'], 'green' | 'amber' | 'red'> = {
@@ -192,18 +195,33 @@ export function AgentPanel({
   onProviderConnect,
   onProviderDisconnect,
   usage,
+  capabilities,
+  onToggleCapability,
 }: AgentPanelProps) {
   const t = useT();
   const [activeTab, setActiveTab] = useState<'chat' | 'activity'>('chat');
   const [draft, setDraft] = useState('');
   const [modelOpen, setModelOpen] = useState(false);
+  /** Popover Kemampuan AI (fase 2.5). */
+  const [capsOpen, setCapsOpen] = useState(false);
   /** Filter chip di tab Aktivitas (dipertahankan saat pindah-pindah tab). */
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
   /** Integrasi yang lagi dibuka form input key-nya (id, atau null). */
   const [keyOpenId, setKeyOpenId] = useState<string | null>(null);
   const [keyDraft, setKeyDraft] = useState('');
   const pickerRef = useRef<HTMLDivElement>(null);
+  const capsRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Popover kemampuan ikut ketutup pas klik di luar-nya.
+  useEffect(() => {
+    if (!capsOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (capsRef.current && !capsRef.current.contains(event.target as Node)) setCapsOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [capsOpen]);
 
   // Dropdown model ketutup kalau klik di luar-nya.
   useEffect(() => {
@@ -398,6 +416,60 @@ export function AgentPanel({
               )}
               <p className="border-t border-neutral-100 px-2 py-1.5 text-[10px] leading-snug text-neutral-400 dark:border-neutral-800">
                 {t('ai.providersNote')}
+              </p>
+            </div>
+          )}
+        </div>
+        <div ref={capsRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setCapsOpen((v) => !v)}
+            className={`flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10px] transition-colors ${
+              capsOpen
+                ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
+                : 'border-neutral-200 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'
+            }`}
+            title={t('ai.capabilities')}
+          >
+            <SlidersHorizontal size={11} />
+          </button>
+          {capsOpen && (
+            <div className="absolute right-0 top-8 z-40 w-64 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+              <p className="px-2 py-1 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+                {t('ai.capabilities')}
+              </p>
+              {(
+                [
+                  { key: 'websearch', title: t('ai.capWebsearch'), desc: t('ai.capWebsearchDesc') },
+                  { key: 'literature', title: t('ai.capLiterature'), desc: t('ai.capLiteratureDesc') },
+                ] as const
+              ).map((item) => {
+                const on = capabilities?.[item.key] ?? false;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => onToggleCapability(item.key, !on)}
+                    className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    <span
+                      className={`mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full px-0.5 transition-colors ${
+                        on ? 'bg-blue-600 justify-end' : 'bg-neutral-300 justify-start dark:bg-neutral-700'
+                      }`}
+                    >
+                      <span className="h-3 w-3 rounded-full bg-white" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[11px] font-medium text-neutral-700 dark:text-neutral-200">
+                        {item.title}
+                      </span>
+                      <span className="block text-[10px] leading-snug text-neutral-400">{item.desc}</span>
+                    </span>
+                  </button>
+                );
+              })}
+              <p className="border-t border-neutral-100 px-2 py-1.5 text-[10px] leading-snug text-neutral-400 dark:border-neutral-800">
+                {t('ai.capabilitiesNote')}
               </p>
             </div>
           )}

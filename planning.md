@@ -17,7 +17,7 @@
 | **Fase 1: layout 3-panel + Tiptap autosave→md + i18n id/en + file tree** | ✅ **BERES** (commit `c307d93`) |
 | **Fase 1 polish: ribbon ala-Word + gambar (upload/paste/drop→`gambar/`, serve via `/raw`, `.md` tetap relatif) + prefs tampilan + tabel/link/align** | ✅ **BERES** (commit `ce0472a`) |
 | Fase 2: chat ↔ OpenCode (session per project, streaming, tool timeline, edit terbatas folder project) | ✅ **BERES (commit `6e211be`)** — inti `d3005b5`, model picker `c1c79c2`, provider login `119f7cd`, sisa fase 2 (riwayat chat persisten + token meter + aktivitas kartu) `6e211be` |
-| Fase 2.5: panel "Kemampuan AI" — toggle MCP/skills tepercaya (websearch, search_literature OpenAlex/Crossref/Semantic Scholar) | ⏳ |
+| Fase 2.5: panel "Kemampuan AI" — toggle MCP/skills tepercaya (websearch, search_literature OpenAlex/Crossref/Semantic Scholar) | ✅ |
 | Fase 3: jurnal/library + PDF viewer + galeri gambar (tab Gambar: browse, insert ulang, hapus) | ⏳ |
 
 Lingkungan mesin: Ubuntu di AWS (VS Code Remote SSH, user `ubuntu`). Akses browser app nanti via **port forwarding VS Code** (`:3000`) — tidak ada expose publik. Push git HTTPS sudah terbukti jalan (via VS Code askpass).
