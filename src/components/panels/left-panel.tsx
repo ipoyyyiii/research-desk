@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, File as FileIcon, FolderClosed, FolderOpen } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Button, Modal } from '@/components/ui';
+import { JournalPanel } from '@/components/panels/journal-panel';
+import { LibraryPanel } from '@/components/panels/library-panel';
 
 type TreeEntry = {
   path: string; // relatif dari root project, selalu '/'
@@ -207,13 +209,12 @@ export function LeftPanel({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            disabled={tab !== 'file'}
-            className={`flex-1 rounded px-1.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={`flex-1 rounded px-1.5 py-1 text-xs font-medium transition-colors ${
               activeTab === tab
                 ? 'bg-neutral-200 dark:bg-neutral-700'
                 : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'
             }`}
-            title={tab !== 'file' ? 'Fase 3' : t('tabs.file')}
+            title={t(`tabs.${tab}`)}
           >
             {t(`tabs.${tab}`)}
           </button>
@@ -234,12 +235,8 @@ export function LeftPanel({
         </div>
       )}
 
-      {activeTab === 'journal' && (
-        <p className="px-3 py-4 text-xs text-neutral-400">{t('left.journalComing')}</p>
-      )}
-      {activeTab === 'library' && (
-        <p className="px-3 py-4 text-xs text-neutral-400">{t('left.libraryComing')}</p>
-      )}
+      {activeTab === 'journal' && <JournalPanel slug={slug} />}
+      {activeTab === 'library' && <LibraryPanel slug={slug} />}
 
       <Modal open={!!pendingDelete} onClose={() => setPendingDelete(null)} title={t('common.delete')}>
         <p className="text-sm">{t('tree.deleteConfirm', { name: pendingDelete?.name ?? '' })}</p>

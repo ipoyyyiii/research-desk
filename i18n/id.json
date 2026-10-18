@@ -157,6 +157,32 @@
     "journalComing": "Fase 3: pencarian jurnal (OpenAlex + Crossref) muncul di sini.",
     "libraryComing": "Fase 3-4: daftar referensi.bib + PDF viewer muncul di sini."
   },
+  "journal": {
+    "searchPlaceholder": "cari jurnal — topik, judul, penulis…",
+    "sort": "urut",
+    "sortRelevance": "relevansi",
+    "sortCitations": "sitasi terbanyak",
+    "sortYear": "terbaru",
+    "searchHint": "Ketik topik lalu tekan Enter — hasil dikumpulkan dari OpenAlex, Crossref, dan Semantic Scholar.",
+    "save": "Simpan",
+    "savedChip": "tersimpan",
+    "pdf": "PDF",
+    "related": "Terelasi",
+    "loading": "mencari…",
+    "empty": "Belum ada hasil.",
+    "error": "Gagal mengambil hasil — coba lagi.",
+    "sources": "Sumber aktif",
+    "abstract": "abstrak",
+    "search": "Cari"
+  },
+  "library": {
+    "title": "Jurnal tersimpan",
+    "count": "jurnal",
+    "remove": "Buang",
+    "deleted": "Dibuang — entri BibTeX ikut dibersih dari references.bib",
+    "empty": "Belum ada jurnal tersimpan. Cari dulu di tab Jurnal, lalu tekan Simpan.",
+    "refresh": "Muat ulang"
+  },
   "api": {
     "invalidRequest": "Data tidak valid",
     "fileOutsideProject": "File di luar folder project",

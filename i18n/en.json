@@ -157,6 +157,32 @@
     "journalComing": "Phase 3: journal search (OpenAlex + Crossref) shows up here.",
     "libraryComing": "Phase 3-4: references.bib list + PDF viewer show up here."
   },
+  "journal": {
+    "searchPlaceholder": "search journals — topic, title, author…",
+    "sort": "sort",
+    "sortRelevance": "relevance",
+    "sortCitations": "most cited",
+    "sortYear": "newest",
+    "searchHint": "Type a topic and press Enter — results are aggregated from OpenAlex, Crossref, and Semantic Scholar.",
+    "save": "Save",
+    "savedChip": "saved",
+    "pdf": "PDF",
+    "related": "Related",
+    "loading": "searching…",
+    "empty": "No results yet.",
+    "error": "Failed to fetch results — try again.",
+    "sources": "Active sources",
+    "abstract": "Abstract",
+    "search": "Search"
+  },
+  "library": {
+    "title": "Saved journals",
+    "count": "papers",
+    "remove": "Remove",
+    "deleted": "Removed — its BibTeX entry was cleaned from references.bib",
+    "empty": "No saved journals yet. Search in the Journals tab, then press Save.",
+    "refresh": "Refresh"
+  },
   "api": {
     "invalidRequest": "Invalid data",
     "fileOutsideProject": "File outside the project folder",
