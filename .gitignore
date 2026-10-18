@@ -47,3 +47,4 @@ next-env.d.ts
 data/
 *.db-wal
 *.db-shm
+public/wordcraft/

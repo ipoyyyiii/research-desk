@@ -11,7 +11,8 @@ import { ChatPanel } from '@/components/panels/chat-panel';
 
 export type CenterTab =
   | { id: string; kind: 'file'; path: string; version: number }
-  | { id: string; kind: 'web'; url: string };
+  | { id: string; kind: 'web'; url: string }
+  | { id: string; kind: 'word'; path: string };
 
 interface CenterState {
   tabs: CenterTab[];
@@ -36,6 +37,14 @@ function openFileTabState(prev: CenterState, path: string): CenterState {
     ),
     activeId: id,
   };
+}
+
+/** Buka file di tab Word (WordCraft): id-nya path juga — satu file = satu tab Word. */
+function openWordTabState(prev: CenterState, path: string): CenterState {
+  const id = `word:${path}`;
+  const exists = prev.tabs.some((tab) => tab.id === id);
+  if (exists) return { tabs: [...prev.tabs], activeId: id };
+  return { tabs: [...prev.tabs, { id, kind: 'word', path }], activeId: id };
 }
 
 /** Tutup tab; kalau tab aktif yang ditutup → activate tetangganya (kanan, fallback kiri). */
@@ -81,6 +90,9 @@ function parseStoredCenterState(value: string | null): CenterState | null {
     } else if (t.kind === 'web' && typeof t.url === 'string') {
       seenIds.add(t.id);
       tabs.push({ id: t.id, kind: 'web', url: t.url });
+    } else if (t.kind === 'word' && typeof t.path === 'string' && t.path !== '') {
+      seenIds.add(t.id);
+      tabs.push({ id: t.id, kind: 'word', path: t.path });
     }
   }
 
@@ -164,6 +176,7 @@ export function WorkspaceShell({
   const refreshTree = () => setTreeVersion((v) => v + 1);
 
   const openFileTab = (path: string) => setCenter((prev) => openFileTabState(prev, path));
+  const openWordTab = (path: string) => setCenter((prev) => openWordTabState(prev, path));
   const activateTab = (id: string) => setCenter((prev) => ({ ...prev, activeId: id }));
   const closeTab = (id: string) => setCenter((prev) => closeTabState(prev, id));
 
@@ -252,6 +265,7 @@ export function WorkspaceShell({
               onNewWeb={newWebTab}
               onWebUrl={setWebUrl}
               onNewDocument={createDocumentFromTitle}
+              onOpenWord={openWordTab}
             />
           </Panel>
 

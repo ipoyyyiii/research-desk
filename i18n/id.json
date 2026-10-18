@@ -305,5 +305,18 @@
     "rule.midDot": "Judul ada \"·\"",
     "rule.titleSplit": "Judul nangkeung kalimat",
     "rule.ellipsis": "Kalimat gantung …"
+  },
+  "word": {
+    "title": "Word",
+    "loading": "Word nyala…",
+    "openBtn": "Buka di Word",
+    "thrown": "File dilempar ke Word — cek jendelanya. Gak kebuka? klik lagi atau drag manual dari panel kiri.",
+    "openFailed": "Gagal buka otomatis — drag file bab ke jendela Word, atau klik tombol ini lagi.",
+    "saveAsk": "Word nyimpen “{name}” — taro balik ke bab?",
+    "saveHint": "Word nyimpen “{name}” — cuma file .md yang bisa balik otomatis ke bab; .docx/.pdf tetep lewat menu Ekspor.",
+    "saveKeep": "Simpen ke bab",
+    "saved": "Kesimpen ✓",
+    "discard": "Buang hasil simpanan",
+    "fullPage": "Buka Word penuh di tab browser"
   }
 }

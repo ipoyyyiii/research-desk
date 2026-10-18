@@ -1,11 +1,12 @@
 'use client';
 
-import { ClipboardList, FilePlus2, Globe, Loader2, PencilRuler, Plus, Table2, X, type LucideIcon } from 'lucide-react';
+import { ClipboardList, FilePlus2, Globe, Loader2, PencilRuler, PenLine, Plus, Table2, X, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useT } from '@/lib/preferences';
 import { ThesisEditor } from '@/components/editor/thesis-editor';
 import { WebView } from '@/components/center/web-view';
 import { FileView } from '@/components/center/file-view';
+import { WordTab } from '@/components/center/word-tab';
 import { isPreviewBinary } from '@/lib/paths';
 import type { CenterTab } from '@/components/workspace/shell';
 
@@ -35,6 +36,7 @@ export function CenterPanel({
   onNewWeb,
   onWebUrl,
   onNewDocument,
+  onOpenWord,
 }: {
   slug: string;
   tabs: CenterTab[];
@@ -44,6 +46,7 @@ export function CenterPanel({
   onNewWeb: () => void;
   onWebUrl: (id: string, url: string) => void;
   onNewDocument: (title: string) => Promise<boolean>;
+  onOpenWord: (path: string) => void;
 }) {
   const active = tabs.find((tab) => tab.id === activeId) ?? null;
 
@@ -85,8 +88,9 @@ export function CenterPanel({
                 onChangeUrl={(url) => onWebUrl(active.id, url)}
               />
             )}
+            {active?.kind === 'word' && <WordTab key={`${active.id}:${active.path}`} slug={slug} path={active.path} />}
           </div>
-          <FooterBar active={active} words={active?.kind === 'file' ? wordsByPath[active.path] : undefined} />
+          <FooterBar active={active} words={active?.kind === 'file' ? wordsByPath[active.path] : undefined} onOpenWord={onOpenWord} />
         </>
       )}
     </section>
@@ -141,7 +145,7 @@ function TabBar({
         key={tab.id}
         type="button"
         onClick={() => onActivate(tab.id)}
-        title={tab.kind === 'file' ? tab.path : tab.url || undefined}
+        title={tab.kind === 'file' || tab.kind === 'word' ? tab.path : tab.url || undefined}
         className={`group flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-t-lg border-b-2 border-b-transparent px-3 transition-colors ${
           active
             ? 'border-b-primary bg-background text-card-foreground'
@@ -162,6 +166,14 @@ function TabBar({
             <Globe size={12} className="shrink-0" />
             <span className="max-w-40 truncate text-xs">
               {tab.url === '' ? t('center.newWeb') : safeHostname(tab.url)}
+            </span>
+          </>
+        ) : tab.kind === 'word' ? (
+          <>
+            <PenLine size={12} className="shrink-0 text-amber-700" />
+            <span className="max-w-40 truncate text-xs">{splitName(tab.path).name}</span>
+            <span className="shrink-0 rounded bg-amber-100 px-1 text-[9px] font-mono uppercase text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              W
             </span>
           </>
         ) : null}
@@ -311,10 +323,18 @@ function MenuItem({
 }
 
 /** Footer ala beeblio: path/label tab aktif di kiri, jenis konten di kanan (file saja). */
-function FooterBar({ active, words }: { active: CenterTab | null; words?: number }) {
+function FooterBar({
+  active,
+  words,
+  onOpenWord,
+}: {
+  active: CenterTab | null;
+  words?: number;
+  onOpenWord: (path: string) => void;
+}) {
   const t = useT();
   let left = '';
-  if (active?.kind === 'file') left = active.path;
+  if (active?.kind === 'file' || active?.kind === 'word') left = active.path;
   else if (active) left = active.url === '' ? t('center.webPage') : safeHostname(active.url);
 
   return (
@@ -325,8 +345,19 @@ function FooterBar({ active, words }: { active: CenterTab | null; words?: number
       ) : active?.kind === 'file' ? (
         <>
           {typeof words === 'number' && <span className="shrink-0 font-mono">{words} {t('center.words')}</span>}
+          <button
+            type="button"
+            onClick={() => onOpenWord(active.path)}
+            title={t('word.openBtn')}
+            className="flex shrink-0 cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-muted hover:text-amber-700"
+          >
+            <PenLine size={11} />
+            {t('word.openBtn')}
+          </button>
           <span className="shrink-0">{t('center.workspaceFile')}</span>
         </>
+      ) : active?.kind === 'word' ? (
+        <span className="shrink-0">{t('word.title')}</span>
       ) : null}
     </footer>
   );

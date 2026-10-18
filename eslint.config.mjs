@@ -19,6 +19,7 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
       "electron/**", // shell Node CommonJS — bukan kode Next (lint jalan di laptop saat dev)
+      "public/**", // aset statis (termasuk build WordCraft resmi — hasil generate, bukan kode kita)
     ],
   },
 ];

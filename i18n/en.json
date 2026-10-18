@@ -305,5 +305,18 @@
     "rule.midDot": "Title has \"·\"",
     "rule.titleSplit": "Title holds body text",
     "rule.ellipsis": "Truncated sentence …"
+  },
+  "word": {
+    "title": "Word",
+    "loading": "Word starting…",
+    "openBtn": "Open in Word",
+    "thrown": "File thrown into Word — check the pane. Not showing? click again or drag it in manually.",
+    "openFailed": "Auto-open failed — drag the chapter file into the Word pane, or click this button again.",
+    "saveAsk": "Word saved “{name}” — put it back into the chapter?",
+    "saveHint": "Word saved “{name}” — only .md files round-trip automatically; .docx/.pdf go through the Export menu.",
+    "saveKeep": "Save to chapter",
+    "saved": "Saved ✓",
+    "discard": "Discard the saved copy",
+    "fullPage": "Open full-page Word in a browser tab"
   }
 }
