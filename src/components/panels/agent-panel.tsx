@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Check, ChevronDown, FileText, SendHorizontal, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useT } from '@/lib/preferences';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Button, SegmentedGroup, StatusDot } from '@/components/ui';
 
 // Panel kanan fase 2 (pratinjau UI — belum nyambung API; wiring nyata menyusul).
@@ -143,6 +145,15 @@ function ToolRow({ event }: { event: ChatToolEvent }) {
   );
 }
 
+/** Respons AI gaya-Claude: full-width, tanpa gelembung, markdown rapi. */
+function AssistantText({ text }: { text: string }) {
+  return (
+    <div className="w-full max-w-[92%] text-[13px] leading-relaxed text-neutral-800 dark:text-neutral-100 [&_a]:break-all [&_a]:text-blue-600 [&_a]:underline dark:[&_a]:text-blue-400 [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-300 [&_blockquote]:pl-2 [&_blockquote]:text-neutral-500 dark:[&_blockquote]:border-neutral-600 [&_code]:rounded [&_code]:bg-neutral-100 [&_code]:px-1 dark:[&_code]:bg-neutral-800 [&_h1]:mt-2 [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:mt-2 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h3]:text-[13px] [&_h3]:font-medium [&_li]:my-0.5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:my-1 [&_pre]:my-1 [&_pre]:overflow-x-auto [&_pre_code]:bg-neutral-100 dark:[&_pre_code]:bg-neutral-800 [&_strong]:font-semibold [&_table]:my-1 [&_table]:text-[11px] [&_td]:border [&_td]:border-neutral-200 [&_td]:px-1.5 [&_td]:py-0.5 [&_th]:border [&_th]:border-neutral-200 [&_th]:bg-neutral-50 [&_th]:px-1.5 [&_th]:py-0.5 [&_th]:font-medium dark:[&_td]:border-neutral-700 dark:[&_th]:border-neutral-700 dark:[&_th]:bg-neutral-800 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-4">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+    </div>
+  );
+}
+
 function MessageBubble({ message }: { message: ChatMessage }) {
   if (message.role === 'system') {
     return (
@@ -151,17 +162,20 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   }
 
   const isUser = message.role === 'user';
-  return (
-    <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-      <div
-        className={
-          isUser
-            ? 'max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-blue-600/15 px-3 py-1.5 text-[13px] leading-relaxed text-neutral-900 dark:bg-blue-400/15 dark:text-neutral-50'
-            : 'max-w-[90%] whitespace-pre-wrap break-words rounded-2xl rounded-bl-sm bg-neutral-100 px-3 py-1.5 text-[13px] leading-relaxed text-neutral-800 dark:bg-neutral-800/70 dark:text-neutral-100'
-        }
-      >
-        {message.text}
+  // User = gelembung kanan. AI = blok teks bersih full-width (tanpa gelembung,
+  // markdown di-render) gaya Claude.
+  if (isUser) {
+    return (
+      <div className="flex flex-col items-end">
+        <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-blue-600/15 px-3 py-1.5 text-[13px] leading-relaxed text-neutral-900 dark:bg-blue-400/15 dark:text-neutral-50">
+          {message.text}
+        </div>
       </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {message.text ? <AssistantText text={message.text} /> : null}
       {!isUser && (message.toolEvents?.length ?? 0) > 0 && (
         <details className="w-full">
           <summary className="cursor-pointer select-none py-0.5 text-[10px] text-neutral-400 transition-colors hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">

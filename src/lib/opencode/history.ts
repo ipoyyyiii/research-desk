@@ -221,11 +221,19 @@ export async function buildHistory(client: OpenCodeClient, sessionId: string): P
       ? ((res as { data: RawItem[] }).data)
       : [];
 
+  // Sort kronologis STABIL — context gak dijamin urut turn (kejadian nyata: prompt
+  // ngantre selepas interrupt nyamping sama balasannya → blob nyampur di UI).
+  const ordered = [...items].sort((a, b) => {
+    const at = a?.time?.created ?? Number.MAX_SAFE_INTEGER;
+    const bt = b?.time?.created ?? Number.MAX_SAFE_INTEGER;
+    return at - bt;
+  });
+
   const messages: HistoryMessage[] = [];
   let input = 0;
   let output = 0;
   let hasTokens = false;
-  items.forEach((item, index) => {
+  ordered.forEach((item, index) => {
     const mapped = mapItem(item, index);
     if (!mapped) return;
     if (mapped.tokens) {

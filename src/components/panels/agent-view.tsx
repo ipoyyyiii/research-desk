@@ -223,6 +223,18 @@ export function AgentView({
         }
       });
 
+      // Route meluluskan event 'error' (punya data). Kalau kena, turn mati → jangan
+      // biarkan indikator "ngetik" menjadi zombie selamanya.
+      es.addEventListener('error', (raw) => {
+        try {
+          const data = JSON.parse((raw as MessageEvent).data) as { message?: string } | undefined;
+          if (!data?.message) return; // kesalahan koneksi asli → EventSource coba sambungkan kembali sendiri
+          setBusy(false);
+        } catch {
+          // bukan pesan aplikasi — biarkan sambungkan kembali
+        }
+      });
+
       es.addEventListener('permission', (raw) => {
         const ev = JSON.parse((raw as MessageEvent).data) as StreamEvent;
         const data = ev.data as unknown as
