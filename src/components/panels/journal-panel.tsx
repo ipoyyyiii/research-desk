@@ -323,7 +323,16 @@ export function PaperCard({
 }
 
 /** Tab Jurnal: header pencarian + daftar hasil + aksi simpan/PDF/terelasi. */
-export function JournalPanel({ slug, pdfFiles = [] }: { slug: string; pdfFiles?: PdfRef[] }) {
+export function JournalPanel({
+  slug,
+  pdfFiles = [],
+  onOpenPdf,
+}: {
+  slug: string;
+  pdfFiles?: PdfRef[];
+  /** Klik daftar PDF → buka tab preview di panel tengah (shell). Kosong → tab browser baru. */
+  onOpenPdf?: (path: string) => void;
+}) {
   const t = useT();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('relevance');
@@ -496,16 +505,28 @@ export function JournalPanel({ slug, pdfFiles = [] }: { slug: string; pdfFiles?:
           <ul className="flex flex-col gap-0.5 py-1.5">
             {pdfFiles.map((pdf) => (
               <li key={pdf.path}>
-                <button
-                  type="button"
-                  onClick={() => window.open(rawUrl(slug, pdf.path), '_blank', 'noopener')}
-                  title={t('views.openNewTab')}
-                  className="flex w-full cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] text-foreground transition-colors hover:bg-muted"
-                >
-                  <FileText size={11} className="shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate">{pdf.name}</span>
-                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatSize(pdf.size)}</span>
-                </button>
+                <div className="flex w-full items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => (onOpenPdf ? onOpenPdf(pdf.path) : window.open(rawUrl(slug, pdf.path), '_blank', 'noopener'))}
+                    title={onOpenPdf ? t('views.openCenter') : t('views.openNewTab')}
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] text-foreground transition-colors hover:bg-muted"
+                  >
+                    <FileText size={11} className="shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate">{pdf.name}</span>
+                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatSize(pdf.size)}</span>
+                  </button>
+                  {onOpenPdf && (
+                    <button
+                      type="button"
+                      onClick={() => window.open(rawUrl(slug, pdf.path), '_blank', 'noopener')}
+                      title={t('views.openNewTab')}
+                      className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      ↗
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

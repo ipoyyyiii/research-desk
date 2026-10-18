@@ -333,7 +333,7 @@ export function LeftPanel({
           </div>
           <div className="flex min-h-0 flex-1 flex-col">
             {journalMode === 'search' ? (
-              <JournalPanel slug={slug} pdfFiles={pdfFiles} />
+              <JournalPanel slug={slug} pdfFiles={pdfFiles} onOpenPdf={onOpenFile} />
             ) : (
               <LibraryPanel slug={slug} />
             )}

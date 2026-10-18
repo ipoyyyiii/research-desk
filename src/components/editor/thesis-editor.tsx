@@ -22,6 +22,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useT } from '@/lib/preferences';
+import { Modal } from '@/components/ui';
+import { computeLineDiff, countDiff } from '@/lib/diff';
 import { Ribbon, readViewPrefs, uploadProjectImage, type ViewPrefs } from './ribbon';
 
 type SaveStatus = 'clean' | 'dirty' | 'saving' | 'error';
@@ -35,7 +37,16 @@ const SPACING_CSS: Record<string, string> = {
   '2': '2.35',
 };
 
-export function ThesisEditor({ slug, filePath }: { slug: string; filePath: string }) {
+export function ThesisEditor({
+  slug,
+  filePath,
+  onWordsChange,
+}: {
+  slug: string;
+  filePath: string;
+  /** Lapor hitungan kata (fase 5) — dipakai footer panel tengah. */
+  onWordsChange?: (words: number) => void;
+}) {
   const t = useT();
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -70,17 +81,20 @@ export function ThesisEditor({ slug, filePath }: { slug: string; filePath: strin
   if (markdown === null) {
     return <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">…</div>;
   }
-  return <EditorSurface slug={slug} filePath={filePath} initialMarkdown={markdown} />;
+  return <EditorSurface slug={slug} filePath={filePath} initialMarkdown={markdown} onWordsChange={onWordsChange} />;
 }
 
 function EditorSurface({
   slug,
   filePath,
   initialMarkdown,
+  onWordsChange,
 }: {
   slug: string;
   filePath: string;
   initialMarkdown: string;
+  /** Lapor hitungan kata ke tab tengah (footer center, fase 5). */
+  onWordsChange?: (words: number) => void;
 }) {
   const t = useT();
   const [status, setStatus] = useState<SaveStatus>('clean');
@@ -90,6 +104,19 @@ function EditorSurface({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filePathRef = useRef(filePath);
   filePathRef.current = filePath;
+
+  // Review edit agent (fase 5): konten before/after satu edit terakhir.
+  const [review, setReview] = useState<{ before: string; after: string; added: number; removed: number } | null>(null);
+  const [diffOpen, setDiffOpen] = useState(false);
+  // Callback words via ref biar gak ngeracik ulang effect tiap render parent.
+  const wordsCbRef = useRef(onWordsChange);
+  wordsCbRef.current = onWordsChange;
+
+  const publishWords = useCallback((ed: Editor) => {
+    const n = countWords(ed);
+    setWords(n);
+    wordsCbRef.current?.(n);
+  }, []);
 
   // Prefs tampilan (font/ukuran/spasi) — ke server gak ikut disimpan (md = konten).
   const [prefs, setPrefsState] = useState<ViewPrefs>(() => readViewPrefs());
@@ -150,7 +177,7 @@ function EditorSurface({
     },
     onUpdate: ({ editor }) => {
       setStatus('dirty');
-      setWords(countWords(editor));
+      publishWords(editor);
       scheduleSave();
     },
   });
@@ -186,6 +213,10 @@ function EditorSurface({
       let cancelled = false;
       const refetch = async () => {
         try {
+          if (!editor) return;
+          // Simpan tampilan user SAAT INI sebagai "before" review (fase 5) —
+          // termasuk edit belum tersimpan, supaya Tolak bisa tulis-ulang semula.
+          const before = editor.getMarkdown();
           const res = await fetch(
             `/api/projects/${encodeURIComponent(slug)}/file?path=${encodeURIComponent(filePath)}`,
           );
@@ -198,7 +229,11 @@ function EditorSurface({
           // Agent gak ngerti chip → `[@key]` mentah dari file: chip-kan lagi.
           applyCitationMarks(editor);
           setStatus('clean');
-          setWords(countWords(editor));
+          publishWords(editor);
+          if (before !== md) {
+            const stats = countDiff(before, md);
+            setReview({ before, after: md, added: stats.added, removed: stats.removed });
+          }
         } catch {
           // diamkan — autosave nanti
         }
@@ -210,7 +245,7 @@ function EditorSurface({
     };
     window.addEventListener('workspace:agent-change', onAgentChange);
     return () => window.removeEventListener('workspace:agent-change', onAgentChange);
-  }, [editor, slug, filePath, status]);
+  }, [editor, slug, filePath, status, publishWords]);
 
   const save = useCallback(async () => {
     if (!editor || editor.isDestroyed) return;
@@ -239,6 +274,31 @@ function EditorSurface({
     timerRef.current = setTimeout(() => void save(), AUTOSAVE_DELAY_MS);
   }, [save]);
 
+  // Review fase 5 — Tolak: tulis-ulang isi "before" (termasuk edit user yang belum tersimpan).
+  const rejectReview = useCallback(async () => {
+    if (!review || !editor || editor.isDestroyed) return;
+    const { before, after, added, removed } = review;
+    setReview(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/file`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePathRef.current, content: before }),
+      });
+      if (!res.ok) {
+        setStatus('error');
+        setReview({ before, after, added, removed });
+        return;
+      }
+      editor.commands.setContent(before, { emitUpdate: false });
+      applyCitationMarks(editor);
+      publishWords(editor);
+      setStatus('clean');
+    } catch {
+      setStatus('error');
+    }
+  }, [review, editor, slug, publishWords]);
+
   // ⌘S / Ctrl+S = simpan sekarang
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -253,11 +313,11 @@ function EditorSurface({
   }, [save]);
 
   useEffect(() => {
-    if (editor) setWords(countWords(editor));
+    if (editor) publishWords(editor);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [editor]);
+  }, [editor, publishWords]);
 
   if (!editor) return null;
 
@@ -268,6 +328,39 @@ function EditorSurface({
         <p className="shrink-0 bg-red-50 px-3 py-1 text-[11px] text-red-600 dark:bg-red-950/40">
           {t('toolbar.uploadFailed')}: {imgError}
         </p>
+      )}
+      {/* Banner review edit agent (fase 5) — muncul pas agent nulis file ini. */}
+      {review && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-300 bg-amber-50 px-3 py-1 text-[11px] text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+          <Sparkles size={12} className="shrink-0" />
+          <span className="font-medium">{t('review.title')}</span>
+          <span className="font-mono text-[10px]">
+            <span className="text-green-700 dark:text-green-400">+{review.added}</span>{' '}
+            <span className="text-red-700 dark:text-red-400">−{review.removed}</span>
+          </span>
+          <span className="min-w-2 flex-1" />
+          <button
+            type="button"
+            onClick={() => setDiffOpen(true)}
+            className="cursor-pointer rounded border border-amber-300 px-1.5 py-0.5 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/50"
+          >
+            {t('review.openDiff')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void rejectReview()}
+            className="cursor-pointer rounded border border-amber-300 px-1.5 py-0.5 font-medium transition-colors hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/50"
+          >
+            {t('review.reject')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setReview(null)}
+            className="cursor-pointer rounded px-1.5 py-0.5 transition-colors hover:bg-amber-100 dark:hover:bg-amber-900/50"
+          >
+            {t('review.keep')}
+          </button>
+        </div>
       )}
       <SelectionBubbleMenu editor={editor} />
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -288,6 +381,34 @@ function EditorSurface({
         </span>
         <SaveStatusLabel status={status} lastSavedAt={lastSavedAt} />
       </footer>
+
+      {/* Diff review (fase 5): baris hijau=masuk, merah=kelaar. */}
+      <Modal open={diffOpen} onClose={() => setDiffOpen(false)} title={t('review.openDiff')} wide>
+        {review && (
+          <>
+            <p className="mb-3 text-[11px] text-muted-foreground">{t('review.rejectHint')}</p>
+            <div className="max-h-[55vh] overflow-y-auto rounded-md border border-border bg-muted/40 font-mono text-[11px] leading-4">
+              {computeLineDiff(review.before, review.after).map((row, index) => (
+                <div
+                  key={`${row.type}:${index}`}
+                  className={
+                    row.type === 'add'
+                      ? 'bg-green-50 px-3 py-px text-green-800 dark:bg-green-950/40 dark:text-green-300'
+                      : row.type === 'del'
+                        ? 'bg-red-50 px-3 py-px text-red-800 dark:bg-red-950/40 dark:text-red-300'
+                        : 'px-3 py-px text-muted-foreground'
+                  }
+                >
+                  <span className="inline-block w-4 shrink-0 select-none">
+                    {row.type === 'add' ? '+' : row.type === 'del' ? '−' : ' '}
+                  </span>
+                  <span className="whitespace-pre-wrap break-words">{row.text || ' '}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

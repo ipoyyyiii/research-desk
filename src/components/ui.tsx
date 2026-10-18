@@ -53,11 +53,14 @@ export function Modal({
   onClose,
   title,
   children,
+  wide,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Lebar 'lg' buat konten lebar (diff review, tabel). Default 'sm' (max-w-md). */
+  wide?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -79,7 +82,7 @@ export function Modal({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div ref={ref} className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
+      <div ref={ref} className={`${wide ? 'w-full max-w-3xl' : 'w-full max-w-md'} max-h-[85vh] overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-700 dark:bg-neutral-900`}>
         <h2 className="mb-4 text-base font-semibold">{title}</h2>
         {children}
       </div>

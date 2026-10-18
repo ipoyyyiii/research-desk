@@ -218,7 +218,8 @@
     "emptyDrafts": "No drafts yet — create one with the + button above.",
     "emptyFigures": "No images yet — drop PNG/JPG into the folder, or ask the AI to make a visual.",
     "emptyData": "No data files yet (CSV/Excel/JSON).",
-    "openNewTab": "Open in new tab"
+    "openNewTab": "Open in new tab",
+    "openCenter": "Open in center tab"
   },
   "err": {
     "server": "Failed to reach the server",
@@ -269,6 +270,15 @@
     "itemSurvey": "Survey form",
     "itemMatrix": "Literature matrix",
     "soon": "Coming soon",
-    "electronHint": "Full browser inside the tab (real Chromium in the desktop app). Logins like Google work normally."
+    "electronHint": "Full browser inside the tab (real Chromium in the desktop app). Logins like Google work normally.",
+    "words": "words"
+  },
+  "review": {
+    "title": "The agent changed this file",
+    "openDiff": "View changes",
+    "reject": "Reject",
+    "keep": "Keep",
+    "rejectHint": "Reject overwrites the previous content back to the file.",
+    "loading": "Loading…"
   }
 }

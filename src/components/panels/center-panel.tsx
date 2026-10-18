@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { useT } from '@/lib/preferences';
 import { ThesisEditor } from '@/components/editor/thesis-editor';
 import { WebView } from '@/components/center/web-view';
+import { FileView } from '@/components/center/file-view';
+import { isPreviewBinary } from '@/lib/paths';
 import type { CenterTab } from '@/components/workspace/shell';
 
 /** Nama file tanpa ekstensi + ekstensi — ekstensi jadi badge tipe ala beeblio (MD/BIB/PDF…). */
@@ -45,6 +47,9 @@ export function CenterPanel({
 }) {
   const active = tabs.find((tab) => tab.id === activeId) ?? null;
 
+  // Hitungan kata per-path buat footer (ThesisEditor lapor via onWordsChange).
+  const [wordsByPath, setWordsByPath] = useState<Record<string, number>>({});
+
   return (
     <section className="flex h-full min-w-0 flex-col bg-muted/50">
       {tabs.length === 0 ? (
@@ -60,9 +65,19 @@ export function CenterPanel({
             onNewDocument={onNewDocument}
           />
           <div className="flex min-h-0 flex-1 text-foreground">
-            {active?.kind === 'file' && (
-              <ThesisEditor key={`${active.path}:${active.version}`} slug={slug} filePath={active.path} />
-            )}
+            {active?.kind === 'file' &&
+              (isPreviewBinary(active.path) ? (
+                <FileView key={`${active.path}:${active.version}`} slug={slug} path={active.path} />
+              ) : (
+                <ThesisEditor
+                  key={`${active.path}:${active.version}`}
+                  slug={slug}
+                  filePath={active.path}
+                  onWordsChange={(n) =>
+                    setWordsByPath((prev) => (prev[active.path] === n ? prev : { ...prev, [active.path]: n }))
+                  }
+                />
+              ))}
             {active?.kind === 'web' && (
               <WebView
                 key={active.id}
@@ -71,7 +86,7 @@ export function CenterPanel({
               />
             )}
           </div>
-          <FooterBar active={active} />
+          <FooterBar active={active} words={active?.kind === 'file' ? wordsByPath[active.path] : undefined} />
         </>
       )}
     </section>
@@ -296,7 +311,7 @@ function MenuItem({
 }
 
 /** Footer ala beeblio: path/label tab aktif di kiri, jenis konten di kanan (file saja). */
-function FooterBar({ active }: { active: CenterTab | null }) {
+function FooterBar({ active, words }: { active: CenterTab | null; words?: number }) {
   const t = useT();
   let left = '';
   if (active?.kind === 'file') left = active.path;
@@ -305,7 +320,14 @@ function FooterBar({ active }: { active: CenterTab | null }) {
   return (
     <footer className="flex h-7 shrink-0 items-center justify-between gap-3 border-t border-border bg-card px-3 text-[11px] text-muted-foreground">
       <span className="min-w-0 flex-1 truncate font-mono">{left}</span>
-      {active?.kind === 'file' && <span className="shrink-0">{t('center.workspaceFile')}</span>}
+      {active?.kind === 'file' && isPreviewBinary(active.path) ? (
+        <span className="shrink-0 font-mono uppercase">{active.path.slice(active.path.lastIndexOf('.') + 1)}</span>
+      ) : active?.kind === 'file' ? (
+        <>
+          {typeof words === 'number' && <span className="shrink-0 font-mono">{words} {t('center.words')}</span>}
+          <span className="shrink-0">{t('center.workspaceFile')}</span>
+        </>
+      ) : null}
     </footer>
   );
 }

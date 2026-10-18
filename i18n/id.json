@@ -218,7 +218,8 @@
     "emptyDrafts": "Belum ada draf — buat dari tombol + di atas.",
     "emptyFigures": "Belum ada gambar — seret PNG/JPG ke folder, atau minta AI membuat visualisasi.",
     "emptyData": "Belum ada berkas data (CSV/Excel/JSON).",
-    "openNewTab": "Buka di tab baru"
+    "openNewTab": "Buka di tab baru",
+    "openCenter": "Buka di tab tengah"
   },
   "err": {
     "server": "Gagal terhubung ke server",
@@ -269,6 +270,15 @@
     "itemSurvey": "Form survei",
     "itemMatrix": "Matriks literatur",
     "soon": "Segera",
-    "electronHint": "Browser penuh di dalam tab (Chromium asli di app desktop). Login Google dsb jalan normal."
+    "electronHint": "Browser penuh di dalam tab (Chromium asli di app desktop). Login Google dsb jalan normal.",
+    "words": "kata"
+  },
+  "review": {
+    "title": "Agent mengubah file ini",
+    "openDiff": "Lihat perubahan",
+    "reject": "Tolak",
+    "keep": "Pakai",
+    "rejectHint": "Tolak menulis-ulang isi sebelumnya ke file.",
+    "loading": "Memuat…"
   }
 }
