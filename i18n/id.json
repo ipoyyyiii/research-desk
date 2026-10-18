@@ -127,7 +127,12 @@
     "providerDisconnectConfirm": "Putus {name}? Model dari provider ini gak bisa dipakai lagi sampai login lagi.",
     "providerKeyPlaceholder": "Paste API key di sini",
     "providerSave": "Simpan",
-    "providerKeyHint": "Key disimpan server lokal OpenCode (bukan di app). Key salah baru ketahuan pas pertama ngechat — tinggal Ganti key."
+    "providerKeyHint": "Key disimpan server lokal OpenCode (bukan di app). Key salah baru ketahuan pas pertama ngechat — tinggal Ganti key.",
+    "activityAll": "Semua",
+    "activityReadEdit": "Baca/Edit",
+    "activityRun": "Jalankan",
+    "activitySteps": "{n} langkah",
+    "usageTokens": "Token"
   },
   "newDoc": {
     "label": "Judul dokumen baru",

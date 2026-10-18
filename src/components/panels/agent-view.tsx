@@ -66,6 +66,7 @@ export function AgentView({
   const [models, setModels] = useState<ModelGroupView[]>([]);
   const [currentModel, setCurrentModel] = useState<ModelEntryView | null>(null);
   const [providerPicks, setProviderPicks] = useState<ProviderPickView[]>([]);
+  const [usage, setUsage] = useState<{ input: number; output: number } | null>(null);
 
   const sessionRef = useRef<string | null>(null);
   const assistantRef = useRef<string | null>(null); // assistantMessageID aktif
@@ -74,6 +75,69 @@ export function AgentView({
   const pushSystem = useCallback((text: string) => {
     setMessages((prev) => [...prev, { id: uid(), role: 'system', text }]);
   }, []);
+
+  // ── riwayat chat persisten + meter token (fase 2 sisa) ──────────────────────
+  // Riwayat di-load sekali saat panel kebuka; live SSE nyusul menimpa state sama.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/ai/messages?slug=${encodeURIComponent(slug)}`);
+        const data = (await res.json()) as {
+          messages?: Array<{
+            id: string;
+            role: 'user' | 'assistant' | 'system';
+            text: string;
+            toolEvents?: Array<{ id: string; title: string; detail?: string; status: string }>;
+            createdAt?: number;
+          }>;
+        };
+        if (cancelled) return;
+        // Multi-step agent = beberapa item assistant server-side; UI livestream
+        // menampilkan SATU bubble. Jadi item assistant berurutan digabung di sini
+        // (teks join, toolEvents concat) biar riwayat = bentuk live.
+        const history: ChatMessage[] = [];
+        for (const m of data.messages ?? []) {
+          const events = (m.toolEvents ?? []).filter(
+            (t): t is { id: string; title: string; detail?: string; status: 'running' | 'done' | 'error' } =>
+              (t.status === 'running' || t.status === 'done' || t.status === 'error') && Boolean(t.title),
+          );
+          const last = history[history.length - 1];
+          if (m.role === 'assistant' && last?.role === 'assistant') {
+            history[history.length - 1] = {
+              ...last,
+              text: [last.text, m.text].filter(Boolean).join('\n\n'),
+              toolEvents: [...(last.toolEvents ?? []), ...events],
+            };
+            continue;
+          }
+          history.push({ id: m.id, role: m.role, text: m.text, toolEvents: events });
+        }
+        // Gak nerobos obrolan yang udah jalan — cuma isi kalau masih kosong.
+        setMessages((prev) => (prev.length > 0 ? prev : history));
+      } catch {
+        // riwayat gagal → mulai kosong, bukan error keras.
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  const refreshUsage = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai/usage?slug=${encodeURIComponent(slug)}`);
+      const data = (await res.json()) as { tokens?: { input: number; output: number } | null };
+      setUsage(data.tokens ?? null);
+    } catch {
+      setUsage(null);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    void refreshUsage();
+  }, [refreshUsage]);
 
   // ── status awal ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -151,6 +215,7 @@ export function AgentView({
             break;
           case 'session.idle':
             setBusy(false);
+            void refreshUsage();
             break;
           default:
             break;
@@ -182,7 +247,7 @@ export function AgentView({
 
       esRef.current = es;
     },
-    [],
+    [refreshUsage],
   );
 
   // ── daftar model + pilihan tersimpan (refresh pas connect berubah) ───────────
@@ -510,6 +575,7 @@ export function AgentView({
         models={models}
         currentModel={currentModel}
         onSelectModel={(model) => void selectModel(model)}
+        usage={usage}
         providerPicks={providerPicks}
         onProviderConnect={(integrationID, key) => connectProvider(integrationID, key)}
         onProviderDisconnect={(integrationID) => disconnectProvider(integrationID)}

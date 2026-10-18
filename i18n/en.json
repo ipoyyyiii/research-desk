@@ -127,7 +127,12 @@
     "providerDisconnectConfirm": "Disconnect {name}? Its models stay unavailable until you sign in again.",
     "providerKeyPlaceholder": "Paste API key here",
     "providerSave": "Save",
-    "providerKeyHint": "Key is stored by the local OpenCode server (not by this app). A wrong key only fails on your first chat — just replace it."
+    "providerKeyHint": "Key is stored by the local OpenCode server (not by this app). A wrong key only fails on your first chat — just replace it.",
+    "activityAll": "All",
+    "activityReadEdit": "Read/Edit",
+    "activityRun": "Run",
+    "activitySteps": "{n} steps",
+    "usageTokens": "Tokens"
   },
   "newDoc": {
     "label": "New document title",
