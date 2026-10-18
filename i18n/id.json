@@ -116,7 +116,18 @@
     "models": "Model AI",
     "autoModel": "Otomatis",
     "modelsEmpty": "Belum ada model tersedia",
-    "providersNote": "Provider lain (Anthropic, OpenRouter, dll.): nyusul di fase 2.5 — login provider bisa via `opencode auth login openrouter` di terminal."
+    "providersNote": "ChatGPT login via banner di atas. Provider lain di atas ini pakai API key masing-masing, daftarnya di situs provider.",
+    "providersLogin": "Login pakai API key",
+    "providerConnected": "Sudah tersambung",
+    "providerNotConnected": "Belum tersambung",
+    "providerConnect": "Sambungkan",
+    "providerReplace": "Ganti key",
+    "providerCancel": "Batal",
+    "providerDisconnect": "Putus",
+    "providerDisconnectConfirm": "Putus {name}? Model dari provider ini gak bisa dipakai lagi sampai login lagi.",
+    "providerKeyPlaceholder": "Paste API key di sini",
+    "providerSave": "Simpan",
+    "providerKeyHint": "Key disimpan server lokal OpenCode (bukan di app). Key salah baru ketahuan pas pertama ngechat — tinggal Ganti key."
   },
   "newDoc": {
     "label": "Judul dokumen baru",

@@ -7,6 +7,7 @@ import {
   type ChatToolEvent,
   type ModelEntryView,
   type ModelGroupView,
+  type ProviderPickView,
 } from '@/components/panels/agent-panel';
 import { Button } from '@/components/ui';
 import { useT } from '@/lib/preferences';
@@ -64,6 +65,7 @@ export function AgentView({
   const [permission, setPermission] = useState<PermissionCard | null>(null);
   const [models, setModels] = useState<ModelGroupView[]>([]);
   const [currentModel, setCurrentModel] = useState<ModelEntryView | null>(null);
+  const [providerPicks, setProviderPicks] = useState<ProviderPickView[]>([]);
 
   const sessionRef = useRef<string | null>(null);
   const assistantRef = useRef<string | null>(null); // assistantMessageID aktif
@@ -220,6 +222,64 @@ export function AgentView({
       }
     },
     [pushSystem],
+  );
+
+  // ── daftar integrasi popular + login/putus API key ───────────────────────────
+  const refreshProviders = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/providers');
+      const data = (await res.json()) as { picks?: ProviderPickView[] };
+      setProviderPicks(data.picks ?? []);
+    } catch {
+      setProviderPicks([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshProviders();
+  }, [refreshProviders]);
+
+  const connectProvider = useCallback(
+    async (integrationID: string, key: string) => {
+      try {
+        const res = await fetch('/api/ai/providers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ integrationID, key }),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (data.error) {
+          pushSystem(`Gagal nyambung ${integrationID}: ${data.error}`);
+        } else {
+          pushSystem(
+            `${integrationID} nyambung — modelnya udah bisa dipilih di daftar atas. Catatan: kalau key salah, error baru kelihatan pas pertama ngechat.`,
+          );
+        }
+      } catch {
+        pushSystem(`Gagal nyambung ${integrationID}.`);
+      }
+      void refreshProviders();
+      void refreshModels();
+    },
+    [pushSystem, refreshProviders, refreshModels],
+  );
+
+  const disconnectProvider = useCallback(
+    async (integrationID: string) => {
+      try {
+        await fetch('/api/ai/providers', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ integrationID }),
+        });
+        pushSystem(`${integrationID} diputus.`);
+      } catch {
+        pushSystem(`Gagal memutus ${integrationID}.`);
+      }
+      void refreshProviders();
+      void refreshModels();
+    },
+    [pushSystem, refreshProviders, refreshModels],
   );
 
   // ── ensure session per project + buka stream (JALAN TANPA LOGIN — model gratis) ──
@@ -450,6 +510,9 @@ export function AgentView({
         models={models}
         currentModel={currentModel}
         onSelectModel={(model) => void selectModel(model)}
+        providerPicks={providerPicks}
+        onProviderConnect={(integrationID, key) => connectProvider(integrationID, key)}
+        onProviderDisconnect={(integrationID) => disconnectProvider(integrationID)}
       />
 
       {/* Kartu izin (agent minta akses) */}

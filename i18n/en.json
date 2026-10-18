@@ -116,7 +116,18 @@
     "models": "AI model",
     "autoModel": "Auto",
     "modelsEmpty": "No models available yet",
-    "providersNote": "Other providers (Anthropic, OpenRouter, etc.): coming in phase 2.5 — provider sign-in via `opencode auth login openrouter` in a terminal."
+    "providersNote": "ChatGPT signs in via the banner above. Other providers above use their own API keys — get one from each provider site.",
+    "providersLogin": "Sign in with API key",
+    "providerConnected": "Connected",
+    "providerNotConnected": "Not connected",
+    "providerConnect": "Connect",
+    "providerReplace": "Replace key",
+    "providerCancel": "Cancel",
+    "providerDisconnect": "Disconnect",
+    "providerDisconnectConfirm": "Disconnect {name}? Its models stay unavailable until you sign in again.",
+    "providerKeyPlaceholder": "Paste API key here",
+    "providerSave": "Save",
+    "providerKeyHint": "Key is stored by the local OpenCode server (not by this app). A wrong key only fails on your first chat — just replace it."
   },
   "newDoc": {
     "label": "New document title",
