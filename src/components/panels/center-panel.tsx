@@ -37,6 +37,7 @@ export function CenterPanel({
   onWebUrl,
   onNewDocument,
   onOpenWord,
+  onOpenText,
 }: {
   slug: string;
   tabs: CenterTab[];
@@ -47,6 +48,7 @@ export function CenterPanel({
   onWebUrl: (id: string, url: string) => void;
   onNewDocument: (title: string) => Promise<boolean>;
   onOpenWord: (path: string) => void;
+  onOpenText: (path: string) => void;
 }) {
   const active = tabs.find((tab) => tab.id === activeId) ?? null;
 
@@ -88,7 +90,15 @@ export function CenterPanel({
                 onChangeUrl={(url) => onWebUrl(active.id, url)}
               />
             )}
-            {active?.kind === 'word' && <WordTab key={`${active.id}:${active.path}`} slug={slug} path={active.path} />}
+            {active?.kind === 'word' && (
+              <WordTab
+                key={`${active.id}:${active.path}`}
+                slug={slug}
+                path={active.path}
+                version={active.version}
+                onOpenText={onOpenText}
+              />
+            )}
           </div>
           <FooterBar active={active} words={active?.kind === 'file' ? wordsByPath[active.path] : undefined} onOpenWord={onOpenWord} />
         </>

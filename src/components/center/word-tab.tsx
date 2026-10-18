@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ExternalLink, Loader2, PenLine, TriangleAlert, Upload, X } from 'lucide-react';
+import { ExternalLink, FileText, Loader2, PenLine, TriangleAlert, Upload, X } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Button } from '@/components/ui';
 
@@ -79,7 +79,17 @@ const HOOK_SOURCE = `
  * di iframe same-origin. File bab dilempar ke dalam via drop sintetis; hasil
  * Save diintip dari anchor-download lalu diminta disimpen balik ke file bab.
  */
-export function WordTab({ slug, path }: { slug: string; path: string }) {
+export function WordTab({
+  slug,
+  path,
+  version,
+  onOpenText,
+}: {
+  slug: string;
+  path: string;
+  version: number;
+  onOpenText: (path: string) => void;
+}) {
   const t = useT();
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const [booted, setBooted] = useState(false);
@@ -159,6 +169,17 @@ export function WordTab({ slug, path }: { slug: string; path: string }) {
     }
   }, [slug, path, fileName, booted]);
 
+  // Auto-lempar: tab dibuka / file diklik lagi → begitu Word siap, file langsung dilempar.
+  // version naik tiap klik file (shell) → lempar ulang; manual-throw user tetap bisa via tombol.
+  const queuedThrow = useRef(true);
+  useEffect(() => {
+    queuedThrow.current = true;
+    if (booted) {
+      queuedThrow.current = false;
+      void throwFile();
+    }
+  }, [version, booted, throwFile]);
+
   // Simpan balik bytes hasil Word ke file bab (khusus .md — format lain via menu Ekspor).
   const keepSave = useCallback(async () => {
     if (!pending || saving) return;
@@ -206,6 +227,15 @@ export function WordTab({ slug, path }: { slug: string; path: string }) {
         >
           <ExternalLink size={13} />
         </a>
+        <Button
+          variant="ghost"
+          className="h-7 shrink-0 px-2 text-[11px]"
+          title={t('word.textEditor')}
+          onClick={() => onOpenText(path)}
+        >
+          <FileText size={12} className="mr-1" />
+          {t('word.textEditor')}
+        </Button>
         <Button
           variant="default"
           className="h-7 shrink-0 px-2.5 text-[11px]"

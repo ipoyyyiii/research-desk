@@ -317,6 +317,7 @@
     "saveKeep": "Save to chapter",
     "saved": "Saved ✓",
     "discard": "Discard the saved copy",
-    "fullPage": "Open full-page Word in a browser tab"
+    "fullPage": "Open full-page Word in a browser tab",
+    "textEditor": "Text editor"
   }
 }

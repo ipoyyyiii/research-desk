@@ -12,7 +12,7 @@ import { ChatPanel } from '@/components/panels/chat-panel';
 export type CenterTab =
   | { id: string; kind: 'file'; path: string; version: number }
   | { id: string; kind: 'web'; url: string }
-  | { id: string; kind: 'word'; path: string };
+  | { id: string; kind: 'word'; path: string; version: number };
 
 interface CenterState {
   tabs: CenterTab[];
@@ -39,12 +39,16 @@ function openFileTabState(prev: CenterState, path: string): CenterState {
   };
 }
 
-/** Buka file di tab Word (WordCraft): id-nya path juga — satu file = satu tab Word. */
+/** Buka file di tab Word (WordCraft): version naik tiap buka → sinyal auto-lempar ulang. */
 function openWordTabState(prev: CenterState, path: string): CenterState {
   const id = `word:${path}`;
   const exists = prev.tabs.some((tab) => tab.id === id);
-  if (exists) return { tabs: [...prev.tabs], activeId: id };
-  return { tabs: [...prev.tabs, { id, kind: 'word', path }], activeId: id };
+  const tabs = exists
+    ? prev.tabs.map((tab) =>
+        tab.id === id && tab.kind === 'word' ? { ...tab, version: tab.version + 1 } : tab,
+      )
+    : [...prev.tabs, { id, kind: 'word' as const, path, version: 0 }];
+  return { tabs, activeId: id };
 }
 
 /** Tutup tab; kalau tab aktif yang ditutup → activate tetangganya (kanan, fallback kiri). */
@@ -92,7 +96,12 @@ function parseStoredCenterState(value: string | null): CenterState | null {
       tabs.push({ id: t.id, kind: 'web', url: t.url });
     } else if (t.kind === 'word' && typeof t.path === 'string' && t.path !== '') {
       seenIds.add(t.id);
-      tabs.push({ id: t.id, kind: 'word', path: t.path });
+      tabs.push({
+        id: t.id,
+        kind: 'word',
+        path: t.path,
+        version: typeof t.version === 'number' && Number.isFinite(t.version) ? t.version : 0,
+      });
     }
   }
 
@@ -118,7 +127,7 @@ export function WorkspaceShell({
 
   // Path tab file yang aktif — dipakai LeftPanel (highlight) & ChatPanel (konteks).
   const activeTab = center.tabs.find((tab) => tab.id === center.activeId) ?? null;
-  const openFile = activeTab?.kind === 'file' ? activeTab.path : null;
+  const openFile = activeTab && activeTab.kind !== 'web' ? activeTab.path : null;
 
   // Persist tab panel tengah ke localStorage per project — biar gak hilang pas
   // refresh. Restore pas mount (bukan useState initializer) biar render pertama
@@ -177,6 +186,11 @@ export function WorkspaceShell({
 
   const openFileTab = (path: string) => setCenter((prev) => openFileTabState(prev, path));
   const openWordTab = (path: string) => setCenter((prev) => openWordTabState(prev, path));
+  /** Klik dokumen: .md langsung ke tab Word; ekstensi lain tetap tab file biasa. */
+  const openDocument = (path: string) =>
+    setCenter((prev) =>
+      path.toLowerCase().endsWith('.md') ? openWordTabState(prev, path) : openFileTabState(prev, path),
+    );
   const activateTab = (id: string) => setCenter((prev) => ({ ...prev, activeId: id }));
   const closeTab = (id: string) => setCenter((prev) => closeTabState(prev, id));
 
@@ -247,7 +261,7 @@ export function WorkspaceShell({
                   slug={slug}
                   treeVersion={treeVersion}
                   openFile={openFile}
-                  onOpenFile={openFileTab}
+                  onOpenFile={openDocument}
                   onFileDeleted={handleDeleteFile}
                 />
               </Panel>
@@ -266,6 +280,7 @@ export function WorkspaceShell({
               onWebUrl={setWebUrl}
               onNewDocument={createDocumentFromTitle}
               onOpenWord={openWordTab}
+              onOpenText={openFileTab}
             />
           </Panel>
 
