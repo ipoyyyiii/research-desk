@@ -1,7 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AgentPanel, type ChatMessage, type ChatToolEvent } from '@/components/panels/agent-panel';
+import {
+  AgentPanel,
+  type ChatMessage,
+  type ChatToolEvent,
+  type ModelEntryView,
+  type ModelGroupView,
+} from '@/components/panels/agent-panel';
 import { Button } from '@/components/ui';
 import { useT } from '@/lib/preferences';
 
@@ -56,6 +62,8 @@ export function AgentView({
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [permission, setPermission] = useState<PermissionCard | null>(null);
+  const [models, setModels] = useState<ModelGroupView[]>([]);
+  const [currentModel, setCurrentModel] = useState<ModelEntryView | null>(null);
 
   const sessionRef = useRef<string | null>(null);
   const assistantRef = useRef<string | null>(null); // assistantMessageID aktif
@@ -173,6 +181,45 @@ export function AgentView({
       esRef.current = es;
     },
     [],
+  );
+
+  // ── daftar model + pilihan tersimpan (refresh pas connect berubah) ───────────
+  const refreshModels = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/models');
+      const data = (await res.json()) as {
+        groups?: ModelGroupView[];
+        override?: { providerID: string; modelID: string; name: string } | null;
+      };
+      setModels(data.groups ?? []);
+      setCurrentModel(data.override ?? null);
+    } catch {
+      setModels([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshModels();
+  }, [refreshModels, connected]);
+
+  const selectModel = useCallback(
+    async (model: ModelEntryView) => {
+      setCurrentModel({ providerID: model.providerID, modelID: model.modelID, name: model.name });
+      try {
+        await fetch('/api/ai/models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            providerID: model.providerID,
+            modelID: model.modelID,
+            sessionId: sessionRef.current,
+          }),
+        });
+      } catch {
+        pushSystem('Gagal mengganti model.');
+      }
+    },
+    [pushSystem],
   );
 
   // ── ensure session per project + buka stream (JALAN TANPA LOGIN — model gratis) ──
@@ -400,6 +447,9 @@ export function AgentView({
         connected={connected ?? false}
         onConnect={() => void connect()}
         busy={busy}
+        models={models}
+        currentModel={currentModel}
+        onSelectModel={(model) => void selectModel(model)}
       />
 
       {/* Kartu izin (agent minta akses) */}

@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { FileText, SendHorizontal, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, FileText, SendHorizontal, Sparkles } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Button, SegmentedGroup, StatusDot } from '@/components/ui';
 
 // Panel kanan fase 2 (pratinjau UI — belum nyambung API; wiring nyata menyusul).
+
+export type ModelEntryView = { providerID: string; modelID: string; name: string };
+export type ModelGroupView = { providerID: string; label: string; free: boolean; models: ModelEntryView[] };
 
 export type ChatToolEvent = {
   id: string;
@@ -40,6 +43,10 @@ export type AgentPanelProps = {
   onConnect: () => void;
   /** Agent sedang mengerjakan sesuatu (tampilkan bubble "mengetik…"). */
   busy: boolean;
+  /** Model picker (fase 2): daftar model per provider + pilihan aktif. */
+  models: ModelGroupView[];
+  currentModel: ModelEntryView | null;
+  onSelectModel: (model: ModelEntryView) => void;
 };
 
 const TOOL_DOT_TONE: Record<ChatToolEvent['status'], 'green' | 'amber' | 'red'> = {
@@ -108,11 +115,26 @@ export function AgentPanel({
   connected,
   onConnect,
   busy,
+  models,
+  currentModel,
+  onSelectModel,
 }: AgentPanelProps) {
   const t = useT();
   const [activeTab, setActiveTab] = useState<'chat' | 'activity'>('chat');
   const [draft, setDraft] = useState('');
+  const [modelOpen, setModelOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Dropdown model ketutup kalau klik di luar-nya.
+  useEffect(() => {
+    if (!modelOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) setModelOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [modelOpen]);
 
   // Ganti project → draft dibersihkan (chat/session itu per project).
   useEffect(() => {
@@ -157,11 +179,61 @@ export function AgentPanel({
           onSelect={(value) => setActiveTab(value as 'chat' | 'activity')}
         />
         <span
-          className="ml-auto min-w-0 max-w-24 truncate text-[10px] text-neutral-400"
+          className="ml-auto min-w-0 max-w-20 truncate text-[10px] text-neutral-400"
           title={projectTitle}
         >
           {projectTitle}
         </span>
+        <div ref={pickerRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setModelOpen((v) => !v)}
+            className="flex items-center gap-0.5 rounded-md border border-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            title={t('ai.models')}
+          >
+            <span className="max-w-20 truncate">{currentModel?.name ?? t('ai.autoModel')}</span>
+            <ChevronDown size={11} />
+          </button>
+          {modelOpen && (
+            <div className="absolute right-0 top-8 z-40 max-h-72 w-64 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+              {models.length === 0 && (
+                <p className="px-2 py-2 text-[11px] text-neutral-400">{t('ai.modelsEmpty')}</p>
+              )}
+              {models.map((group) => (
+                <div key={group.providerID} className="mb-0.5">
+                  <p className="px-2 py-0.5 text-[9px] uppercase tracking-wide text-neutral-400">
+                    {group.label}
+                  </p>
+                  {group.models.map((model) => {
+                    const active =
+                      currentModel?.providerID === model.providerID && currentModel?.modelID === model.modelID;
+                    return (
+                      <button
+                        key={`${model.providerID}/${model.modelID}`}
+                        type="button"
+                        onClick={() => {
+                          onSelectModel(model);
+                          setModelOpen(false);
+                        }}
+                        className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] transition-colors ${
+                          active
+                            ? 'bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-200'
+                            : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800'
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{model.name}</span>
+                        {active && <Check size={11} className="shrink-0 text-blue-600 dark:text-blue-400" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+              <p className="border-t border-neutral-100 px-2 py-1.5 text-[10px] leading-snug text-neutral-400 dark:border-neutral-800">
+                {t('ai.providersNote')}
+              </p>
+            </div>
+          )}
+        </div>
         <StatusDot
           tone={connected ? 'green' : 'amber'}
           title={t(connected ? 'ai.connected' : 'ai.disconnected')}

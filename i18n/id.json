@@ -112,7 +112,11 @@
     "linkModeLabel": "Pindah ke mode tautan",
     "deviceModeLabel": "Pindah ke kode perangkat",
     "linkPortHint": "port ini harus di-forward (VS Code: panel Ports → Forward a Port), atau pindah ke kode perangkat.",
-    "freeBanner": "Chat udah jalan pakai model gratis. Hubungkan ChatGPT kalau mau pake model Plus kamu."
+    "freeBanner": "Chat udah jalan pakai model gratis. Hubungkan ChatGPT kalau mau pake model Plus kamu.",
+    "models": "Model AI",
+    "autoModel": "Otomatis",
+    "modelsEmpty": "Belum ada model tersedia",
+    "providersNote": "Provider lain (Anthropic, OpenRouter, dll.): nyusul di fase 2.5 — login provider bisa via `opencode auth login openrouter` di terminal."
   },
   "newDoc": {
     "label": "Judul dokumen baru",
