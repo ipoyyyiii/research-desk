@@ -59,10 +59,10 @@ export async function uploadProjectImage(slug: string, file: File): Promise<{ ok
   try {
     const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/upload`, { method: 'POST', body: form });
     const data = await res.json();
-    if (!res.ok) return { ok: false, error: data.error ?? 'upload gagal' };
+    if (!res.ok) return { ok: false, error: data.error ?? 'upload:server' };
     return { ok: true, path: data.document.path };
   } catch {
-    return { ok: false, error: 'Gagal terhubung ke server' };
+    return { ok: false, error: 'server' };
   }
 }
 

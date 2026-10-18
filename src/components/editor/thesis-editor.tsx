@@ -35,6 +35,7 @@ const SPACING_CSS: Record<string, string> = {
 };
 
 export function ThesisEditor({ slug, filePath }: { slug: string; filePath: string }) {
+  const t = useT();
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -48,19 +49,19 @@ export function ThesisEditor({ slug, filePath }: { slug: string; filePath: strin
         const data = await res.json();
         if (cancelled) return;
         if (!res.ok) {
-          setLoadError(data.error ?? 'Gagal membuka file');
+          setLoadError(t('err.openFile'));
           return;
         }
         setMarkdown(data.content ?? '');
       } catch {
-        if (!cancelled) setLoadError('Gagal terhubung ke server');
+        if (!cancelled) setLoadError(t('err.server'));
       }
     };
     void load();
     return () => {
       cancelled = true;
     };
-  }, [slug, filePath]);
+  }, [slug, filePath, t]);
 
   if (loadError) {
     return <div className="flex h-full items-center justify-center p-8 text-sm text-red-600">{loadError}</div>;
@@ -153,6 +154,7 @@ function EditorSurface({
     insertRef.current = async (files: File[]) => {
       for (const file of files) {
         const result = await uploadProjectImage(slug, file);
+        if (!result.ok) setImgError(result.error === 'server' || result.error === 'upload:server' ? t('err.server') : result.error);
         if (result.ok) {
           editor.chain().focus().setImage({ src: result.path }).run();
         } else {

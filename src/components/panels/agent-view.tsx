@@ -296,10 +296,10 @@ export function AgentView({
           }),
         });
       } catch {
-        pushSystem('Gagal mengganti model.');
+        pushSystem(t('err.model'));
       }
     },
-    [pushSystem],
+    [pushSystem, t],
   );
 
   // ── daftar integrasi popular + login/putus API key ───────────────────────────
@@ -401,11 +401,11 @@ export function AgentView({
             );
           }
         } catch {
-          pushSystem('Gagal nyimpan kemampuan.');
+          pushSystem(t('err.caps'));
         }
       })();
     },
-    [slug, pushSystem],
+    [slug, pushSystem, t],
   );
 
   // ── ensure session per project + buka stream (JALAN TANPA LOGIN — model gratis) ──
@@ -422,14 +422,14 @@ export function AgentView({
         const data = (await res.json()) as { sessionId?: string; error?: string };
         if (cancelled) return;
         if (!res.ok || !data.sessionId) {
-          pushSystem(`Gagal menyiapkan sesi agent: ${data.error ?? 'tidak diketahui'}`);
+          pushSystem(t('err.sessionPrep', { r: data.error ?? t('err.unknown') }));
           return;
         }
         sessionRef.current = data.sessionId;
         setSessionReady(true);
         openStream(data.sessionId);
       } catch {
-        if (!cancelled) pushSystem('Gagal terhubung ke server agent.');
+        if (!cancelled) pushSystem(t('err.agentServer'));
       }
     };
 
@@ -439,7 +439,7 @@ export function AgentView({
       esRef.current?.close();
       esRef.current = null;
     };
-  }, [slug, pushSystem, openStream]);
+  }, [slug, pushSystem, openStream, t]);
 
   const send = useCallback(
     async (text: string) => {
@@ -458,17 +458,17 @@ export function AgentView({
         });
         const data = (await res.json()) as { ok?: boolean; error?: string };
         if (!res.ok || !data.ok) {
-          pushSystem(`Agent gagal dipanggil: ${data.error ?? 'tidak diketahui'}`);
+          pushSystem(t('err.agentCall', { r: data.error ?? t('err.unknown') }));
           setBusy(false);
         }
       } catch {
-        pushSystem('Gagal terhubung ke server.');
+        pushSystem(t('err.server'));
         setBusy(false);
       } finally {
         setSending(false);
       }
     },
-    [activeFilePath, sending, slug, pushSystem],
+    [activeFilePath, sending, slug, pushSystem, t],
   );
 
   const answerPermission = useCallback(
@@ -484,10 +484,10 @@ export function AgentView({
           body: JSON.stringify({ sessionId: sessionRef.current, requestId: card.requestId, decision }),
         });
       } catch {
-        pushSystem('Gagal memproses izin.');
+        pushSystem(t('err.permission'));
       }
     },
-    [permission, pushSystem],
+    [permission, pushSystem, t],
   );
 
   const pollConnect = useCallback(() => {

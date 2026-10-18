@@ -1,14 +1,24 @@
 'use client';
 
-import { BookOpenText, Files, LibraryBig, type LucideIcon } from 'lucide-react';
+import {
+  BookOpenText,
+  Database,
+  FolderClosed,
+  Images,
+  ScrollText,
+  type LucideIcon,
+} from 'lucide-react';
 import { useT } from '@/lib/preferences';
 
-export type LeftTab = 'file' | 'journal' | 'library';
+export type LeftTab = 'drafts' | 'journals' | 'figures' | 'data' | 'files';
 
-const TABS: Array<{ id: LeftTab; icon: LucideIcon }> = [
-  { id: 'file', icon: Files },
-  { id: 'journal', icon: BookOpenText },
-  { id: 'library', icon: LibraryBig },
+// Views berbasis tujuan dulu (kiri atas), view file-manager mentah paling bawah.
+const TABS: Array<{ id: LeftTab; icon: LucideIcon; labelKey: string }> = [
+  { id: 'drafts', icon: ScrollText, labelKey: 'views.drafts' },
+  { id: 'journals', icon: BookOpenText, labelKey: 'tabs.journal' },
+  { id: 'figures', icon: Images, labelKey: 'views.figures' },
+  { id: 'data', icon: Database, labelKey: 'views.data' },
+  { id: 'files', icon: FolderClosed, labelKey: 'tabs.file' },
 ];
 
 /** Activity bar ala VS Code — strip ikon vertikal tipis di tepi kiri panel. */
@@ -16,8 +26,8 @@ export function IconRail({ active, onChange }: { active: LeftTab; onChange: (tab
   const t = useT();
   return (
     <nav className="flex w-11 flex-col items-center gap-1 border-r border-border bg-card py-2">
-      {TABS.map(({ id, icon: TabIcon }) => {
-        const label = t(`tabs.${id}`);
+      {TABS.map(({ id, icon: TabIcon, labelKey }) => {
+        const label = t(labelKey);
         return (
           <button
             key={id}

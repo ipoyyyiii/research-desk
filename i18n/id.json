@@ -186,7 +186,8 @@
     "remove": "Buang",
     "deleted": "Dibuang — entri BibTeX ikut dibersih dari references.bib",
     "empty": "Belum ada jurnal tersimpan. Cari dulu di tab Jurnal, lalu tekan Simpan.",
-    "refresh": "Muat ulang"
+    "refresh": "Muat ulang",
+    "tabSaved": "Tersimpan"
   },
   "api": {
     "invalidRequest": "Data tidak valid",
@@ -198,5 +199,43 @@
   "lib": {
     "fileCount": "{n} berkas",
     "searchPlaceholder": "Cari berkas…"
+  },
+  "views": {
+    "drafts": "Draf",
+    "figures": "Gambar",
+    "data": "Data",
+    "pdfTitle": "PDF di folder referensi",
+    "emptyDrafts": "Belum ada draf — buat dari tombol + di atas.",
+    "emptyFigures": "Belum ada gambar — seret PNG/JPG ke folder, atau minta AI membuat visualisasi.",
+    "emptyData": "Belum ada berkas data (CSV/Excel/JSON).",
+    "openNewTab": "Buka di tab baru"
+  },
+  "err": {
+    "server": "Gagal terhubung ke server",
+    "unknown": "tidak diketahui",
+    "createDoc": "Gagal membuat dokumen",
+    "createProject": "Gagal membuat project",
+    "openFile": "Gagal membuka file",
+    "model": "Gagal mengganti model.",
+    "caps": "Gagal menyimpan kemampuan.",
+    "sessionPrep": "Gagal menyiapkan sesi agent: {r}",
+    "agentCall": "Agent gagal dipanggil: {r}",
+    "agentServer": "Gagal terhubung ke server agent.",
+    "permission": "Gagal memproses izin.",
+    "loadFocus": "Gagal memuat — coba lagi saat window fokus"
+  },
+  "w": {
+    "tagline": "Satu tempat untuk nulis skripsi + baca jurnal + tanya AI.",
+    "attached": "Project terpasang",
+    "loading": "Memuat…",
+    "empty": "Belum ada project. Pasang folder skripsi lu di bawah.",
+    "openTitle": "Buka project",
+    "removeTitle": "Lepas project (folder di disk gak disentuh)",
+    "attachTitle": "Pasang folder project",
+    "nameLabel": "Nama project",
+    "folderLabel": "Folder (harus dalam ~)",
+    "attach": "Pasang folder",
+    "attaching": "Memasang…",
+    "attachHint": "Subfolder baku (dokumen/, gambar/, referensi/papers/, export/) dibuat otomatis kalau belum ada. File lama tidak disentuh."
   }
 }

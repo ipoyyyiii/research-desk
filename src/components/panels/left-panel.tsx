@@ -1,19 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Search } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Modal } from '@/components/ui';
 import { JournalPanel } from '@/components/panels/journal-panel';
 import { LibraryPanel } from '@/components/panels/library-panel';
 import { IconRail, type LeftTab } from '@/components/workspace/icon-rail';
-
-type TreeEntry = {
-  path: string; // relatif dari root project, selalu '/'
-  name: string;
-  type: 'dir' | 'file';
-  size: number;
-};
+import {
+  DataView,
+  DraftsView,
+  FiguresView,
+  dataFiles,
+  draftFiles,
+  figureFiles,
+  referencePdfFiles,
+  type TreeEntry,
+} from '@/components/panels/views-left';
 
 type TreeNode = TreeEntry & { children: TreeNode[] };
 
@@ -122,7 +125,8 @@ export function LeftPanel({
   const { entries, loading, error } = useFileTree(slug, treeVersion);
 
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['dokumen', 'referensi']));
-  const [activeTab, setActiveTab] = useState<LeftTab>('file');
+  const [activeTab, setActiveTab] = useState<LeftTab>('drafts');
+  const [journalMode, setJournalMode] = useState<'search' | 'saved'>('search');
   const [pendingDelete, setPendingDelete] = useState<TreeEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [filter, setFilter] = useState('');
@@ -146,6 +150,11 @@ export function LeftPanel({
       })()
     : entries;
   const nodes = buildTree(filteredEntries);
+
+  const chipCount = (count: number) => t('lib.fileCount', { n: count });
+
+  /** PDF unduhan jurnal di referensi/ — tampil juga sebagai section di tab Jurnal. */
+  const pdfFiles = useMemo(() => referencePdfFiles(entries), [entries]);
 
   const toggleExpand = (path: string) => {
     setExpanded((prev) => {
@@ -258,11 +267,81 @@ export function LeftPanel({
     </header>
   );
 
+  /** Kerangka tab view tujuan: header + area scroll, plus status load/error tree yang sama. */
+  const viewPane = (title: string, chip: string, view: React.ReactNode) => (
+    <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+      {tabHeader(title, chip)}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {loading ? (
+          <p className="px-2 py-4 text-xs text-muted-foreground">…</p>
+        ) : error ? (
+          <p className="px-2 py-4 text-xs text-destructive">{t('err.loadFocus')}</p>
+        ) : (
+          view
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <aside className="flex h-full">
       <IconRail active={activeTab} onChange={setActiveTab} />
 
-      {activeTab === 'file' && (
+      {activeTab === 'drafts' &&
+        viewPane(
+          t('views.drafts'),
+          chipCount(draftFiles(entries).length),
+          <DraftsView slug={slug} entries={entries} onOpenFile={onOpenFile} />,
+        )}
+
+      {activeTab === 'figures' &&
+        viewPane(
+          t('views.figures'),
+          chipCount(figureFiles(entries).length),
+          <FiguresView slug={slug} entries={entries} />,
+        )}
+
+      {activeTab === 'data' &&
+        viewPane(t('views.data'), chipCount(dataFiles(entries).length), <DataView slug={slug} entries={entries} />)}
+
+      {activeTab === 'journals' && (
+        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+          {tabHeader(t('journal.header'), `${pdfFiles.length} PDF`)}
+          <div className="flex shrink-0 gap-1 border-b border-border bg-card px-2 pb-1.5">
+            <button
+              type="button"
+              onClick={() => setJournalMode('search')}
+              className={`cursor-pointer rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                journalMode === 'search'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {t('journal.search')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setJournalMode('saved')}
+              className={`cursor-pointer rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                journalMode === 'saved'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {t('library.tabSaved')}
+            </button>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col">
+            {journalMode === 'search' ? (
+              <JournalPanel slug={slug} pdfFiles={pdfFiles} />
+            ) : (
+              <LibraryPanel slug={slug} />
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'files' && (
         <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
           {tabHeader(t('tabs.file'), t('lib.fileCount', { n: entries.length }))}
           <div className="shrink-0 border-b border-border px-3 py-2">
@@ -285,30 +364,12 @@ export function LeftPanel({
             {loading ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">…</p>
             ) : error ? (
-              <p className="px-2 py-4 text-xs text-destructive">Gagal memuat — coba lagi saat window fokus</p>
+              <p className="px-2 py-4 text-xs text-destructive">{t('err.loadFocus')}</p>
             ) : entries.length === 0 ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">{t('tree.empty')}</p>
             ) : (
               <ul>{nodes.map((node) => renderNode(node, 0))}</ul>
             )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'journal' && (
-        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
-          {tabHeader(t('journal.header'))}
-          <div className="flex min-h-0 flex-1 flex-col">
-            <JournalPanel slug={slug} />
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'library' && (
-        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
-          {tabHeader(t('tabs.library'))}
-          <div className="flex min-h-0 flex-1 flex-col">
-            <LibraryPanel slug={slug} />
           </div>
         </div>
       )}

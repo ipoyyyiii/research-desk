@@ -186,7 +186,8 @@
     "remove": "Remove",
     "deleted": "Removed — its BibTeX entry was cleaned from references.bib",
     "empty": "No saved journals yet. Search in the Journals tab, then press Save.",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "tabSaved": "Saved"
   },
   "api": {
     "invalidRequest": "Invalid data",
@@ -198,5 +199,43 @@
   "lib": {
     "fileCount": "{n} files",
     "searchPlaceholder": "Search files…"
+  },
+  "views": {
+    "drafts": "Drafts",
+    "figures": "Figures",
+    "data": "Data",
+    "pdfTitle": "PDFs in references folder",
+    "emptyDrafts": "No drafts yet — create one with the + button above.",
+    "emptyFigures": "No images yet — drop PNG/JPG into the folder, or ask the AI to make a visual.",
+    "emptyData": "No data files yet (CSV/Excel/JSON).",
+    "openNewTab": "Open in new tab"
+  },
+  "err": {
+    "server": "Failed to reach the server",
+    "unknown": "unknown",
+    "createDoc": "Failed to create the document",
+    "createProject": "Failed to create the project",
+    "openFile": "Failed to open the file",
+    "model": "Failed to switch models.",
+    "caps": "Failed to save capabilities.",
+    "sessionPrep": "Failed to prepare the agent session: {r}",
+    "agentCall": "Agent call failed: {r}",
+    "agentServer": "Failed to reach the agent server.",
+    "permission": "Failed to process the permission.",
+    "loadFocus": "Failed to load — retry when the window regains focus"
+  },
+  "w": {
+    "tagline": "One place to write your thesis + read journals + ask the AI.",
+    "attached": "Attached projects",
+    "loading": "Loading…",
+    "empty": "No projects yet. Attach your thesis folder below.",
+    "openTitle": "Open project",
+    "removeTitle": "Detach project (folder on disk is untouched)",
+    "attachTitle": "Attach a project folder",
+    "nameLabel": "Project name",
+    "folderLabel": "Folder (must be under ~)",
+    "attach": "Attach folder",
+    "attaching": "Attaching…",
+    "attachHint": "Standard subfolders (dokumen/, gambar/, referensi/papers/, export/) are created automatically if missing. Existing files are untouched."
   }
 }

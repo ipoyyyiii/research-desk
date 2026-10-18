@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { ChevronDown, Quote, Search, X } from 'lucide-react';
+import { ChevronDown, FileText, Quote, Search, X } from 'lucide-react';
 import { useT } from '@/lib/preferences';
+import { formatSize, rawUrl, type PdfRef } from '@/components/panels/views-left';
 
 // Tab "Jurnal" (fase 3): cari paper lintas OpenAlex/Crossref/Semantic Scholar,
 // simpan ke perpustakaan project (backend ikut menambah entri BibTeX).
@@ -322,7 +323,7 @@ export function PaperCard({
 }
 
 /** Tab Jurnal: header pencarian + daftar hasil + aksi simpan/PDF/terelasi. */
-export function JournalPanel({ slug }: { slug: string }) {
+export function JournalPanel({ slug, pdfFiles = [] }: { slug: string; pdfFiles?: PdfRef[] }) {
   const t = useT();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('relevance');
@@ -482,6 +483,34 @@ export function JournalPanel({ slug }: { slug: string }) {
           </div>
         )}
       </div>
+
+      {/* PDF unduhan jurnal di folder referensi/ — dibuka langsung via route raw project. */}
+      {pdfFiles.length > 0 && (
+        <details className="shrink-0 border-b border-border px-2 py-1.5">
+          <summary className="flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground">
+            {t('views.pdfTitle')}
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+              {pdfFiles.length}
+            </span>
+          </summary>
+          <ul className="flex flex-col gap-0.5 py-1.5">
+            {pdfFiles.map((pdf) => (
+              <li key={pdf.path}>
+                <button
+                  type="button"
+                  onClick={() => window.open(rawUrl(slug, pdf.path), '_blank', 'noopener')}
+                  title={t('views.openNewTab')}
+                  className="flex w-full cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] text-foreground transition-colors hover:bg-muted"
+                >
+                  <FileText size={11} className="shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{pdf.name}</span>
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatSize(pdf.size)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {loading ? (

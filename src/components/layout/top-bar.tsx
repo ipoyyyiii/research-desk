@@ -38,14 +38,14 @@ export function TopBar({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? 'Gagal membuat dokumen');
+        setError(t('err.createDoc'));
         return;
       }
       setNewDocOpen(false);
       setTitle('');
       onDocumentCreated(data.document.path);
     } catch {
-      setError('Gagal terhubung ke server');
+      setError(t('err.server'));
     } finally {
       setCreating(false);
     }

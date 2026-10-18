@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useT } from '@/lib/preferences';
 
 type Project = {
   id: number;
@@ -14,6 +15,7 @@ type Project = {
 
 export default function WorkspacePage() {
   const router = useRouter();
+  const t = useT();
   const [projects, setProjects] = useState<Project[]>([]);
   const [name, setName] = useState('Skripsi-ku');
   const [folder, setFolder] = useState('~/Documents/skripsi');
@@ -38,7 +40,7 @@ export default function WorkspacePage() {
         return;
       }
     } catch {
-      setError('Gagal terhubung ke server');
+      setError(t('err.server'));
     }
     setLoading(false);
   };
@@ -61,12 +63,12 @@ export default function WorkspacePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? 'Gagal membuat project');
+        setError(t('err.createProject'));
       } else {
         router.push(`/p/${data.project.slug}`);
       }
     } catch {
-      setError('Gagal terhubung ke server');
+      setError(t('err.server'));
     } finally {
       setCreating(false);
     }
@@ -91,18 +93,18 @@ export default function WorkspacePage() {
     <main className="mx-auto max-w-2xl px-6 py-12">
       <h1 className="text-2xl font-semibold tracking-tight">research-desk</h1>
       <p className="mt-1 text-sm text-neutral-500">
-        Satu tempat untuk nulis skripsi + baca jurnal + tanya AI.
+        {t('w.tagline')}
       </p>
 
       <section className="mt-8">
         <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Project terpasang
+          {t('w.attached')}
         </h2>
         {loading ? (
-          <p className="mt-3 text-sm text-neutral-400">Memuat…</p>
+          <p className="mt-3 text-sm text-neutral-400">{t('w.loading')}</p>
         ) : projects.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-400">
-            Belum ada project. Pasang folder skripsi kamu di bawah 👇
+            {t('w.empty')}
           </p>
         ) : (
           <ul className="mt-3 divide-y divide-neutral-200 rounded-md border border-neutral-200">
@@ -112,7 +114,7 @@ export default function WorkspacePage() {
                   type="button"
                   onClick={() => buka(project.slug)}
                   className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
-                  title="Buka project"
+                  title={t('w.openTitle')}
                 >
                   <div className="min-w-0">
                     <p className="font-medium hover:underline">{project.name}</p>
@@ -124,7 +126,7 @@ export default function WorkspacePage() {
                   type="button"
                   onClick={() => void buang(project.slug)}
                   className="shrink-0 rounded px-1.5 py-0.5 text-xs text-neutral-300 hover:text-red-600 dark:text-neutral-600"
-                  title="Lepas project (folder di disk gak disentuh)"
+                  title={t('w.removeTitle')}
                 >
                   ✕
                 </button>
@@ -136,12 +138,12 @@ export default function WorkspacePage() {
 
       <section className="mt-10">
         <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Pasang folder project
+          {t('w.attachTitle')}
         </h2>
         <form onSubmit={attach} className="mt-3 space-y-4 rounded-md border border-neutral-200 p-4">
           <div>
             <label htmlFor="name" className="block text-sm font-medium">
-              Nama project
+              {t('w.nameLabel')}
             </label>
             <input
               id="name"
@@ -153,7 +155,7 @@ export default function WorkspacePage() {
           </div>
           <div>
             <label htmlFor="folder" className="block text-sm font-medium">
-              Folder (harus dalam ~)
+              {t('w.folderLabel')}
             </label>
             <input
               id="folder"
@@ -169,11 +171,10 @@ export default function WorkspacePage() {
             disabled={creating}
             className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
           >
-            {creating ? 'Memasang…' : 'Pasang folder'}
+            {creating ? t('w.attaching') : t('w.attach')}
           </button>
           <p className="text-xs text-neutral-400">
-            Subfolder baku (dokumen/, gambar/, referensi/papers/, export/) dibuat otomatis kalau belum ada.
-            File lama tidak disentuh.
+            {t('w.attachHint')}
           </p>
         </form>
       </section>
