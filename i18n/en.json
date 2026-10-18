@@ -247,6 +247,15 @@
     "newWeb": "Web tab",
     "workspaceFile": "Workspace file",
     "webPage": "Web page",
-    "blockedHint": "Many sites (Google, Scholar, etc.) refuse in-frame display — use the ↗ button if blank."
+    "blockedHint": "Many sites (Google, Scholar, etc.) refuse in-frame display — use the ↗ button if blank.",
+    "proxyHint": "Pages load through a rewrite proxy (anti-frame headers stripped). Heavy sites/CAPTCHA may block it — use the ↗ button.",
+    "searchPlaceholder": "Search the web…",
+    "searchGo": "Search",
+    "webHint": "Results open right inside this tab. You can also type an address above.",
+    "newDoc": "New document",
+    "itemDrawing": "Drawing",
+    "itemSurvey": "Survey form",
+    "itemMatrix": "Literature matrix",
+    "soon": "Coming soon"
   }
 }

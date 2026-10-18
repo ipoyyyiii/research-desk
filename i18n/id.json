@@ -247,6 +247,15 @@
     "newWeb": "Tab web",
     "workspaceFile": "Berkas workspace",
     "webPage": "Halaman web",
-    "blockedHint": "Banyak situs (Google, Scholar, dsb.) larang tampil dalam frame — pakai tombol ↗ kalau blank."
+    "blockedHint": "Banyak situs (Google, Scholar, dsb.) larang tampil dalam frame — pakai tombol ↗ kalau blank.",
+    "proxyHint": "Halaman dimuat lewat proxy rewrite (anti-frame dibersihkan). Situs berat/CAPTCHA kadang nyobot — pakai tombol ↗.",
+    "searchPlaceholder": "Cari di web…",
+    "searchGo": "Cari",
+    "webHint": "Hasil dibuka langsung di tab ini. Bisa juga ketik alamat di atas.",
+    "newDoc": "Dokumen baru",
+    "itemDrawing": "Sketsa",
+    "itemSurvey": "Form survei",
+    "itemMatrix": "Matriks literatur",
+    "soon": "Segera"
   }
 }

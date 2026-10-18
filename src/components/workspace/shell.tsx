@@ -108,6 +108,23 @@ export function WorkspaceShell({
     openFileTab(path);
   };
 
+  // Versi nilai-balik untuk menu + tab-bar: true kalau dokumen berhasil dibuat.
+  const createDocumentFromTitle = async (title: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      handleDocumentCreated(data.document.path);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   // Kontrak LeftPanel cuma kasih wasOpen (file terhapus = tab file yang aktif
   // sekarang), jadi yang bisa ditutup itu tab aktif saja — tab non-aktif yang
   // ternyata buka file sama gak terdeteksi dari param ini.
@@ -157,6 +174,7 @@ export function WorkspaceShell({
               onClose={closeTab}
               onNewWeb={newWebTab}
               onWebUrl={setWebUrl}
+              onNewDocument={createDocumentFromTitle}
             />
           </Panel>
 

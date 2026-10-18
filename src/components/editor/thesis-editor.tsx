@@ -165,7 +165,7 @@ function EditorSurface({
     return () => {
       insertRef.current = null;
     };
-  }, [editor, slug]);
+  }, [editor, slug, t]);
 
   // Agent mengubah file → refetch (hidup: file yang sama, gak lagi berhas edit)
   useEffect(() => {

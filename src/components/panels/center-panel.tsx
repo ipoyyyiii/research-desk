@@ -1,6 +1,7 @@
 'use client';
 
-import { Globe, X } from 'lucide-react';
+import { ClipboardList, FilePlus2, Globe, Loader2, PencilRuler, Plus, Table2, X, type LucideIcon } from 'lucide-react';
+import { useState } from 'react';
 import { useT } from '@/lib/preferences';
 import { ThesisEditor } from '@/components/editor/thesis-editor';
 import { WebView } from '@/components/center/web-view';
@@ -31,6 +32,7 @@ export function CenterPanel({
   onClose,
   onNewWeb,
   onWebUrl,
+  onNewDocument,
 }: {
   slug: string;
   tabs: CenterTab[];
@@ -39,6 +41,7 @@ export function CenterPanel({
   onClose: (id: string) => void;
   onNewWeb: () => void;
   onWebUrl: (id: string, url: string) => void;
+  onNewDocument: (title: string) => Promise<boolean>;
 }) {
   const active = tabs.find((tab) => tab.id === activeId) ?? null;
 
@@ -54,6 +57,7 @@ export function CenterPanel({
             onActivate={onActivate}
             onClose={onClose}
             onNewWeb={onNewWeb}
+            onNewDocument={onNewDocument}
           />
           <div className="flex min-h-0 flex-1 text-foreground">
             {active?.kind === 'file' && (
@@ -81,14 +85,38 @@ function TabBar({
   onActivate,
   onClose,
   onNewWeb,
+  onNewDocument,
 }: {
   tabs: CenterTab[];
   activeId: string | null;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
   onNewWeb: () => void;
+  onNewDocument: (title: string) => Promise<boolean>;
 }) {
   const t = useT();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [docTitle, setDocTitle] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const submitDoc = async () => {
+    const title = docTitle.trim();
+    if (title.length === 0 || creating) return;
+    setCreating(true);
+    setCreateError(null);
+    const ok = await onNewDocument(title);
+    setCreating(false);
+    if (ok) {
+      setMenuOpen(false);
+      setNaming(false);
+      setDocTitle('');
+    } else {
+      setCreateError(t('err.createDoc'));
+    }
+  };
 
   const chip = (tab: CenterTab) => {
     const active = tab.id === activeId;
@@ -145,16 +173,125 @@ function TabBar({
   return (
     <div className="flex h-9 shrink-0 items-stretch border-b border-border bg-card">
       <div className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto px-1">{tabs.map(chip)}</div>
-      <button
-        type="button"
-        onClick={onNewWeb}
-        title={t('center.newWeb')}
-        aria-label={t('center.newWeb')}
-        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        <Globe size={13} />
-      </button>
+      <div className="relative flex shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            setMenuOpen((prev) => !prev);
+            setNaming(false);
+            setCreateError(null);
+          }}
+          title={t('center.newWeb')}
+          aria-label={t('center.newWeb')}
+          aria-expanded={menuOpen}
+          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Plus size={14} />
+        </button>
+
+        {menuOpen && (
+          <>
+            {/* Backdrop transparan untuk klik-diluar; di bawah menu. */}
+            <button
+              type="button"
+              aria-hidden
+              tabIndex={-1}
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 z-40 cursor-default"
+            />
+            <div
+              role="menu"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setMenuOpen(false);
+              }}
+              className="absolute right-1 top-10 z-50 w-48 rounded-lg border border-border bg-card p-1 shadow-lg"
+            >
+              {naming ? (
+                <form
+                  className="p-1.5"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submitDoc();
+                  }}
+                >
+                  <input
+                    autoFocus
+                    type="text"
+                    value={docTitle}
+                    onChange={(event) => setDocTitle(event.target.value)}
+                    placeholder={t('newDoc.placeholder')}
+                    aria-label={t('newDoc.label')}
+                    className="h-7 w-full rounded-md border border-border bg-background px-2 text-[12px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                  <button
+                    type="submit"
+                    disabled={docTitle.trim().length === 0 || creating}
+                    className="mt-1.5 flex w-full cursor-pointer items-center justify-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {creating && <Loader2 size={11} className="animate-spin" />}
+                    {t('common.create')}
+                  </button>
+                  {createError && <p className="mt-1 text-[10px] text-destructive">{createError}</p>}
+                </form>
+              ) : (
+                <>
+                  <MenuItem
+                    icon={FilePlus2}
+                    label={t('center.newDoc')}
+                    onClick={() => {
+                      setNaming(true);
+                      setDocTitle('');
+                      setCreateError(null);
+                    }}
+                  />
+                  <MenuItem
+                    icon={Globe}
+                    label={t('center.newWeb')}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onNewWeb();
+                    }}
+                  />
+                  <div className="mx-1 my-1 h-px bg-border" />
+                  <MenuItem icon={PencilRuler} label={t('center.itemDrawing')} disabled title={t('center.soon')} />
+                  <MenuItem icon={ClipboardList} label={t('center.itemSurvey')} disabled title={t('center.soon')} />
+                  <MenuItem icon={Table2} label={t('center.itemMatrix')} disabled title={t('center.soon')} />
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** Baris item menu + (menu ala ss3: ikon + label; disabled = fitur berikutnya). */
+function MenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  title,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className="flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[12px] text-card-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45"
+    >
+      <Icon size={13} className="shrink-0 text-muted-foreground" />
+      {label}
+    </button>
   );
 }
 
