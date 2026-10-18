@@ -210,7 +210,7 @@ export function Ribbon({
   const [exportResult, setExportResult] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const doExport = async (style: 'apa' | 'ieee') => {
+  const doExport = async (style: 'apa' | 'ieee', out: 'docx' | 'pdf' = 'docx') => {
     setExportOpen(false);
     setExportBusy(true);
     setExportError(null);
@@ -219,7 +219,7 @@ export function Ribbon({
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filePath, style }),
+        body: JSON.stringify({ path: filePath, style, out }),
       });
       const data = await res.json();
       if (res.ok && data?.out) setExportResult(data.out);
@@ -527,6 +527,21 @@ export function Ribbon({
                 onClick={() => void doExport('ieee')}
               >
                 .docx — {t('toolbar.exportIeee')}
+              </button>
+              <div className="my-1 h-px bg-border" />
+              <button
+                type="button"
+                className="w-full cursor-pointer rounded px-2 py-1 text-left transition-colors hover:bg-muted"
+                onClick={() => void doExport('apa', 'pdf')}
+              >
+                .pdf — {t('toolbar.exportApa')}
+              </button>
+              <button
+                type="button"
+                className="w-full cursor-pointer rounded px-2 py-1 text-left transition-colors hover:bg-muted"
+                onClick={() => void doExport('ieee', 'pdf')}
+              >
+                .pdf — {t('toolbar.exportIeee')}
               </button>
             </div>
           )}

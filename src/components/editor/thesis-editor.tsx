@@ -130,6 +130,11 @@ function EditorSurface({
   // Dipanggil editorProps.handlePaste / handleDrop — disetel setelah editor siap.
   const insertRef = useRef<((files: File[]) => void) | null>(null);
 
+  // Chip sitasi: map key → label hover "Judul (Tahun) — Venue" (dari references.bib).
+  const bibLabelsRef = useRef<Map<string, string>>(new Map());
+  // Ref ke fungsi label-kan chip — dipanggil ulang pas fetch bib selesai.
+  const applyChipLabelsRef = useRef<(() => void) | null>(null);
+
   const editor = useEditor({
     // Wajib utk Next.js SSR — cegah hydration mismatch (editor dirender client-side)
     immediatelyRender: false,
@@ -159,6 +164,18 @@ function EditorSurface({
       attributes: {
         class: 'tiptap paper outline-none',
       },
+      // Klik chip sitasi → bubuarkan event buat panel kiri (tanpa preventDefault).
+      handleDOMEvents: {
+        click: (_view, event) => {
+          const chip = (event.target as HTMLElement | null)?.closest?.('span[data-citation-key]');
+          if (!chip) return false;
+          const key = chip.getAttribute('data-citation-key');
+          if (!key) return false;
+          // Konsumsi event oleh left-panel (fase 6).
+          window.dispatchEvent(new CustomEvent('workspace:open-bib-entry', { detail: { key } }));
+          return false; // kursor & seleksi tetap jalan normal
+        },
+      },
       handlePaste: (_view, event) => {
         const files = [...(event.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
         if (files.length === 0) return false;
@@ -181,6 +198,59 @@ function EditorSurface({
       scheduleSave();
     },
   });
+
+  // Fetch references.bib sekali → map label chip sitasi (bib gak ada → map kosong).
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/bib`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          entries?: Array<{ key: string; title?: string; year?: string | number; venue?: string }>;
+        };
+        if (cancelled || !Array.isArray(data.entries)) return;
+        const labels = new Map<string, string>();
+        for (const e of data.entries) {
+          if (!e?.key) continue;
+          const year = e.year == null || e.year === '' ? '' : String(e.year);
+          const label = `${e.title ?? e.key}${year ? ` (${year})` : ''}${e.venue ? ` — ${e.venue}` : ''}`;
+          labels.set(e.key, label);
+        }
+        bibLabelsRef.current = labels;
+        applyChipLabelsRef.current?.(); // chip yang udah terpasang → label lengkap sekarang
+      } catch {
+        // diam — tanpa bib chip tetap ada, fallback label = key
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  // Hover title chip: scan ulang tiap update — ProseMirror bisa strip attr title saat re-render.
+  useEffect(() => {
+    if (!editor) return;
+    const labelChips = () => {
+      const labels = bibLabelsRef.current;
+      const chips = editor.view.dom.querySelectorAll<HTMLElement>('span[data-citation-key]');
+      chips.forEach((el) => {
+        const key = el.getAttribute('data-citation-key');
+        if (!key) return;
+        const label = labels.get(key) ?? key; // fallback: key mentah
+        if (el.title !== label) el.title = label;
+      });
+    };
+    applyChipLabelsRef.current = labelChips;
+    const onUpdate = () => queueMicrotask(labelChips); // biarkan DOM di-patch transaksi dulu
+    editor.on('update', onUpdate);
+    labelChips(); // chip awal dari onCreate/applyCitationMarks
+    return () => {
+      editor.off('update', onUpdate);
+      applyChipLabelsRef.current = null;
+    };
+  }, [editor]);
 
   // Handler upload + sisip gambar (dipakai paste & drag-drop).
   useEffect(() => {

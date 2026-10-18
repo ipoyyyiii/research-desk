@@ -169,7 +169,8 @@
   },
   "left": {
     "journalComing": "Phase 3: journal search (OpenAlex + Crossref) shows up here.",
-    "libraryComing": "Phase 3-4: references.bib list + PDF viewer show up here."
+    "libraryComing": "Phase 3-4: references.bib list + PDF viewer show up here.",
+    "tabOutline": "Outline"
   },
   "journal": {
     "searchPlaceholder": "search journals — topic, title, author…",
@@ -280,5 +281,14 @@
     "keep": "Keep",
     "rejectHint": "Reject overwrites the previous content back to the file.",
     "loading": "Loading…"
+  },
+  "outline": {
+    "title": "Outline",
+    "target": "Target",
+    "progress": "{curr} / {target} words",
+    "noDocs": "No chapters in the dokumen folder yet.",
+    "targetHint": "Targets are saved in this browser.",
+    "loading": "Counting…",
+    "openHint": "Click to open a chapter"
   }
 }

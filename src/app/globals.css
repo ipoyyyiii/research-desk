@@ -106,8 +106,15 @@ webview {
   font-family: var(--font-mono), monospace;
   font-size: 10px;
   vertical-align: baseline;
-  cursor: default;
+  cursor: pointer;
   user-select: text;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Hover halus: naikkan background & garis sedikit (tetap dari --primary). */
+.cite-chip:hover {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 48%, transparent);
 }
 
 .cite-chip::selection {

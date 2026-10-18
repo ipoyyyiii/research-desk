@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Search } from 
 import { useT } from '@/lib/preferences';
 import { Modal } from '@/components/ui';
 import { JournalPanel } from '@/components/panels/journal-panel';
+import { OutlineView } from '@/components/panels/outline-view';
 import { LibraryPanel } from '@/components/panels/library-panel';
 import { IconRail, type LeftTab } from '@/components/workspace/icon-rail';
 import {
@@ -130,6 +131,19 @@ export function LeftPanel({
   const [pendingDelete, setPendingDelete] = useState<TreeEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [filter, setFilter] = useState('');
+
+  // Klik chip sitasi di editor (fase 6) → lompat ke tab Jurnal + mode Tersimpan.
+  // Dipasang di sini karena journalMode = state internal panel ini.
+  useEffect(() => {
+    const onOpenBib = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string }>).detail;
+      if (!detail?.key) return;
+      setActiveTab('journals');
+      setJournalMode('saved');
+    };
+    window.addEventListener('workspace:open-bib-entry', onOpenBib);
+    return () => window.removeEventListener('workspace:open-bib-entry', onOpenBib);
+  }, []);
 
   // Filter client-side by path (case-insensitive). Folder induk ikut disertakan
   // biar hasil tetap muncul di dalam pohonnya — buildTree butuh parent dir-nya ada.
@@ -292,6 +306,16 @@ export function LeftPanel({
           t('views.drafts'),
           chipCount(draftFiles(entries).length),
           <DraftsView slug={slug} entries={entries} onOpenFile={onOpenFile} />,
+        )}
+
+      {activeTab === 'outline' &&
+        viewPane(
+          t('left.tabOutline'),
+          chipCount(
+            entries.filter((entry) => entry.type === 'file' && entry.path.startsWith('dokumen/') && entry.path.endsWith('.md'))
+              .length,
+          ),
+          <OutlineView slug={slug} entries={entries} onOpenFile={onOpenFile} />,
         )}
 
       {activeTab === 'figures' &&

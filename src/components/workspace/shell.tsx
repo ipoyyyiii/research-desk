@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import { TopBar } from '@/components/layout/top-bar';
 import { LeftPanel } from '@/components/panels/left-panel';
@@ -48,6 +48,51 @@ function closeTabState(prev: CenterState, id: string): CenterState {
   return { tabs, activeId: next ? next.id : null };
 }
 
+/** Restorasi state tab dari localStorage. Balikin null kalau data gak valid
+ * (corrupt / bentuk salah / lebih dari 10 tab) — biar state awal gak di-override. */
+function parseStoredCenterState(value: string | null): CenterState | null {
+  if (!value) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(value);
+  } catch {
+    return null; // JSON corrupt → abaikan.
+  }
+  if (typeof raw !== 'object' || raw === null) return null;
+  const obj = raw as Record<string, unknown>;
+  if (!Array.isArray(obj.tabs) || obj.tabs.length > 10) return null;
+
+  // Saring item gak valid: kind file minta path string gak kosong, kind web
+  // minta url string ('' boleh). Id juga harus unik biar key React gak bentrok.
+  const seenIds = new Set<string>();
+  const tabs: CenterTab[] = [];
+  for (const item of obj.tabs) {
+    if (typeof item !== 'object' || item === null) continue;
+    const t = item as Record<string, unknown>;
+    if (typeof t.id !== 'string' || seenIds.has(t.id)) continue;
+    if (t.kind === 'file' && typeof t.path === 'string' && t.path !== '') {
+      seenIds.add(t.id);
+      tabs.push({
+        id: t.id,
+        kind: 'file',
+        path: t.path,
+        version: typeof t.version === 'number' && Number.isFinite(t.version) ? t.version : 0,
+      });
+    } else if (t.kind === 'web' && typeof t.url === 'string') {
+      seenIds.add(t.id);
+      tabs.push({ id: t.id, kind: 'web', url: t.url });
+    }
+  }
+
+  // Hasil valid kosong → gak ada yang bisa dipulihin, jangan override state awal.
+  if (tabs.length === 0) return null;
+  const activeId =
+    typeof obj.activeId === 'string' && tabs.some((tab) => tab.id === obj.activeId)
+      ? obj.activeId
+      : (tabs[0]?.id ?? null);
+  return { tabs, activeId };
+}
+
 export function WorkspaceShell({
   slug,
   projectName,
@@ -62,6 +107,38 @@ export function WorkspaceShell({
   // Path tab file yang aktif — dipakai LeftPanel (highlight) & ChatPanel (konteks).
   const activeTab = center.tabs.find((tab) => tab.id === center.activeId) ?? null;
   const openFile = activeTab?.kind === 'file' ? activeTab.path : null;
+
+  // Persist tab panel tengah ke localStorage per project — biar gak hilang pas
+  // refresh. Restore pas mount (bukan useState initializer) biar render pertama
+  // selalu identik dengan SSR (gak ada hydration mismatch). Persist di-gate pake
+  // ref: skip sampai restore selesai supaya gak nge-overwrite data tersimpan
+  // pake state awal yang masih kosong.
+  const hasRestoredRef = useRef(false);
+
+  useEffect(() => {
+    hasRestoredRef.current = false;
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(`center-tabs:${slug}`);
+    } catch {
+      stored = null; // Akses localStorage bisa gagal — anggep aja gak ada data.
+    }
+    const restored = parseStoredCenterState(stored);
+    if (restored) setCenter(restored);
+    hasRestoredRef.current = true;
+  }, [slug]);
+
+  useEffect(() => {
+    if (!hasRestoredRef.current) return;
+    try {
+      localStorage.setItem(
+        `center-tabs:${slug}`,
+        JSON.stringify({ tabs: center.tabs, activeId: center.activeId }),
+      );
+    } catch {
+      // localStorage penuh/private mode — biarkan state aja.
+    }
+  }, [center, slug]);
 
   // Catat project ini sebagai yang terakhir dibuka — dipakai /workspace auto-redirect.
   useEffect(() => {

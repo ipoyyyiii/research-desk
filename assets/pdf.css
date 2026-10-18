@@ -1,0 +1,44 @@
+/* Gaya PDF ekspor (weasyprint) — nuansa skripsi, tanpa tailwind. */
+@page {
+  size: A4;
+  margin: 2.5cm;
+  @bottom-center {
+    content: counter(page);
+    font-family: 'Times New Roman', serif;
+    font-size: 10pt;
+  }
+}
+body {
+  font-family: 'Times New Roman', 'Liberation Serif', serif;
+  font-size: 12pt;
+  line-height: 1.85;
+  text-align: justify;
+  color: #111;
+}
+h1, h2, h3 {
+  color: #1E3A5F;
+  font-weight: 700;
+  line-height: 1.3;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  page-break-inside: avoid;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+  font-size: 10.5pt;
+}
+img {
+  max-width: 100%;
+}
+pre, code {
+  font-family: 'JetBrains Mono', 'DejaVu Sans Mono', monospace;
+}
+blockquote {
+  margin: 1em 0;
+  padding: 0 1em;
+  border-left: 3px solid #A16207;
+  color: #444;
+}

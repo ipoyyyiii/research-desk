@@ -169,7 +169,8 @@
   },
   "left": {
     "journalComing": "Fase 3: pencarian jurnal (OpenAlex + Crossref) muncul di sini.",
-    "libraryComing": "Fase 3-4: daftar referensi.bib + PDF viewer muncul di sini."
+    "libraryComing": "Fase 3-4: daftar referensi.bib + PDF viewer muncul di sini.",
+    "tabOutline": "Outline"
   },
   "journal": {
     "searchPlaceholder": "cari jurnal — topik, judul, penulis…",
@@ -280,5 +281,14 @@
     "keep": "Pakai",
     "rejectHint": "Tolak menulis-ulang isi sebelumnya ke file.",
     "loading": "Memuat…"
+  },
+  "outline": {
+    "title": "Outline",
+    "target": "Target",
+    "progress": "{curr} / {target} kata",
+    "noDocs": "Belum ada bab di folder dokumen.",
+    "targetHint": "Target kesimpen di browser ini.",
+    "loading": "Menghitung…",
+    "openHint": "Klik buat buka bab"
   }
 }

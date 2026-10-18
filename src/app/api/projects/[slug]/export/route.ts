@@ -13,11 +13,12 @@ export const runtime = 'nodejs';
 const exec = promisify(execFile);
 
 /**
- * Ekspor .md → .docx dengan SITASI dikerjakan pandoc:
+ * Ekspor .md → .docx/pdf dengan SITASI dikerjakan pandoc:
  * - `[@key]` di teks + references.bib → --citeproc → sitasi berformat (APA/IEEE)
  *   + daftar pustaka otomatis di akhir dokumen.
+ * - `out:'pdf'`: pandoc → html5 + assets/pdf.css → tool PDF lokal (weasyprint).
  * - Path sumber dikunci di dalam folder project (blokir `..`).
- * - Output .docx ditulis DISEBELAH file sumber (bisa dibuka/unduh via /raw).
+ * - Output ditulis DISEBELAH file sumber (bisa dibuka/unduh via /raw).
  */
 const STYLE_CSL: Record<string, string> = {
   apa: 'apa.csl',
@@ -37,12 +38,24 @@ async function resolveProjectFolder(slug: string): Promise<string | null> {
   return rows[0]?.folderPath ?? null;
 }
 
+/** Tool PDF lokal: weasyprint dulu, fallback wkhtmltopdf. Null kalau tidak ada. */
+async function findPdfTool(): Promise<'weasyprint' | 'wkhtmltopdf' | null> {
+  for (const tool of ['weasyprint', 'wkhtmltopdf'] as const) {
+    const ok = await exec('sh', ['-c', `command -v ${tool}`]).then(() => true).catch(() => false);
+    if (ok) return tool;
+  }
+  return null;
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await params;
-    const body = (await request.json().catch(() => null)) as { path?: string; style?: string } | null;
+    const body = (await request.json().catch(() => null)) as
+      | { path?: string; style?: string; out?: 'docx' | 'pdf' }
+      | null;
     const rel = (body?.path ?? '').trim();
     const style = body?.style ?? 'apa';
+    const outFmt = body?.out === 'pdf' ? 'pdf' : 'docx';
 
     if (rel.length === 0) {
       return NextResponse.json({ error: 'Path file wajib diisi' }, { status: 400 });
@@ -68,13 +81,56 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const bibAbs = path.join(folder, 'references.bib');
     const bib = await fs.stat(bibAbs).then(() => true).catch(() => false);
 
+    const base = path.basename(src, path.extname(src));
+    const outDir = path.dirname(rel.replace(/^\/+/, ''));
+
+    if (outFmt === 'pdf') {
+      const tool = await findPdfTool();
+      if (!tool) {
+        return NextResponse.json({ error: 'Gagal: tool PDF belum terpasang' }, { status: 500 });
+      }
+
+      // HTML perantara HARUS di dalam folder project — gambar relative resolve via cwd.
+      const tmpHtml = path.join(folder, `.tmp-export-${Date.now()}.html`);
+      try {
+        const args = [
+          src,
+          '-f', 'markdown',
+          '-t', 'html5',
+          '--standalone',
+          '--metadata', `title=${base}`,
+          '--resource-path', folder,
+          '--css', path.join(process.cwd(), 'assets', 'pdf.css'),
+          '-o', tmpHtml,
+        ];
+        if (bib) {
+          args.push('--citeproc', '--bibliography', bibAbs, '--csl', cslAbs);
+        }
+
+        await exec('pandoc', args, { timeout: 90_000, maxBuffer: 24 * 1024 * 1024 });
+
+        const outRel = path.join(outDir, `${base}-export.pdf`);
+        const outAbs = path.join(folder, outRel);
+
+        // cwd=folder biar path gambar relatif di HTML kena.
+        await exec(tool, [path.basename(tmpHtml), outAbs], {
+          cwd: folder,
+          timeout: 120_000,
+          maxBuffer: 8 * 1024 * 1024,
+        });
+
+        return NextResponse.json({ ok: true, out: outRel, citeproc: bib });
+      } finally {
+        await fs.rm(tmpHtml, { force: true }).catch(() => undefined);
+      }
+    }
+
     const args = [src, '-f', 'markdown', '-t', 'docx', '--resource-path', folder];
     if (bib) {
       args.push('--citeproc', '--bibliography', bibAbs, '--csl', cslAbs);
     }
 
-    const base = path.basename(src, path.extname(src));
-    const outRel = path.join(path.dirname(rel.replace(/^\/+/, '')), `${base}-export.docx`);
+    const outRel = path.join(outDir, `${base}-export.docx`);
     const outAbs = path.join(folder, outRel);
 
     await exec('pandoc', [...args, '-o', outAbs], { timeout: 90_000, maxBuffer: 24 * 1024 * 1024 });
@@ -82,6 +138,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     return NextResponse.json({ ok: true, out: outRel, citeproc: bib });
   } catch (error) {
     console.error('[api/projects/export] POST gagal:', error);
-    return NextResponse.json({ error: 'Ekspor DOCX gagal' }, { status: 500 });
+    return NextResponse.json({ error: 'Ekspor gagal' }, { status: 500 });
   }
 }
