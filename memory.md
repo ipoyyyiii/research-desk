@@ -110,6 +110,7 @@ User memasang **agentmemory lokal** (REST `http://localhost:3111`, data `~/.loca
 5. `OPENCODE_SERVER_PASSWORD` env gak dipakai usaha app (discovery file sudah ada password) — jangan bingung.
 6. Criticize test: prompt "Sebutkan satu kata doang: kopi" → jawab streaming "kopi" — pipeline End-to-End VALID.
 7. Status page: `/api/ai/status` → `{ connected:false, providers:['opencode'] }` — indikator UI CTA connect.
+8. **"Safari can't connect to server" pas login (mode tautan): OAuth redirect-nya ke `127.0.0.1:<port-acak>` di mesin SERVER, bukan laptop user yang terhubung SSH.** Solusi: connect route dua mode — `?method=device` (chatgpt-headless: kode perangkat + URL statis auth.openai.com/codex/device, TANPA port forwarding) jadi default; `?method=link` (chatgpt-token-sharing) tersisa utk browser di mesin yang sama + forwarding port VS Code.
 
 **Yang masih hidden di fase 2 sisa:** riwayat chat loading pas buka ulang app (session export/list messages belum diwalikan), model picker manual, tab aktivitas live tiap tool detail, "tugas aktif" batching, token meter.
 

@@ -46,7 +46,15 @@ export function AgentView({
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
-  const [waitingUrl, setWaitingUrl] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState<{
+    method: 'device' | 'link';
+    url: string | null;
+    code: string | null;
+    callbackPort: string | null;
+    done: boolean;
+    running: boolean;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [permission, setPermission] = useState<PermissionCard | null>(null);
 
   const sessionRef = useRef<string | null>(null);
@@ -256,48 +264,128 @@ export function AgentView({
         const res = await fetch('/api/ai/connect');
         const data = (await res.json()) as {
           running?: boolean;
+          method?: 'device' | 'link';
           url?: string | null;
+          code?: string | null;
+          callbackPort?: string | null;
           connected?: boolean;
           done?: boolean;
         };
-        setWaitingUrl(data.url ?? null);
         if (data.connected) {
           clearInterval(timer);
-          setWaitingUrl(null);
+          setWaiting(null);
           setConnected(true);
           return;
         }
-        if (data.done && !data.running) {
-          clearInterval(timer);
-          if (!data.url) setWaitingUrl(null);
-        }
+        setWaiting((prev) =>
+          prev
+            ? { ...prev, url: data.url ?? null, code: data.code ?? null, done: Boolean(data.done), running: Boolean(data.running) }
+            : null,
+        );
       } catch {
         clearInterval(timer);
       }
     }, 2_500);
   }, []);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(
+    async (mode: 'device' | 'link' = 'device', restart = false) => {
+      try {
+        const res = await fetch(
+          `/api/ai/connect?method=${mode}${restart ? '&restart=1' : ''}`,
+          { method: 'POST' },
+        );
+        const data = (await res.json()) as {
+          url?: string | null;
+          code?: string | null;
+          callbackPort?: string | null;
+          method?: 'device' | 'link';
+          running?: boolean;
+          done?: boolean;
+        };
+        setWaiting({
+          method: data.method ?? mode,
+          url: data.url ?? null,
+          code: data.code ?? null,
+          callbackPort: data.callbackPort ?? null,
+          running: Boolean(data.running ?? true),
+          done: Boolean(data.done),
+        });
+        setCopied(false);
+        pollConnect();
+      } catch {
+        setWaiting(null);
+      }
+    },
+    [pollConnect],
+  );
+
+  const copyAuth = async (text: string) => {
     try {
-      const res = await fetch('/api/ai/connect', { method: 'POST' });
-      const data = (await res.json()) as { url?: string | null };
-      if (data.url) setWaitingUrl(data.url);
-      pollConnect();
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1_800);
     } catch {
-      setWaitingUrl(null);
+      // clipboard ditolak browser — biarin user salin manual
     }
-  }, [pollConnect]);
+  };
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
-      {/* Banner "Sign in dengan link" saat proses koneksi berjalan */}
-      {waitingUrl && (
-        <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-900 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
-          <p className="mb-1 font-medium">{t('ai.waitingAuth')}</p>
-          <a href={waitingUrl} target="_blank" rel="noreferrer" className="break-all underline">
-            {waitingUrl.slice(0, 96)}…
-          </a>
-          <p className="mt-1 opacity-70">{t('ai.waitingAuthHint')}</p>
+      {/* Banner login "Sign in with ChatGPT" — dua mode wajib tahan-banting SSH */}
+      {waiting && (
+        <div className="shrink-0 space-y-2 border-b border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-900 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
+          {waiting.method === 'device' ? (
+            <>
+              <p className="font-medium">{t('ai.deviceUrlLabel')}</p>
+              {waiting.url && (
+                <a href={waiting.url} target="_blank" rel="noreferrer" className="block break-all underline">
+                  {waiting.url}
+                </a>
+              )}
+              <p className="font-medium">{t('ai.deviceCode')}</p>
+              <div className="flex items-center gap-2">
+                <code className="rounded bg-white px-2 py-1 text-sm font-bold tracking-widest dark:bg-neutral-900">
+                  {waiting.code ?? '…'}
+                </code>
+                {waiting.code && (
+                  <button
+                    type="button"
+                    onClick={() => void copyAuth(waiting.code ?? '')}
+                    className="rounded border border-blue-300 px-2 py-0.5 text-[10px] hover:bg-blue-100 dark:border-blue-700 dark:hover:bg-blue-900/50"
+                  >
+                    {copied ? t('ai.copiedLabel') : t('ai.copyLabel')}
+                  </button>
+                )}
+              </div>
+              <p className="opacity-70">{t('ai.deviceHint')}</p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium">{t('ai.waitingAuth')}</p>
+              {waiting.url && (
+                <a href={waiting.url} target="_blank" rel="noreferrer" className="block break-all underline">
+                  {waiting.url.slice(0, 96)}…
+                </a>
+              )}
+              {waiting.callbackPort && (
+                <p className="opacity-70">
+                  Port callback: <b>{waiting.callbackPort}</b> — {t('ai.linkPortHint')}
+                </p>
+              )}
+            </>
+          )}
+          <div className="flex gap-3 pt-1 text-[10px] underline opacity-80">
+            <button type="button" onClick={() => void connect(waiting.method, true)}>
+              {t('ai.restartAuth')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void connect(waiting.method === 'device' ? 'link' : 'device', true)}
+            >
+              {waiting.method === 'device' ? t('ai.linkModeLabel') : t('ai.deviceModeLabel')}
+            </button>
+          </div>
         </div>
       )}
 

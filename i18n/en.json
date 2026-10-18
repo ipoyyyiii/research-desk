@@ -102,7 +102,16 @@
     "waitingAuthHint": "Sign in there; this page stops waiting automatically once connected. Keep it open.",
     "permissionAsk": "Agent is asking permission:",
     "permissionAllow": "Allow once",
-    "permissionReject": "Reject"
+    "permissionReject": "Reject",
+    "deviceCode": "Enter this code on that page:",
+    "deviceUrlLabel": "Open this address in your browser (Safari/Chrome):",
+    "deviceHint": "No port forwarding needed — sign in and type the code; this app connects automatically.",
+    "copyLabel": "Copy",
+    "copiedLabel": "Copied!",
+    "restartAuth": "Restart",
+    "linkModeLabel": "Switch to link mode",
+    "deviceModeLabel": "Switch to device code",
+    "linkPortHint": "this port must be forwarded (VS Code: Ports panel → Forward a Port), or switch to device code."
   },
   "newDoc": {
     "label": "New document title",

@@ -102,7 +102,16 @@
     "waitingAuthHint": "Login dulu di sana, halaman ini berhenti sendiri pas udah nempel. Jangan tutup.",
     "permissionAsk": "Agent minta izin:",
     "permissionAllow": "Izinkan sekali",
-    "permissionReject": "Tolak"
+    "permissionReject": "Tolak",
+    "deviceCode": "Masukin kode ini di halaman itu:",
+    "deviceUrlLabel": "Buka alamat ini di browser kamu (Safari/Chrome):",
+    "deviceHint": "Gak perlu port forwarding — login + ketik kode, app ini nyambung otomatis.",
+    "copyLabel": "Salin",
+    "copiedLabel": "Tersalin!",
+    "restartAuth": "Mulai ulang",
+    "linkModeLabel": "Pindah ke mode tautan",
+    "deviceModeLabel": "Pindah ke kode perangkat",
+    "linkPortHint": "port ini harus di-forward (VS Code: panel Ports → Forward a Port), atau pindah ke kode perangkat."
   },
   "newDoc": {
     "label": "Judul dokumen baru",
