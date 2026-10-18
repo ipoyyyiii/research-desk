@@ -9,21 +9,56 @@ type SaveCandidate = { name: string; bytes: ArrayBuffer };
 
 /**
  * Hook yang disuntik KE DALAM iframe WordCraft (same-origin). Dua tugas:
- * (1) matiin showSaveFilePicker dengan NotAllowedError → kode WordCraft
- *     otomatis jatuh ke path anchor-download; (2) tangkep anchor download
- * berisi blob → kirim bytes ke parent (app), tanpa download stinggal.
+ * (1) ganti showSaveFilePicker dengan picker palsu (handle + writable stream
+ *     ajaib) — simpan di Word sukses tanpa dialog, bytes dijemput saat close,
+ *     lalu dikirim ke parent (app) via postMessage; (2) jemput anchor-download
+ * (ekspor dari dalam Word) TANPA memblokir unduhan aslinya.
  */
 const HOOK_SOURCE = `
 (() => {
   if (window.__rwHooked) return;
   window.__rwHooked = true;
-  const post = (name, bytesPromise) => Promise.resolve(bytesPromise).then((bytes) => {
+  const post = (name, bytes) => {
     try { parent.postMessage({ source: 'wordcraft-bridge', kind: 'save', name: name, bytes: bytes }, '*'); } catch (e) {}
-  });
-  // Paksa path anchor: picker gagal dengan error NON-abort (harus, biar fallback anchor).
-  try { window.showSaveFilePicker = function () {
-    return Promise.reject(new DOMException('word-bridge: tanpa picker', 'NotAllowedError'));
-  }; } catch (e) {}
+  };
+  // Picker palsu: pura-pura sukses simpan, bytes ditangkap lewat writable stream.
+  try {
+    window.showSaveFilePicker = async function (opts) {
+      const name = (opts && opts.suggestedName) || 'dokumen.md';
+      return {
+        kind: 'file',
+        name: name,
+        createWritable: async function () {
+          const parts = [];
+          return {
+            write: async function (d) {
+              if (d && typeof d === 'object' && 'type' in d) {
+                if (d.type === 'truncate') { parts.length = 0; if (d.size > 0) parts.push(new Uint8Array(d.size)); return; }
+                if (d.type === 'seek') return;
+                if ('data' in d) { d = d.data; } else { return; }
+              }
+              if (d instanceof Blob) { d = await d.arrayBuffer(); }
+              if (d instanceof ArrayBuffer) { parts.push(new Uint8Array(d)); return; }
+              if (ArrayBuffer.isView(d)) { parts.push(new Uint8Array(d.buffer, d.byteOffset, d.byteLength)); return; }
+              parts.push(new TextEncoder().encode(String(d)));
+            },
+            truncate: async function (size) { parts.length = 0; if (size > 0) parts.push(new Uint8Array(size)); },
+            seek: async function () {},
+            close: async function () {
+              let total = 0;
+              for (const p of parts) { total += p.length; }
+              const out = new Uint8Array(total);
+              let at = 0;
+              for (const p of parts) { out.set(p, at); at += p.length; }
+              post(name, out.buffer);
+            },
+            abort: async function (r) { throw r; },
+          };
+        },
+      };
+    };
+  } catch (e) {}
+  // Unduhan jangkar (mis. ekspor dari dalam Word): jemput juga, TANPA memblokir unduhan aslinya.
   const proto = HTMLAnchorElement.prototype;
   const click = proto.click;
   proto.click = function () {
@@ -31,9 +66,7 @@ const HOOK_SOURCE = `
       const href = this.getAttribute('href') || '';
       if (href.startsWith('blob:') && this.hasAttribute('download')) {
         const name = this.getAttribute('download') || 'dokumen.md';
-        this.addEventListener('click', (e) => e.preventDefault(), true);
-        post(name, fetch(href).then((r) => r.arrayBuffer()));
-        return undefined;
+        fetch(href).then((r) => r.arrayBuffer()).then((bytes) => post(name, bytes)).catch(() => {});
       }
     } catch (e) {}
     return click.apply(this, arguments);
