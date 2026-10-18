@@ -10,43 +10,64 @@ type WebViewProps = {
 };
 
 /**
- * Tab "browser" embedded — versi PROXY (bukan iframe mentah):
- * halaman di-fetch server (/api/proxy, strip CSP/X-Frame + rewrite <a>),
- * jadi situs yang menolak di-frame pun tetap tampil.
+ * UA standar desktop untuk <webview> — UA default Electron ("…Electron/x.y…")
+ * kadang ditolak situs tertentu (Google cek string ini).
  */
+const ELECTRON_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
+
+function useIsElectron(): boolean {
+  const [flag, setFlag] = useState(false);
+  useEffect(() => {
+    setFlag(typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron'));
+  }, []);
+  return flag;
+}
+
 export function WebView({ url, onChangeUrl }: WebViewProps) {
   const t = useT();
+  const isElectron = useIsElectron();
   const [draft, setDraft] = useState(url);
   const [query, setQuery] = useState('');
+  const [key, setKey] = useState(0);
 
-  // Sinkronkan draft hanya saat url berubah dari luar (mis. state shell) —
-  // jangan reset pas user lagi mengetik karena draft milik komponen ini.
+  // Sinkron draft saat URL eksternal berubah (mis. tab lain navigasi);
+  // draft pakai state sendiri agar pengetikan user tidak ter-reset tiap render.
   useEffect(() => {
     setDraft(url);
+    setKey((v) => v + 1);
   }, [url]);
 
+  // Navigasi pintar ala browser: ada titik → situs; tanpa titik/skema → cari DDG.
   const navigate = () => {
     const raw = draft.trim();
-    if (raw.length === 0) return;
-    // Tanpa skema → default https://. Fetch jalan di server proxy.
+    if (!raw) return;
+    const looksUrl = /^https?:\/\//i.test(raw) || /^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/.*)?$/i.test(raw);
+    if (!looksUrl) {
+      runSearch(raw);
+      return;
+    }
+    // Tanpa skema → https://. In Electron ini = true; di browser = via proxy.
     onChangeUrl(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
   };
 
-  const search = () => {
-    const q = query.trim();
-    if (q.length === 0) return;
-    // DuckDuckGo lewat proxy: ringan-javascript, gak nge-bot-detect keras.
-    onChangeUrl(`https://duckduckgo.com/html/?q=${encodeURIComponent(q)}`);
+  // DuckDuckGo lewat proxy: ringan-javascript, gak nge-bot-detect keras.
+  const runSearch = (q: string) => {
+    const query = q.trim();
+    if (!query) return;
+    onChangeUrl(`https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`);
   };
 
-  const proxiedSrc = url ? `/api/proxy?url=${encodeURIComponent(url)}` : undefined;
+  const search = () => runSearch(query);
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      {/* Hint di bawah tab bar — pasang permanen selama tab web aktif, bukan modal. */}
+      {/* Hint pas di bawah tab bar — selalu ada selama web tab aktif. */}
       <div className="flex items-center gap-1.5 border-b border-border bg-background px-3 py-1 text-[10px] text-muted-foreground">
         <Globe size={11} className="shrink-0" />
-        <span className="truncate">{t('center.proxyHint')}</span>
+        <span className="truncate">
+          {isElectron ? t('center.electronHint') : t('center.proxyHint')}
+        </span>
       </div>
 
       <form
@@ -85,7 +106,7 @@ export function WebView({ url, onChangeUrl }: WebViewProps) {
       </form>
 
       {url === '' ? (
-        // Halaman awal: kotak pencarian (lewat proxy), ala start-browser.
+        // Halaman awal: kotak cari (DuckDuckGo — JS ringan, gak bot-detect keras).
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 bg-card px-8">
           <Globe size={20} className="text-muted-foreground" />
           <form
@@ -114,11 +135,20 @@ export function WebView({ url, onChangeUrl }: WebViewProps) {
           </form>
           <p className="max-w-sm text-center text-[11px] text-muted-foreground">{t('center.webHint')}</p>
         </div>
+      ) : isElectron ? (
+        // Di dalam Electron: webview native — Chromium penuh, bukan iframe.
+        <webview
+          key={key}
+          src={url}
+          useragent={ELECTRON_UA}
+          allowpopups
+          title="web"
+          className="min-h-0 flex-1 border-0 bg-card"
+        />
       ) : (
-        // Sandbox moderat: scripts+forms jalan (situs polos tetap hidup),
-        // origin terisolasi dari app (gak ada allow-same-origin).
+        // Di browser biasa: mode PROXY-REWRITE.
         <iframe
-          src={proxiedSrc}
+          src={`/api/proxy?url=${encodeURIComponent(url)}`}
           title="web"
           referrerPolicy="no-referrer"
           sandbox="allow-scripts allow-forms"

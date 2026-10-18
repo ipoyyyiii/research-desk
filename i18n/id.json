@@ -256,6 +256,7 @@
     "itemDrawing": "Sketsa",
     "itemSurvey": "Form survei",
     "itemMatrix": "Matriks literatur",
-    "soon": "Segera"
+    "soon": "Segera",
+    "electronHint": "Browser penuh di dalam tab (Chromium asli di app desktop). Login Google dsb jalan normal."
   }
 }

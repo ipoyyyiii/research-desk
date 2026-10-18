@@ -256,6 +256,7 @@
     "itemDrawing": "Drawing",
     "itemSurvey": "Survey form",
     "itemMatrix": "Literature matrix",
-    "soon": "Coming soon"
+    "soon": "Coming soon",
+    "electronHint": "Full browser inside the tab (real Chromium in the desktop app). Logins like Google work normally."
   }
 }
