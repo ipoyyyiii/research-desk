@@ -321,5 +321,24 @@
     "textEditor": "Text editor",
     "stale": "The chapter changed outside Word (agent wrote?) — unsaved Word edits will be lost; save in Word first before pulling.",
     "pull": "Pull into Word"
+  },
+  "zotero": {
+    "title": "Import Zotero",
+    "userId": "Zotero user ID",
+    "apiKey": "Zotero API key",
+    "saveBtn": "Save connection",
+    "saved": "Connection saved ✓ — the key is never shown again",
+    "pullBtn": "Pull library → references.bib",
+    "pulling": "Pulling library…",
+    "added": "{n} new entries merged into references.bib",
+    "nothing": "Library already up to date — nothing new",
+    "conf": "Connected to Zotero user {id}",
+    "hint": "Your user ID is at zotero.org (Settings → Account); create a key at zotero.org/settings/keys/new with library read access.",
+    "noCreds": "Fill in ID + key and click Save connection first",
+    "errData": "Invalid ID/key format",
+    "errForbidden": "Denied — wrong ID/key or a private library without a read key",
+    "errUser": "Zotero user ID not found",
+    "errNetwork": "Failed to reach zotero.org",
+    "errUpstream": "Zotero responded oddly — try again shortly"
   }
 }

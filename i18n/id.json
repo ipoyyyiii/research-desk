@@ -321,5 +321,24 @@
     "textEditor": "Editor teks",
     "stale": "File bab berubah di luar Word (agen nulis?) — editan Word yang belum disimpen bakal ilang, sebaiknya Save dulu di Word sebelum Tarik.",
     "pull": "Tarik ke Word"
+  },
+  "zotero": {
+    "title": "Import Zotero",
+    "userId": "ID user Zotero",
+    "apiKey": "API key Zotero",
+    "saveBtn": "Simpen sambungan",
+    "saved": "Sambungan nyimpen ✓ — key gak ditampilin lagi",
+    "pullBtn": "Tarik library → references.bib",
+    "pulling": "Narik library…",
+    "added": "{n} entri baru masuk references.bib",
+    "nothing": "Library udah lengkap — gak ada entri baru",
+    "conf": "Nyambung ke Zotero user {id}",
+    "hint": "userID ada di zotero.org (Settings → Account), key bikin di zotero.org/settings/keys/new dengan akses library read.",
+    "noCreds": "Isi ID + key, klik Simpen sambungan dulu",
+    "errData": "Format ID/key gak valid",
+    "errForbidden": "Ditolak — ID/key salah atau library private tanpa key read",
+    "errUser": "ID user gak ketemu di Zotero",
+    "errNetwork": "Gagal nyambung ke zotero.org",
+    "errUpstream": "Zotero responds janggal — coba lagi sebentar"
   }
 }
