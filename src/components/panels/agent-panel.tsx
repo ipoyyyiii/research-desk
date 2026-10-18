@@ -160,9 +160,14 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         {message.text}
       </div>
       {!isUser && (message.toolEvents?.length ?? 0) > 0 && (
-        <ul className="mt-1 w-full space-y-1">
-          {message.toolEvents?.map((event) => <ToolRow key={event.id} event={event} />)}
-        </ul>
+        <details className="w-full">
+          <summary className="cursor-pointer select-none py-0.5 text-[10px] text-neutral-400 transition-colors hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+            ⚡ Aktivitas AI ({message.toolEvents?.length ?? 0} langkah)
+          </summary>
+          <ul className="mt-1 w-full space-y-1">
+            {message.toolEvents?.map((event) => <ToolRow key={event.id} event={event} />)}
+          </ul>
+        </details>
       )}
     </div>
   );

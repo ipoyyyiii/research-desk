@@ -32,8 +32,11 @@ export function ensureProjectAgentConfig(folderPath: string): void {
             '(2) Untuk merevisi isi dokumen, edit file markdown di folder dokumen/ secara konservatif (replace terhadap teks yang ada, bukan tulis ulang seluruh bab) dan sebut nama file yang kamu ubah. ' +
             '(3) Sebelum menambah jurnal, tampilkan singkat: judul, penulis, tahun, DOI, jumlah sitasi — jangan asal comot. ' +
             '(4) Kamu boleh membaca/mengubah berkas di dalam folder project ini saja. ' +
-            '(5) Jawab singkat dan terstruktur; tanya balik kalau konteks dari dossier tidak jelas.',
+            '(5) Jawab singkat dan terstruktur; kalau konteks dari dossier tidak jelas, tanyakan lewat TEKS jawaban biasa — tool `question` sudah DIMATIKAN karena app belum bisa menjawabnya (bikin turn gantung selamanya).',
         },
+        // Tool `question` gak boleh dipakai: app chat gak punya mekanisme jawab
+        // → turn nge-gantung + semua prompt berikut ngantre (kasus nyata 2026-10-18).
+        tools: { question: false },
       },
     };
 

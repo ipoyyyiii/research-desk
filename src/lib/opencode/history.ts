@@ -38,7 +38,7 @@ export type BuiltHistory = {
 type RawItem = {
   id?: string;
   type?: string;
-  time?: { created?: number };
+  time?: { created?: number; completed?: number };
   text?: string;
   content?: unknown;
   data?: { text?: unknown };
@@ -94,8 +94,14 @@ function toolLabel(name: string, stateInput: unknown): { title: string; detail?:
       const first = String(input.command ?? input.code ?? '')
         .split('\n')[0]
         .trim();
-      const shown = first.length > 48 ? `${first.slice(0, 48)}…` : first;
-      return { title: first ? `Jalankan ${shown}` : 'Jalankan perintah', detail: first || undefined };
+      // Pola tool-call agent: "return await tools.<ns>.<fn>(...)" → tampil manusiawi.
+      const toolCall = first.match(/tools\.([a-zA-Z0-9_-]+)\.([a-zA-Z0-9_]+)/);
+      if (toolCall) {
+        return { title: `Panggil ${toolCall[1]}.${toolCall[2]}`, detail: 'tool agent' };
+      }
+      const clean = first.replace(/^return\s+await\s+/, '');
+      const shown = clean.length > 48 ? `${clean.slice(0, 48)}…` : clean;
+      return { title: shown ? `Jalankan ${shown}` : 'Jalankan perintah', detail: shown || undefined };
     }
     case 'permission':
       return { title: 'Minta izin', detail: input.description || undefined };
@@ -164,16 +170,20 @@ function mapItem(item: RawItem, index: number): HistoryMessage | null {
 
   const toolEvents: HistoryToolEvent[] = [];
   if (type === 'assistant' && Array.isArray(item.content)) {
+    // Riwayat = masa lalu: pesan yang udah selesai gak mungkin punya tool jalan.
+    const finished = typeof item.time?.completed === 'number';
     item.content.forEach((part, i) => {
       const p = part as { type?: unknown; id?: unknown; name?: unknown; state?: unknown };
       if (p?.type !== 'tool') return;
       const state = (p.state ?? {}) as { status?: unknown; input?: unknown };
       const label = toolLabel(typeof p.name === 'string' ? p.name : '', state.input);
+      let status = toolStatus(state.status);
+      if (finished && status === 'running') status = 'done';
       toolEvents.push({
         id: typeof p.id === 'string' && p.id ? p.id : `${item.id ?? 'evt'}#${i}`,
         title: label.title,
         detail: label.detail,
-        status: toolStatus(state.status),
+        status,
       });
     });
   }
