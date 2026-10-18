@@ -173,7 +173,7 @@ export function PaperCard({
   };
 
   return (
-    <article className="relative rounded-md border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-800 dark:bg-neutral-800/60">
+    <article className="relative rounded-md border border-border bg-muted p-2  /60">
       {onRemove && (
         <button
           type="button"
@@ -181,7 +181,7 @@ export function PaperCard({
           disabled={removing}
           title={t('library.remove')}
           aria-label={t('library.remove')}
-          className="absolute right-1.5 top-1.5 rounded p-0.5 text-neutral-400 transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="absolute right-1.5 top-1.5 rounded p-0.5 text-muted-foreground transition-colors hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <X size={12} />
         </button>
@@ -193,7 +193,7 @@ export function PaperCard({
           target="_blank"
           rel="noopener noreferrer"
           title={link}
-          className="block pr-5 text-[13px] font-medium leading-snug text-neutral-800 hover:underline dark:text-neutral-100"
+          className="block pr-5 text-[13px] font-medium leading-snug text-foreground hover:underline"
         >
           {paper.title}
         </a>
@@ -203,37 +203,37 @@ export function PaperCard({
 
       {paper.authors.length > 0 && (
         <p
-          className="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-neutral-400"
+          className="mt-0.5 truncate text-[11px] text-muted-foreground "
           title={paper.authors.join(', ')}
         >
           {paper.authors.join(', ')}
         </p>
       )}
       {(paper.year !== null || paper.venue !== null) && (
-        <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
+        <p className="text-[11px] text-muted-foreground dark:text-muted-foreground">
           {[paper.year, paper.venue].filter(Boolean).join(' · ')}
         </p>
       )}
 
       <div className="mt-1 flex flex-wrap items-center gap-1">
         <span
-          className="inline-flex items-center gap-0.5 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+          className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground  "
           title={t('journal.sortCitations')}
         >
           <Quote size={9} />
           {paper.citations}
         </span>
-        <span className="rounded border border-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+        <span className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground  ">
           {SOURCE_BADGE[paper.source]}
         </span>
       </div>
 
       {paper.abstract && (
         <details className="mt-1">
-          <summary className="cursor-pointer select-none text-[11px] text-neutral-400 transition-colors hover:text-neutral-600 dark:hover:text-neutral-300">
+          <summary className="cursor-pointer select-none text-[11px] text-muted-foreground transition-colors hover:text-foreground">
             {t('journal.abstract')}
           </summary>
-          <p className="mt-0.5 line-clamp-3 text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
+          <p className="mt-0.5 line-clamp-3 text-[11px] leading-snug text-muted-foreground ">
             {paper.abstract}
           </p>
         </details>
@@ -243,7 +243,7 @@ export function PaperCard({
         {onSave ? (
           savedBibKey ? (
             <span
-              className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400"
+              className="inline-flex items-center gap-0.5 text-accent dark:text-blue-400"
               title={`${t('journal.savedChip')} · ${savedBibKey}`}
             >
               ✓ {savedBibKey}
@@ -279,7 +279,7 @@ export function PaperCard({
           <button
             type="button"
             onClick={() => void toggleRelated()}
-            className="inline-flex items-center gap-0.5 text-neutral-500 transition-colors hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+            className="inline-flex items-center gap-0.5 text-muted-foreground transition-colors hover:text-foreground  "
           >
             {t('journal.related')}
             <ChevronDown size={10} className={`transition-transform ${relatedOpen ? 'rotate-0' : '-rotate-90'}`} />
@@ -290,7 +290,7 @@ export function PaperCard({
       {saveFailed && <p className="mt-1 text-[10px] text-red-500">{t('ai.error')}</p>}
 
       {relatedOpen && related && related.length > 0 && (
-        <ul className="mt-1.5 space-y-0.5 border-l border-neutral-200 pl-2.5 dark:border-neutral-700">
+        <ul className="mt-1.5 space-y-0.5 border-l border-border pl-2.5 ">
           {related.map((child, index) => {
             const childLink = paperOpenUrl(child);
             return (
@@ -301,14 +301,14 @@ export function PaperCard({
                     target="_blank"
                     rel="noopener noreferrer"
                     title={childLink}
-                    className="text-neutral-600 hover:underline dark:text-neutral-300"
+                    className="text-card-foreground hover:underline "
                   >
                     {child.title}
                   </a>
                 ) : (
-                  <span className="text-neutral-600 dark:text-neutral-300">{child.title}</span>
+                  <span className="text-card-foreground ">{child.title}</span>
                 )}
-                <span className="text-neutral-400 dark:text-neutral-500">
+                <span className="text-muted-foreground dark:text-muted-foreground">
                   {' · '}
                   {[child.year, child.citations].filter((part) => part !== null).join(' · ')}
                 </span>
@@ -425,7 +425,7 @@ export function JournalPanel({ slug }: { slug: string }) {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 border-b border-neutral-200 p-2 dark:border-neutral-800">
+      <div className="shrink-0 border-b border-border p-2 ">
         <div className="flex items-center gap-1.5">
           <input
             value={query}
@@ -438,7 +438,7 @@ export function JournalPanel({ slug }: { slug: string }) {
             }}
             placeholder={t('journal.searchPlaceholder')}
             aria-label={t('journal.searchPlaceholder')}
-            className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-transparent px-2 py-1 text-[12px] outline-none transition-colors placeholder:text-neutral-400 focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-200"
+            className="min-w-0 flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-[12px] outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
           />
           <select
             value={sort}
@@ -450,7 +450,7 @@ export function JournalPanel({ slug }: { slug: string }) {
             }}
             aria-label={t('journal.sort')}
             title={t('journal.sort')}
-            className="shrink-0 cursor-pointer rounded-md border border-neutral-300 bg-transparent px-1 py-1 text-[11px] outline-none transition-colors dark:border-neutral-700"
+            className="shrink-0 cursor-pointer rounded-md border border-border bg-transparent px-1 py-1 text-[11px] outline-none transition-colors "
           >
             <option value="relevance">{t('journal.sortRelevance')}</option>
             <option value="citations">{t('journal.sortCitations')}</option>
@@ -462,7 +462,7 @@ export function JournalPanel({ slug }: { slug: string }) {
             disabled={loading || !query.trim()}
             title={t('journal.search')}
             aria-label={t('journal.search')}
-            className="flex shrink-0 items-center justify-center rounded-md bg-neutral-900 p-1.5 text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+            className="flex shrink-0 items-center justify-center rounded-md bg-primary p-1.5 text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Search size={13} className={loading ? 'animate-pulse' : ''} />
           </button>
@@ -470,11 +470,11 @@ export function JournalPanel({ slug }: { slug: string }) {
 
         {sourcesUsed.length > 0 && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1">
-            <span className="text-[9px] uppercase tracking-wide text-neutral-400">{t('journal.sources')}</span>
+            <span className="text-[9px] uppercase tracking-wide text-muted-foreground">{t('journal.sources')}</span>
             {sourcesUsed.map((name, index) => (
               <span
                 key={`${name}-${index}`}
-                className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground  "
               >
                 {prettySource(name)}
               </span>
@@ -485,15 +485,15 @@ export function JournalPanel({ slug }: { slug: string }) {
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {loading ? (
-          <p className="px-1 py-6 text-center text-xs text-neutral-400">{t('journal.loading')}</p>
+          <p className="px-1 py-6 text-center text-xs text-muted-foreground">{t('journal.loading')}</p>
         ) : error ? (
           <p className="px-1 py-6 text-center text-xs text-red-500">{t('journal.error')}</p>
         ) : results === null ? (
-          <p className="px-1 py-6 text-center text-xs leading-relaxed text-neutral-400">
+          <p className="px-1 py-6 text-center text-xs leading-relaxed text-muted-foreground">
             {t('journal.searchHint')}
           </p>
         ) : results.length === 0 ? (
-          <p className="px-1 py-6 text-center text-xs text-neutral-400">{t('journal.empty')}</p>
+          <p className="px-1 py-6 text-center text-xs text-muted-foreground">{t('journal.empty')}</p>
         ) : (
           <ul className="space-y-2">
             {results.map((paper) => (

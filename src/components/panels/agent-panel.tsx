@@ -68,6 +68,9 @@ const TOOL_DOT_TONE: Record<ChatToolEvent['status'], 'green' | 'amber' | 'red'> 
   error: 'red',
 };
 
+/** Chip saran (fase 3.5): prompt cepat di atas input — key i18n `chat.suggest*`. */
+const SUGGESTION_KEYS = ['chat.suggestProgress', 'chat.suggestJournals', 'chat.suggestReview'] as const;
+
 function basename(path: string): string {
   const index = path.lastIndexOf('/');
   return index === -1 ? path : path.slice(index + 1);
@@ -97,32 +100,45 @@ function matchActivityFilter(event: ChatToolEvent, filter: ActivityFilter): bool
     : title.includes('jalankan');
 }
 
+/** Detail tool kadang membawa konfirmasi kunci BibTeX "✓ <bibKey>" — itu ditampilkan
+ * sebagai chip mono amber (aksen) biar gampang dilirik; teks lain tetap polos. */
+function DetailText({ detail }: { detail: string }) {
+  const index = detail.indexOf('✓');
+  if (index === -1) return <>{detail}</>;
+  return (
+    <>
+      {detail.slice(0, index)}
+      <span className="font-mono text-accent">{detail.slice(index)}</span>
+    </>
+  );
+}
+
 /** Kartu timeline collapsible: header 1 baris, detail terbuka pas diklik. */
 function ActivityCard({ event }: { event: ChatToolEvent }) {
   const [open, setOpen] = useState(false);
   return (
-    <li className="overflow-hidden rounded-md border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-800/60">
+    <li className="overflow-hidden rounded-md border border-border bg-muted/60">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left transition-colors hover:bg-muted"
       >
         <StatusDot tone={TOOL_DOT_TONE[event.status]} title={event.status} />
-        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-neutral-700 dark:text-neutral-200">
+        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">
           {event.title}
         </span>
         {event.detail && (
-          <span className="min-w-0 max-w-[45%] shrink-0 truncate text-[10px] text-neutral-400 dark:text-neutral-500">
-            {event.detail}
+          <span className="min-w-0 max-w-[45%] shrink-0 truncate text-[10px] text-muted-foreground">
+            <DetailText detail={event.detail} />
           </span>
         )}
-        <ChevronDown size={11} className={`shrink-0 text-neutral-400 transition-transform ${open ? '' : '-rotate-90'}`} />
+        <ChevronDown size={11} className={`shrink-0 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
       </button>
       {open && event.detail && (
-        <div className="border-t border-neutral-200 px-2 py-1.5 dark:border-neutral-800">
-          <p className="whitespace-pre-wrap break-words text-[10px] font-mono leading-relaxed text-neutral-500 dark:text-neutral-400">
-            {event.detail}
+        <div className="border-t border-border px-2 py-1.5">
+          <p className="whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-muted-foreground">
+            <DetailText detail={event.detail} />
           </p>
         </div>
       )}
@@ -133,13 +149,15 @@ function ActivityCard({ event }: { event: ChatToolEvent }) {
 /** Baris kecil satu event tool (dot status + judul + detail). */
 function ToolRow({ event }: { event: ChatToolEvent }) {
   return (
-    <li className="flex items-start gap-1.5 rounded-md bg-neutral-50 px-2 py-1 dark:bg-neutral-800/60">
+    <li className="flex items-start gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1">
       <span className="mt-1 shrink-0">
         <StatusDot tone={TOOL_DOT_TONE[event.status]} title={event.status} />
       </span>
       <span className="min-w-0 flex-1 text-[11px] leading-snug">
-        <span className="font-medium text-neutral-700 dark:text-neutral-200">{event.title}</span>
-        {event.detail && <span className="text-neutral-400 dark:text-neutral-500"> · {event.detail}</span>}
+        <span className="font-medium text-foreground">{event.title}</span>
+        {event.detail && (
+          <span className="text-muted-foreground"> · <DetailText detail={event.detail} /></span>
+        )}
       </span>
     </li>
   );
@@ -148,7 +166,7 @@ function ToolRow({ event }: { event: ChatToolEvent }) {
 /** Respons AI gaya-Claude: full-width, tanpa gelembung, markdown rapi. */
 function AssistantText({ text }: { text: string }) {
   return (
-    <div className="w-full max-w-[92%] text-[13px] leading-relaxed text-neutral-800 dark:text-neutral-100 [&_a]:break-all [&_a]:text-blue-600 [&_a]:underline dark:[&_a]:text-blue-400 [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-300 [&_blockquote]:pl-2 [&_blockquote]:text-neutral-500 dark:[&_blockquote]:border-neutral-600 [&_code]:rounded [&_code]:bg-neutral-100 [&_code]:px-1 dark:[&_code]:bg-neutral-800 [&_h1]:mt-2 [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:mt-2 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h3]:text-[13px] [&_h3]:font-medium [&_li]:my-0.5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:my-1 [&_pre]:my-1 [&_pre]:overflow-x-auto [&_pre_code]:bg-neutral-100 dark:[&_pre_code]:bg-neutral-800 [&_strong]:font-semibold [&_table]:my-1 [&_table]:text-[11px] [&_td]:border [&_td]:border-neutral-200 [&_td]:px-1.5 [&_td]:py-0.5 [&_th]:border [&_th]:border-neutral-200 [&_th]:bg-neutral-50 [&_th]:px-1.5 [&_th]:py-0.5 [&_th]:font-medium dark:[&_td]:border-neutral-700 dark:[&_th]:border-neutral-700 dark:[&_th]:bg-neutral-800 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-4">
+    <div className="w-full max-w-[92%] text-[13px] leading-relaxed text-card-foreground [&_a]:break-all [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-2 [&_blockquote]:text-muted-foreground [&_code]:rounded [&_code]:border [&_code]:border-border [&_code]:bg-muted [&_code]:px-1 [&_h1]:mt-2 [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:mt-2 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h3]:text-[13px] [&_h3]:font-medium [&_li]:my-0.5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:my-1 [&_pre]:my-1 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:rounded-none [&_pre_code]:border-0 [&_pre_code]:bg-transparent [&_pre_code]:px-0 [&_strong]:font-semibold [&_table]:my-1 [&_table]:text-[11px] [&_td]:border [&_td]:border-border [&_td]:px-1.5 [&_td]:py-0.5 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:px-1.5 [&_th]:py-0.5 [&_th]:font-medium [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-4">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
@@ -157,17 +175,17 @@ function AssistantText({ text }: { text: string }) {
 function MessageBubble({ message }: { message: ChatMessage }) {
   if (message.role === 'system') {
     return (
-      <div className="px-4 text-center text-[11px] text-neutral-400 dark:text-neutral-500">{message.text}</div>
+      <div className="px-4 text-center text-[11px] text-muted-foreground">{message.text}</div>
     );
   }
 
   const isUser = message.role === 'user';
-  // User = gelembung kanan. AI = blok teks bersih full-width (tanpa gelembung,
-  // markdown di-render) gaya Claude.
+  // User = gelembung navy rata kanan. AI = blok teks bersih full-width (tanpa
+  // gelembung, markdown di-render) gaya Claude.
   if (isUser) {
     return (
       <div className="flex flex-col items-end">
-        <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-blue-600/15 px-3 py-1.5 text-[13px] leading-relaxed text-neutral-900 dark:bg-blue-400/15 dark:text-neutral-50">
+        <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-[13px] leading-relaxed text-primary-foreground">
           {message.text}
         </div>
       </div>
@@ -178,7 +196,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       {message.text ? <AssistantText text={message.text} /> : null}
       {!isUser && (message.toolEvents?.length ?? 0) > 0 && (
         <details className="w-full">
-          <summary className="cursor-pointer select-none py-0.5 text-[10px] text-neutral-400 transition-colors hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+          <summary className="cursor-pointer select-none py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground">
             ⚡ Aktivitas AI ({message.toolEvents?.length ?? 0} langkah)
           </summary>
           <ul className="mt-1 w-full space-y-1">
@@ -226,6 +244,7 @@ export function AgentPanel({
   const pickerRef = useRef<HTMLDivElement>(null);
   const capsRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Popover kemampuan ikut ketutup pas klik di luar-nya.
   useEffect(() => {
@@ -284,10 +303,17 @@ export function AgentPanel({
     }
   };
 
+  // Chip saran: isi draft + fokus ke textarea. Gak auto-kirim — user yang
+  // menekan Enter (jujur & aman, pesannya masih bisa diedit).
+  const applySuggestion = (text: string) => {
+    setDraft(text);
+    textareaRef.current?.focus();
+  };
+
   return (
-    <aside className="flex h-full flex-col border-l border-neutral-200 bg-neutral-50/60 dark:border-neutral-800 dark:bg-neutral-900/40">
-      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-neutral-200 px-2 dark:border-neutral-800">
-        <Sparkles size={13} className="shrink-0 text-neutral-400" />
+    <aside className="flex h-full flex-col border-l border-border bg-background">
+      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border bg-card px-2">
+        <Sparkles size={13} className="shrink-0 text-accent" />
         <SegmentedGroup
           options={[
             { value: 'chat', label: t('ai.chat') },
@@ -297,7 +323,7 @@ export function AgentPanel({
           onSelect={(value) => setActiveTab(value as 'chat' | 'activity')}
         />
         <span
-          className="ml-auto min-w-0 max-w-20 truncate text-[10px] text-neutral-400"
+          className="ml-auto min-w-0 max-w-28 truncate font-serif text-sm font-semibold tracking-tight text-foreground"
           title={projectTitle}
         >
           {projectTitle}
@@ -306,20 +332,22 @@ export function AgentPanel({
           <button
             type="button"
             onClick={() => setModelOpen((v) => !v)}
-            className="flex items-center gap-0.5 rounded-md border border-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            className={`flex items-center gap-0.5 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] transition-colors ${
+              currentModel ? 'text-primary' : 'text-muted-foreground'
+            }`}
             title={t('ai.models')}
           >
             <span className="max-w-20 truncate">{currentModel?.name ?? t('ai.autoModel')}</span>
             <ChevronDown size={11} />
           </button>
           {modelOpen && (
-            <div className="absolute right-0 top-8 z-40 max-h-72 w-64 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+            <div className="absolute right-0 top-8 z-40 max-h-72 w-64 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg">
               {models.length === 0 && (
-                <p className="px-2 py-2 text-[11px] text-neutral-400">{t('ai.modelsEmpty')}</p>
+                <p className="px-2 py-2 text-[11px] text-muted-foreground">{t('ai.modelsEmpty')}</p>
               )}
               {models.map((group) => (
                 <div key={group.providerID} className="mb-0.5">
-                  <p className="px-2 py-0.5 text-[9px] uppercase tracking-wide text-neutral-400">
+                  <p className="px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">
                     {group.label}
                   </p>
                   {group.models.map((model) => {
@@ -335,12 +363,12 @@ export function AgentPanel({
                         }}
                         className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] transition-colors ${
                           active
-                            ? 'bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-200'
-                            : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800'
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-foreground hover:bg-muted'
                         }`}
                       >
                         <span className="min-w-0 flex-1 truncate">{model.name}</span>
-                        {active && <Check size={11} className="shrink-0 text-blue-600 dark:text-blue-400" />}
+                        {active && <Check size={11} className="shrink-0 text-primary" />}
                       </button>
                     );
                   })}
@@ -348,20 +376,20 @@ export function AgentPanel({
               ))}
               {/* Login provider lain pakai API key — langsung dari dropdown. */}
               {providerPicks.length > 0 && (
-                <div className="mt-0.5 border-t border-neutral-100 px-1 pt-1 dark:border-neutral-800">
-                  <p className="px-1 py-0.5 text-[9px] uppercase tracking-wide text-neutral-400">
+                <div className="mt-0.5 border-t border-border px-1 pt-1">
+                  <p className="px-1 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">
                     {t('ai.providersLogin')}
                   </p>
                   {providerPicks.map((pick) => {
                     const open = keyOpenId === pick.integrationID;
                     return (
                       <div key={pick.integrationID}>
-                        <div className="flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/60">
+                        <div className="flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-muted">
                           <StatusDot
                             tone={pick.connected ? 'green' : 'idle'}
                             title={pick.connected ? t('ai.providerConnected') : t('ai.providerNotConnected')}
                           />
-                          <span className="min-w-0 flex-1 truncate text-[11px] text-neutral-700 dark:text-neutral-200">
+                          <span className="min-w-0 flex-1 truncate text-[11px] text-foreground">
                             {pick.name}
                           </span>
                           <button
@@ -371,7 +399,7 @@ export function AgentPanel({
                               setKeyDraft('');
                             }}
                             disabled={Boolean(keyOpenId) && !open}
-                            className="rounded px-1.5 py-0.5 text-[10px] text-blue-700 transition-colors hover:bg-blue-50 disabled:opacity-40 dark:text-blue-300 dark:hover:bg-blue-950/40"
+                            className="rounded px-1.5 py-0.5 text-[10px] text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
                           >
                             {open ? t('ai.providerCancel') : pick.connected ? t('ai.providerReplace') : t('ai.providerConnect')}
                           </button>
@@ -384,7 +412,7 @@ export function AgentPanel({
                                   setModelOpen(false);
                                 }
                               }}
-                              className="rounded px-1.5 py-0.5 text-[10px] text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                              className="rounded px-1.5 py-0.5 text-[10px] text-destructive transition-colors hover:bg-destructive/10"
                             >
                               {t('ai.providerDisconnect')}
                             </button>
@@ -406,7 +434,7 @@ export function AgentPanel({
                                 if (e.key === 'Escape') setKeyOpenId(null);
                               }}
                               placeholder={t('ai.providerKeyPlaceholder')}
-                              className="min-w-0 flex-1 rounded border border-neutral-200 bg-white px-2 py-1 text-[11px] outline-none focus:border-blue-400 dark:border-neutral-700 dark:bg-neutral-900"
+                              className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1 text-[11px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                             />
                             <button
                               type="button"
@@ -416,7 +444,7 @@ export function AgentPanel({
                                 setKeyDraft('');
                                 setKeyOpenId(null);
                               }}
-                              className="shrink-0 rounded bg-blue-600 px-2 py-1 text-[10px] text-white transition-colors hover:bg-blue-700 disabled:opacity-40"
+                              className="shrink-0 rounded-lg bg-primary px-2 py-1 text-[10px] text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {t('ai.providerSave')}
                             </button>
@@ -425,10 +453,10 @@ export function AgentPanel({
                       </div>
                     );
                   })}
-                  <p className="px-1 pb-1 text-[9px] leading-snug text-neutral-400">{t('ai.providerKeyHint')}</p>
+                  <p className="px-1 pb-1 text-[9px] leading-snug text-muted-foreground">{t('ai.providerKeyHint')}</p>
                 </div>
               )}
-              <p className="border-t border-neutral-100 px-2 py-1.5 text-[10px] leading-snug text-neutral-400 dark:border-neutral-800">
+              <p className="border-t border-border px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
                 {t('ai.providersNote')}
               </p>
             </div>
@@ -440,16 +468,16 @@ export function AgentPanel({
             onClick={() => setCapsOpen((v) => !v)}
             className={`flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10px] transition-colors ${
               capsOpen
-                ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900'
-                : 'border-neutral-200 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-muted text-muted-foreground'
             }`}
             title={t('ai.capabilities')}
           >
             <SlidersHorizontal size={11} />
           </button>
           {capsOpen && (
-            <div className="absolute right-0 top-8 z-40 w-64 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-              <p className="px-2 py-1 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+            <div className="absolute right-0 top-8 z-40 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
+              <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
                 {t('ai.capabilities')}
               </p>
               {(
@@ -464,25 +492,25 @@ export function AgentPanel({
                     key={item.key}
                     type="button"
                     onClick={() => onToggleCapability(item.key, !on)}
-                    className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-muted"
                   >
                     <span
                       className={`mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full px-0.5 transition-colors ${
-                        on ? 'bg-blue-600 justify-end' : 'bg-neutral-300 justify-start dark:bg-neutral-700'
+                        on ? 'bg-primary justify-end' : 'bg-muted justify-start'
                       }`}
                     >
-                      <span className="h-3 w-3 rounded-full bg-white" />
+                      <span className="h-3 w-3 rounded-full bg-card" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-[11px] font-medium text-neutral-700 dark:text-neutral-200">
+                      <span className="block text-[11px] font-medium text-foreground">
                         {item.title}
                       </span>
-                      <span className="block text-[10px] leading-snug text-neutral-400">{item.desc}</span>
+                      <span className="block text-[10px] leading-snug text-muted-foreground">{item.desc}</span>
                     </span>
                   </button>
                 );
               })}
-              <p className="border-t border-neutral-100 px-2 py-1.5 text-[10px] leading-snug text-neutral-400 dark:border-neutral-800">
+              <p className="border-t border-border px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
                 {t('ai.capabilitiesNote')}
               </p>
             </div>
@@ -490,14 +518,14 @@ export function AgentPanel({
         </div>
         {/* Meter token sesi: total in+out; usage belum ke-wire → "—". */}
         <span
-          className="shrink-0 rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+          className="shrink-0 rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
           title={
             usage
               ? `Masuk ${formatTokenCompact(usage.input)} · Keluar ${formatTokenCompact(usage.output)}`
               : t('ai.usageTokens')
           }
         >
-          {t('ai.usageTokens')} {usage ? formatTokenCompact(usage.input + usage.output) : '—'}
+          {t('ai.usageTokens')} <span className="font-mono">{usage ? formatTokenCompact(usage.input + usage.output) : '—'}</span>
         </span>
         <StatusDot
           tone={connected ? 'green' : 'amber'}
@@ -509,7 +537,7 @@ export function AgentPanel({
         <>
           {!connected && (
             // Belum login provider Plus → chat tetap jalan (model gratis); CTA ramping di atas.
-            <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+            <div className="flex shrink-0 items-center gap-2 border-b border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] text-foreground">
               <span className="min-w-0 flex-1 leading-snug">{t('ai.freeBanner')}</span>
               <Button
                 variant="outline"
@@ -521,10 +549,10 @@ export function AgentPanel({
             </div>
           )}
           {/* Banner status session */}
-          <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-neutral-200 px-2.5 dark:border-neutral-800">
+          <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-border px-2.5">
             <StatusDot tone="idle" />
             <span
-              className="min-w-0 flex-1 truncate text-[11px] text-neutral-500 dark:text-neutral-400"
+              className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground"
               title={projectTitle}
             >
               {sessionReady ? t('ai.sessionReady') : projectTitle}
@@ -542,13 +570,13 @@ export function AgentPanel({
 
           <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5">
             {messages.length === 0 ? (
-              <p className="px-2 py-4 text-center text-xs text-neutral-400">{t('ai.empty')}</p>
+              <p className="px-2 py-4 text-center text-xs text-muted-foreground">{t('ai.empty')}</p>
             ) : (
               <div className="space-y-2.5">
                 {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
                 {busy && (
                   <div className="flex justify-start" role="status" aria-label={t('ai.typing')}>
-                    <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm bg-neutral-100 px-3 py-2 text-neutral-400 dark:bg-neutral-800/70 dark:text-neutral-500">
+                    <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm bg-muted px-3 py-2 text-muted-foreground">
                       <span className="typing-dots">
                         <span />
                         <span />
@@ -563,15 +591,36 @@ export function AgentPanel({
           </div>
 
           <form
-            className="border-t border-neutral-200 p-2.5 dark:border-neutral-800"
+            className="border-t border-border bg-card p-2.5"
             onSubmit={(event) => {
               event.preventDefault();
               submitDraft();
             }}
           >
+            {/* Chip saran (fase 3.5): isi draft + fokus, gak auto-kirim. */}
+            {!busy && (
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {t('chat.suggestLabel')}
+                </span>
+                {SUGGESTION_KEYS.map((key) => {
+                  const text = t(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => applySuggestion(text)}
+                      className="cursor-pointer rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                    >
+                      {text}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {activeFilePath && (
               <div
-                className="mb-1.5 flex max-w-full items-center gap-1 self-start rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                className="mb-1.5 flex max-w-full items-center gap-1 self-start rounded-full border border-border bg-muted/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground"
                 title={activeFilePath}
               >
                 <FileText size={11} className="shrink-0" />
@@ -580,24 +629,29 @@ export function AgentPanel({
             )}
             <div className="flex items-end gap-1.5">
               <textarea
+                ref={textareaRef}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={t('ai.placeholder')}
                 rows={2}
-                className="min-h-0 max-h-28 flex-1 resize-none rounded-md border border-neutral-300 bg-transparent px-2.5 py-1.5 text-[13px] outline-none transition-colors placeholder:text-neutral-400 focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-200"
+                className="min-h-0 max-h-28 flex-1 resize-none rounded-xl border border-border bg-background px-2.5 py-1.5 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
               />
-              <Button type="submit" disabled={!canSend}>
+              <button
+                type="submit"
+                disabled={!canSend}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              >
                 <SendHorizontal size={14} />
                 {t('ai.send')}
-              </Button>
+              </button>
             </div>
           </form>
         </>
       ) : (
         // Tab Aktivitas: chip filter + timeline collapsible (grup per pesan, terbaru di atas).
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center gap-1 border-b border-neutral-200 px-2.5 py-1.5 dark:border-neutral-800">
+          <div className="flex shrink-0 items-center gap-1 border-b border-border bg-card px-2.5 py-1.5">
             {ACTIVITY_FILTERS.map((item) => (
               <button
                 key={item.value}
@@ -605,26 +659,26 @@ export function AgentPanel({
                 onClick={() => setActivityFilter(item.value)}
                 className={`rounded-full px-2 py-0.5 text-[10px] transition-colors ${
                   activityFilter === item.value
-                    ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
-                    : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 {t(item.key)}
               </button>
             ))}
-            <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+            <span className="ml-auto rounded-full border border-border bg-muted/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
               {t('ai.activitySteps', { n: visibleCount, count: visibleCount })}
             </span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5">
             {activityGroups.length === 0 ? (
-              <p className="px-2 py-4 text-center text-xs text-neutral-400">{t('ai.activityEmpty')}</p>
+              <p className="px-2 py-4 text-center text-xs text-muted-foreground">{t('ai.activityEmpty')}</p>
             ) : (
               <div className="space-y-3">
                 {visibleGroups.map((group) => (
                   <section key={group.message.id}>
                     <p
-                      className="mb-1 truncate px-0.5 text-[9px] uppercase tracking-wide text-neutral-400"
+                      className="mb-1 truncate px-0.5 text-[9px] uppercase tracking-wide text-muted-foreground"
                       title={group.message.text}
                     >
                       {group.message.text}

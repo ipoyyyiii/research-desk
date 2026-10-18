@@ -66,7 +66,7 @@ export function ThesisEditor({ slug, filePath }: { slug: string; filePath: strin
     return <div className="flex h-full items-center justify-center p-8 text-sm text-red-600">{loadError}</div>;
   }
   if (markdown === null) {
-    return <div className="flex h-full items-center justify-center p-8 text-sm text-neutral-400">…</div>;
+    return <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">…</div>;
   }
   return <EditorSurface slug={slug} filePath={filePath} initialMarkdown={markdown} />;
 }
@@ -260,7 +260,7 @@ function EditorSurface({
       <SelectionBubbleMenu editor={editor} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div
-          className="paper-wrap mx-auto my-6 max-w-[820px] rounded-lg bg-white px-12 py-10 shadow-sm ring-1 ring-neutral-200/70 dark:bg-neutral-900 dark:ring-neutral-800"
+          className="paper-wrap mx-auto my-6 max-w-[820px] rounded-lg bg-card px-12 py-10 text-card-foreground shadow-sm ring-1 ring-border"
           style={{
             fontFamily: prefs.fontFamily.css,
             fontSize: `${prefs.fontSize}pt`,
@@ -270,7 +270,7 @@ function EditorSurface({
           <EditorContent editor={editor} />
         </div>
       </div>
-      <footer className="flex h-8 shrink-0 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-neutral-800">
+      <footer className="flex h-8 shrink-0 items-center justify-between border-t border-border px-4 text-[11px] text-muted-foreground">
         <span>
           {words} {t('editor.words')}
         </span>

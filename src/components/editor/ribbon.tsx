@@ -91,7 +91,7 @@ function TBtn({
       disabled={isDisabled}
       title={title}
       onClick={() => onClick(editor)}
-      className={`inline-flex h-7 w-7 items-center justify-center rounded text-neutral-700 transition-colors hover:bg-neutral-200 disabled:opacity-35 dark:text-neutral-300 dark:hover:bg-neutral-700 ${
+      className={`inline-flex h-7 w-7 items-center justify-center rounded text-foreground transition-colors hover:bg-muted disabled:opacity-35 ${
         isActive ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300' : ''
       }`}
     >
@@ -100,10 +100,10 @@ function TBtn({
   );
 }
 
-const Sep = () => <span className="mx-1 h-5 w-px shrink-0 bg-neutral-200 dark:bg-neutral-700" />;
+const Sep = () => <span className="mx-1 h-5 w-px shrink-0 bg-border" />;
 
 const selectClass =
-  'h-7 rounded border border-neutral-200 bg-white px-1.5 text-xs text-neutral-700 outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
+  'h-7 rounded border border-border bg-background px-1.5 text-xs text-foreground outline-none transition-colors';
 
 // ── Ribbon utama (bar ala-Word/GDocs) ────────────────────────────────────────
 
@@ -144,7 +144,7 @@ export function Ribbon({
         : 'p';
 
   return (
-    <div className="relative border-b border-neutral-200 bg-white px-2 py-1 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="relative border-b border-border bg-card px-2 py-1">
       <div className="flex flex-wrap items-center gap-0.5">
         {/* Undo/Redo */}
         <TBtn editor={editor} title={t('toolbar.undo')} disabled={(ed) => !ed.can().undo()} onClick={(ed) => ed.chain().focus().undo().run()}>
@@ -273,10 +273,10 @@ export function Ribbon({
             <TableIcon size={15} />
           </TBtn>
           {tableMenuOpen && (
-            <div className="absolute left-0 top-8 z-40 w-44 rounded-md border border-neutral-200 bg-white p-1 text-xs shadow-lg dark:border-neutral-700 dark:bg-neutral-800">
+            <div className="absolute left-0 top-8 z-40 w-44 rounded-md border border-border bg-card p-1 text-xs shadow-lg">
               <button
                 type="button"
-                className="w-full rounded px-2 py-1 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                className="w-full rounded px-2 py-1 text-left transition-colors hover:bg-muted"
                 onClick={() => {
                   editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
                   setTableMenuOpen(false);
@@ -284,7 +284,7 @@ export function Ribbon({
               >
                 ＋ {t('toolbar.tableInsert')}
               </button>
-              <div className="my-1 h-px bg-neutral-200 dark:bg-neutral-700" />
+              <div className="my-1 h-px bg-border" />
               {[
                 { label: t('toolbar.rowAbove'), run: 'addRowBefore' as const, disabled: !inTable },
                 { label: t('toolbar.rowBelow'), run: 'addRowAfter' as const, disabled: !inTable },
@@ -298,7 +298,7 @@ export function Ribbon({
                   key={item.run}
                   type="button"
                   disabled={item.disabled}
-                  className="w-full rounded px-2 py-1 text-left hover:bg-neutral-100 disabled:opacity-35 dark:hover:bg-neutral-700"
+                  className="w-full rounded px-2 py-1 text-left transition-colors hover:bg-muted disabled:opacity-35"
                   onClick={() => {
                     editor.chain().focus()[item.run]().run();
                     setTableMenuOpen(false);

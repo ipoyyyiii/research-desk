@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, File as FileIcon, FolderClosed, FolderOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Search } from 'lucide-react';
 import { useT } from '@/lib/preferences';
-import { Button, Modal } from '@/components/ui';
+import { Modal } from '@/components/ui';
 import { JournalPanel } from '@/components/panels/journal-panel';
 import { LibraryPanel } from '@/components/panels/library-panel';
+import { IconRail, type LeftTab } from '@/components/workspace/icon-rail';
 
 type TreeEntry = {
   path: string; // relatif dari root project, selalu '/'
@@ -38,6 +39,16 @@ function parentPathOf(p: string): string {
 
 const TEXT_EXTS = ['.md', '.txt', '.json', '.jsonc', '.csv', '.ris', '.bib', '.tex'];
 const isTextFile = (name: string) => TEXT_EXTS.some((ext) => name.toLowerCase().endsWith(ext));
+
+/** Ekstensi yang dapet badge di tree — sisanya (mis. .json) tampil polos. */
+const BADGE_EXTS = new Set(['md', 'pdf', 'bib', 'docx', 'txt', 'png', 'jpg']);
+
+function extBadge(name: string): string | null {
+  const dot = name.lastIndexOf('.');
+  if (dot === -1) return null;
+  const ext = name.slice(dot + 1).toLowerCase();
+  return BADGE_EXTS.has(ext) ? ext.toUpperCase() : null;
+}
 
 /** Fetch pohon berkas; refetch on window-focus (file hasil copy manual langsung	muncul). */
 function useFileTree(slug: string, version: number) {
@@ -109,12 +120,32 @@ export function LeftPanel({
 }) {
   const t = useT();
   const { entries, loading, error } = useFileTree(slug, treeVersion);
-  const nodes = buildTree(entries);
 
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['dokumen', 'referensi']));
-  const [activeTab, setActiveTab] = useState<'file' | 'journal' | 'library'>('file');
+  const [activeTab, setActiveTab] = useState<LeftTab>('file');
   const [pendingDelete, setPendingDelete] = useState<TreeEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [filter, setFilter] = useState('');
+
+  // Filter client-side by path (case-insensitive). Folder induk ikut disertakan
+  // biar hasil tetap muncul di dalam pohonnya — buildTree butuh parent dir-nya ada.
+  const normalizedFilter = filter.trim().toLowerCase();
+  const filterActive = normalizedFilter.length > 0;
+  const filteredEntries = filterActive
+    ? (() => {
+        const matched = entries.filter((entry) => entry.path.toLowerCase().includes(normalizedFilter));
+        const keep = new Set<string>(matched.map((entry) => entry.path));
+        for (const entry of matched) {
+          let parent = parentPathOf(entry.path);
+          while (parent && !keep.has(parent)) {
+            keep.add(parent);
+            parent = parentPathOf(parent);
+          }
+        }
+        return entries.filter((entry) => keep.has(entry.path));
+      })()
+    : entries;
+  const nodes = buildTree(filteredEntries);
 
   const toggleExpand = (path: string) => {
     setExpanded((prev) => {
@@ -142,23 +173,24 @@ export function LeftPanel({
 
   const renderNode = (node: TreeNode, depth: number): React.ReactNode => {
     if (node.type === 'dir') {
-      const isOpen = expanded.has(node.path);
+      // Saat filter aktif semua folder yang relevan dibuka otomatis — hasil search langsung kelihatan.
+      const isOpen = filterActive || expanded.has(node.path);
       return (
         <li key={node.path}>
           <button
             onClick={() => toggleExpand(node.path)}
-            className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-[13px] hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+            className="flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-muted"
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
             {isOpen ? (
-              <ChevronDown size={13} className="shrink-0 text-neutral-400" />
+              <ChevronDown size={13} className="shrink-0 text-muted-foreground" />
             ) : (
-              <ChevronRight size={13} className="shrink-0 text-neutral-400" />
+              <ChevronRight size={13} className="shrink-0 text-muted-foreground" />
             )}
             {isOpen ? (
-              <FolderOpen size={13} className="shrink-0 text-neutral-400" />
+              <FolderOpen size={13} className="shrink-0 text-muted-foreground" />
             ) : (
-              <FolderClosed size={13} className="shrink-0 text-neutral-400" />
+              <Folder size={13} className="shrink-0 text-muted-foreground" />
             )}
             <span className="truncate">{node.name}</span>
           </button>
@@ -169,84 +201,136 @@ export function LeftPanel({
 
     const openable = isTextFile(node.name);
     const active = openFile === node.path;
+    const badge = extBadge(node.name);
     return (
       <li key={node.path}>
         <button
           onClick={() => openable && onOpenFile(node.path)}
           onDoubleClick={() => openable && setPendingDelete(node)}
           disabled={!openable}
-          className={`group flex w-full items-center gap-1.5 px-2 py-1 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
+          className={`group flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
             active
-              ? 'bg-neutral-100 font-medium dark:bg-neutral-800'
-              : 'hover:bg-neutral-100 dark:hover:bg-neutral-800/60'
+              ? 'bg-primary/10 font-medium text-primary'
+              : 'cursor-pointer text-foreground hover:bg-muted'
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           title={!openable ? t('tree.fase3Hint') : node.path}
         >
-          <FileIcon size={13} className="shrink-0 text-neutral-400" />
+          <FileText
+            size={13}
+            className={`shrink-0 ${active ? 'text-primary' : 'text-muted-foreground'}`}
+          />
           <span className="truncate">{node.name}</span>
-          <span
-            role="button"
-            tabIndex={-1}
-            onClick={(event) => {
-              event.stopPropagation();
-              setPendingDelete(node);
-            }}
-            className="ml-auto hidden text-[11px] text-neutral-400 hover:text-red-500 group-hover:inline-flex"
-            title="×"
-          >
-            ×
+          <span className="ml-auto flex shrink-0 items-center gap-1">
+            {badge && (
+              <span className="rounded bg-muted px-1 text-[9px] font-mono uppercase text-muted-foreground">
+                {badge}
+              </span>
+            )}
+            <span
+              role="button"
+              tabIndex={-1}
+              onClick={(event) => {
+                event.stopPropagation();
+                setPendingDelete(node);
+              }}
+              className="hidden text-[11px] text-muted-foreground transition-colors hover:text-destructive group-hover:inline-flex"
+              title="×"
+            >
+              ×
+            </span>
           </span>
         </button>
       </li>
     );
   };
 
-  return (
-    <aside className="flex h-full flex-col border-r border-neutral-200 bg-neutral-50/60 dark:border-neutral-800 dark:bg-neutral-900/40">
-      <div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-neutral-200 px-1.5 dark:border-neutral-800">
-        {(['file', 'journal', 'library'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 rounded px-1.5 py-1 text-xs font-medium transition-colors ${
-              activeTab === tab
-                ? 'bg-neutral-200 dark:bg-neutral-700'
-                : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-            }`}
-            title={t(`tabs.${tab}`)}
-          >
-            {t(`tabs.${tab}`)}
-          </button>
-        ))}
+  const tabHeader = (title: string, chip?: string) => (
+    <header className="shrink-0 border-b border-border bg-card px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-serif text-sm font-semibold tracking-tight text-card-foreground">{title}</h2>
+        {chip && (
+          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-mono text-muted-foreground">
+            {chip}
+          </span>
+        )}
       </div>
+    </header>
+  );
+
+  return (
+    <aside className="flex h-full">
+      <IconRail active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'file' && (
-        <div className="min-h-0 flex-1 overflow-y-auto px-1 py-2">
-          {loading ? (
-            <p className="px-2 py-4 text-xs text-neutral-400">…</p>
-          ) : error ? (
-            <p className="px-2 py-4 text-xs text-red-500">Gagal memuat — coba lagi saat window fokus</p>
-          ) : entries.length === 0 ? (
-            <p className="px-2 py-4 text-xs text-neutral-400">{t('tree.empty')}</p>
-          ) : (
-            <ul>{nodes.map((node) => renderNode(node, 0))}</ul>
-          )}
+        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+          {tabHeader(t('tabs.file'), t('lib.fileCount', { n: entries.length }))}
+          <div className="shrink-0 border-b border-border px-3 py-2">
+            <div className="relative">
+              <Search
+                size={13}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                type="text"
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder={t('lib.searchPlaceholder')}
+                aria-label={t('lib.searchPlaceholder')}
+                className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs text-foreground transition-colors placeholder:text-muted-foreground"
+              />
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-1 py-2">
+            {loading ? (
+              <p className="px-2 py-4 text-xs text-muted-foreground">…</p>
+            ) : error ? (
+              <p className="px-2 py-4 text-xs text-destructive">Gagal memuat — coba lagi saat window fokus</p>
+            ) : entries.length === 0 ? (
+              <p className="px-2 py-4 text-xs text-muted-foreground">{t('tree.empty')}</p>
+            ) : (
+              <ul>{nodes.map((node) => renderNode(node, 0))}</ul>
+            )}
+          </div>
         </div>
       )}
 
-      {activeTab === 'journal' && <JournalPanel slug={slug} />}
-      {activeTab === 'library' && <LibraryPanel slug={slug} />}
+      {activeTab === 'journal' && (
+        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+          {tabHeader(t('journal.header'))}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <JournalPanel slug={slug} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'library' && (
+        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+          {tabHeader(t('tabs.library'))}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <LibraryPanel slug={slug} />
+          </div>
+        </div>
+      )}
 
       <Modal open={!!pendingDelete} onClose={() => setPendingDelete(null)} title={t('common.delete')}>
-        <p className="text-sm">{t('tree.deleteConfirm', { name: pendingDelete?.name ?? '' })}</p>
+        <p className="text-sm text-foreground">{t('tree.deleteConfirm', { name: pendingDelete?.name ?? '' })}</p>
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setPendingDelete(null)}>
+          <button
+            type="button"
+            onClick={() => setPendingDelete(null)}
+            className="cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+          >
             {t('common.cancel')}
-          </Button>
-          <Button variant="outline" disabled={deleting} onClick={() => void performDelete()}>
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={() => void performDelete()}
+            className="cursor-pointer rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             {t('common.delete')}
-          </Button>
+          </button>
         </div>
       </Modal>
     </aside>

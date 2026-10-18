@@ -80,7 +80,11 @@
     "statusOff": "OpenCode not connected",
     "statusOn": "Connected",
     "placeholder": "Ask anything about your chapters… (live in phase 2)",
-    "comingSoon": "Phase 2: streaming chat + tool timeline wired to OpenCode."
+    "comingSoon": "Phase 2: streaming chat + tool timeline wired to OpenCode.",
+    "suggestLabel": "Try",
+    "suggestProgress": "Summarize my document progress",
+    "suggestJournals": "Find journals for my document topic",
+    "suggestReview": "Review my document structure and argument"
   },
   "ai": {
     "chat": "Chat",
@@ -173,7 +177,8 @@
     "error": "Failed to fetch results — try again.",
     "sources": "Active sources",
     "abstract": "Abstract",
-    "search": "Search"
+    "search": "Search",
+    "header": "Journal Search"
   },
   "library": {
     "title": "Saved journals",
@@ -189,5 +194,9 @@
     "fileNotFound": "File not found",
     "fileTooBig": "File too large",
     "unsupportedType": "This file type cannot be opened yet"
+  },
+  "lib": {
+    "fileCount": "{n} files",
+    "searchPlaceholder": "Search files…"
   }
 }

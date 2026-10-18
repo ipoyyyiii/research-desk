@@ -80,11 +80,11 @@ export function LibraryPanel({ slug }: { slug: string }) {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-neutral-200 px-2 py-1.5 dark:border-neutral-800">
-        <span className="min-w-0 truncate text-[11px] font-medium text-neutral-600 dark:text-neutral-300">
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-2 py-1.5 ">
+        <span className="min-w-0 truncate text-[11px] font-medium text-card-foreground ">
           {t('library.title')}
         </span>
-        <span className="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+        <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground  ">
           {entries ? `${entries.length} ${t('library.count')}` : '…'}
         </span>
         <button
@@ -96,7 +96,7 @@ export function LibraryPanel({ slug }: { slug: string }) {
           disabled={loading}
           title={t('library.refresh')}
           aria-label={t('library.refresh')}
-          className="ml-auto shrink-0 rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+          className="ml-auto shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40  "
         >
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -109,13 +109,13 @@ export function LibraryPanel({ slug }: { slug: string }) {
           </p>
         )}
         {loading ? (
-          <p className="px-1 py-6 text-center text-xs text-neutral-400">…</p>
+          <p className="px-1 py-6 text-center text-xs text-muted-foreground">…</p>
         ) : entries === null ? (
-          <p className="px-1 py-6 text-center text-xs text-neutral-400">…</p>
+          <p className="px-1 py-6 text-center text-xs text-muted-foreground">…</p>
         ) : error ? (
           <p className="px-1 py-6 text-center text-xs text-red-500">{t('journal.error')}</p>
         ) : entries.length === 0 ? (
-          <p className="px-1 py-6 text-center text-xs leading-relaxed text-neutral-400">
+          <p className="px-1 py-6 text-center text-xs leading-relaxed text-muted-foreground">
             {t('library.empty')}
           </p>
         ) : (

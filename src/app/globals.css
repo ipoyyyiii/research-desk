@@ -1,42 +1,92 @@
 @import "tailwindcss";
 
+@import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap");
+
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Design tokens: "Kertas dingin + tinta navy + sorot amber" (Swiss Modernism 2.0) ── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --muted: #f5f5f5;
-  --muted-foreground: #737373;
-  --border: #e5e5e5;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --muted: #e9eef5;
+  --muted-foreground: #475569;
+  --border: #cbd5e1;
+  --primary: #1e3a5f;
+  --primary-foreground: #ffffff;
+  --accent: #a16207;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --ring: #1e3a5f;
 }
 
 .dark {
-  --background: #0f0f0f;
-  --foreground: #ededed;
-  --muted: #1c1c1c;
-  --muted-foreground: #a3a3a3;
-  --border: #2e2e2e;
+  --background: #0b1220;
+  --foreground: #e6ecf5;
+  --card: #101a2c;
+  --card-foreground: #e6ecf5;
+  --muted: #18243a;
+  --muted-foreground: #94a6bf;
+  --border: #24324d;
+  --primary: #9dbbe4;
+  --primary-foreground: #0b1220;
+  --accent: #d9a93c;
+  --accent-foreground: #0b1220;
+  --destructive: #f87171;
+  --destructive-foreground: #0b1220;
+  --ring: #9dbbe4;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+  --font-sans: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Crimson Pro", "Times New Roman", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Fokus keyboard yang jelas & konsisten (a11y) */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Seleksi teks pakai warna primer — detail kecil yang bikin "satu rasa" */
+::selection {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+/* Scrollbar tipis senada border */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
 /* ── Kertas editor (feel-Word: serif 12pt-ish, spasi longgar) ──────────────── */
 
 .paper {
-  font-family: "Times New Roman", ui-serif, Georgia, serif;
+  font-family: var(--font-serif);
   font-size: 16px;
   line-height: 1.9;
   color: var(--foreground);
@@ -138,7 +188,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgb(59 130 246 / 0.12);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
   pointer-events: none;
 }
 
@@ -211,8 +261,8 @@ body {
 }
 
 .bubble-btn.is-active {
-  background: rgb(59 130 246 / 0.16);
-  color: rgb(37 99 235);
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  color: var(--primary);
 }
 
 .bubble-btn:disabled {

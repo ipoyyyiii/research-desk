@@ -80,7 +80,11 @@
     "statusOff": "OpenCode belum disambung",
     "statusOn": "Terhubung",
     "placeholder": "Tanya apa aja soal bab kamu… (aktif di fase 2)",
-    "comingSoon": "Fase 2: chat streaming + tool timeline nyambung ke OpenCode."
+    "comingSoon": "Fase 2: chat streaming + tool timeline nyambung ke OpenCode.",
+    "suggestLabel": "Coba",
+    "suggestProgress": "Ringkas kemajuan dokumenku",
+    "suggestJournals": "Carikan jurnal untuk topik dokumenku",
+    "suggestReview": "Review struktur dan argumen dokumenku"
   },
   "ai": {
     "chat": "Chat",
@@ -173,7 +177,8 @@
     "error": "Gagal mengambil hasil — coba lagi.",
     "sources": "Sumber aktif",
     "abstract": "abstrak",
-    "search": "Cari"
+    "search": "Cari",
+    "header": "Pencarian Jurnal"
   },
   "library": {
     "title": "Jurnal tersimpan",
@@ -189,5 +194,9 @@
     "fileNotFound": "File tidak ditemukan",
     "fileTooBig": "File terlalu besar",
     "unsupportedType": "Tipe file ini belum bisa dibuka"
+  },
+  "lib": {
+    "fileCount": "{n} berkas",
+    "searchPlaceholder": "Cari berkas…"
   }
 }

@@ -80,7 +80,7 @@ export function WorkspaceShell({
                   onFileDeleted={handleDeleteFile}
                 />
               </Panel>
-              <Separator className="w-1 bg-neutral-200 transition-colors hover:bg-blue-400 dark:bg-neutral-800" />
+              <Separator className="w-1 bg-neutral-200 transition-colors hover:bg-primary/40 dark:bg-neutral-800" />
             </>
           )}
 
@@ -90,7 +90,7 @@ export function WorkspaceShell({
 
           {!focusMode && (
             <>
-              <Separator className="w-1 bg-neutral-200 transition-colors hover:bg-blue-400 dark:bg-neutral-800" />
+              <Separator className="w-1 bg-neutral-200 transition-colors hover:bg-primary/40 dark:bg-neutral-800" />
               <Panel id="right" defaultSize="27" minSize="18" maxSize="42" className="min-w-0">
                 <ChatPanel slug={slug} projectTitle={projectName} activeFilePath={openFile} />
               </Panel>
