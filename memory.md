@@ -116,7 +116,11 @@ User memasang **agentmemory lokal** (REST `http://localhost:3111`, data `~/.loca
 11. Override picker yang di-set saat smoke test HARUS di-reset ke NULL (biar auto-ChatGPT jalan) — smoke test set `settings.agent_model_override` via sqlite langsung pakai better-sqlite3 + `nvm use 24` (node 20 → SIGSEGV karena native module beda versi).
 12. **Login provider lain dari app = jalur RESMI `client.integration.connect.key({ integrationID, key })`** (commit `119f7cd`) — hot nyala tanpa restart service, provider langsung masuk `provider.list()`; gak divalidasi (key salah baru kena pas chat pertama). Kebalikannya manual: hapus baris di `~/.local/share/opencode/opencode.db` tabel `credential` (`DELETE FROM credential WHERE integration_id = ?`) — bentuk tabel terverifikasi v2.0.32 (kolom id/integration_id/label/value/method_id/active). CLI `opencode auth login --answer` (gotcha #10) jadi tak relevan buat app-route ini. 235 integrasi ada di `integration.list()`; dropdown cuma nawarin 6 popular (anthropic, google, openrouter, deepseek, groq, mistral) yang punya method `key`.
 
-**Yang masih hidden di fase 2 sisa:** riwayat chat loading pas buka ulang app (session export/list messages belum diwalikan), tab aktivitas live tiap tool detail, "tugas aktif" batching, token meter. *(Model picker manual udah BERES — commit `c1c79c2`.)*
+**Yang masih hidden di fase 2 sisa:** *(semua BERES di `6e211be` — riwayat chat persisten + token meter + tab aktivitas detail). Model picker (`c1c79c2`) & login provider (`119f7cd`) juga udah masuk.*
+
+13. **Riwayat chat**: route `GET /api/ai/messages?slug=` — BACA doang (list desc, first.id), GAK boleh bikin session baru (beda dr session route). Item assistant multi-step di-gabung jadi 1 bubble saat load (teks join + toolEvents concat) biar konsisten dgn tampilan streaming. `history.ts` buang type aneh (`model-switched`, `compaction`) + teks user display cuma blok `[PERINTAH USER]` (dossier otomatis dipotong).
+14. **Token meter**: sumber resmi = field top-level `tokens?: {input, output, reasoning, cache}` pada pesan assistant dr `session.context`; sum cocok dgn `session.tokens` (39603/192). Route `GET /api/ai/usage?slug=` → `{tokens, messageCount}`; pesan in-flight `tokens: null` (jujur). Lagi-nya didengang pas `session.idle` (SSE).
+15. **Tab aktivitas**: kartu collapsible grouped per pesan + filter chips (Semua/Baca/Edit/Jalankan; match pakai kata judul — API gak kasih field kind; belakangan bisa kasih `kind` di toolLabel).
 
 ## 9. Fase 1 polish — editor ala-Word (commit `ce0472a`, 2026-10-17)
 
