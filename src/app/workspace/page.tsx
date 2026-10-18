@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 type Project = {
@@ -12,25 +13,40 @@ type Project = {
 };
 
 export default function WorkspacePage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [name, setName] = useState('Skripsi-ku');
   const [folder, setFolder] = useState('~/Documents/skripsi');
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
     try {
       const res = await fetch('/api/projects');
       const data = await res.json();
-      setProjects(data.projects ?? []);
+      const list = data.projects ?? [];
+      setProjects(list);
+      // Auto-masuk: satu-satunya project ATAU project terakhir yang dibuka.
+      const lastSlug = data.lastSlug ?? null;
+      if (list.length === 1) {
+        router.replace(`/p/${list[0].slug}`);
+        return;
+      }
+      if (lastSlug && list.some((p: Project) => p.slug === lastSlug)) {
+        router.replace(`/p/${lastSlug}`);
+        return;
+      }
     } catch {
       setError('Gagal terhubung ke server');
     }
+    setLoading(false);
   };
 
   useEffect(() => {
-    load().finally(() => setLoading(false));
+    load();
+    // load dipanggil sekali di mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const attach = async (event: React.FormEvent) => {
@@ -47,7 +63,7 @@ export default function WorkspacePage() {
       if (!res.ok) {
         setError(data.error ?? 'Gagal membuat project');
       } else {
-        setProjects((prev) => [...prev, data.project]);
+        router.push(`/p/${data.project.slug}`);
       }
     } catch {
       setError('Gagal terhubung ke server');
@@ -55,6 +71,21 @@ export default function WorkspacePage() {
       setCreating(false);
     }
   };
+
+  const buang = async (slug: string) => {
+    setProjects((prev) => prev.filter((p) => p.slug !== slug));
+    try {
+      await fetch('/api/projects', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+    } catch {
+      void load();
+    }
+  };
+
+  const buka = (slug: string) => router.push(`/p/${slug}`);
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
@@ -76,12 +107,27 @@ export default function WorkspacePage() {
         ) : (
           <ul className="mt-3 divide-y divide-neutral-200 rounded-md border border-neutral-200">
             {projects.map((project) => (
-              <li key={project.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="font-medium">{project.name}</p>
-                  <p className="text-xs text-neutral-500">{project.folderPath}</p>
-                </div>
-                <span className="text-xs text-neutral-400">slug: {project.slug}</span>
+              <li key={project.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => buka(project.slug)}
+                  className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
+                  title="Buka project"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium hover:underline">{project.name}</p>
+                    <p className="truncate text-xs text-neutral-500">{project.folderPath}</p>
+                  </div>
+                  <span className="shrink-0 text-xs text-neutral-400">{project.slug}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void buang(project.slug)}
+                  className="shrink-0 rounded px-1.5 py-0.5 text-xs text-neutral-300 hover:text-red-600 dark:text-neutral-600"
+                  title="Lepas project (folder di disk gak disentuh)"
+                >
+                  ✕
+                </button>
               </li>
             ))}
           </ul>

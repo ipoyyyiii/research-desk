@@ -20,6 +20,15 @@ export function WorkspaceShell({
   const [focusMode, setFocusMode] = useState(false);
   const [treeVersion, setTreeVersion] = useState(0);
 
+  // Catat project ini sebagai yang terakhir dibuka — dipakai /workspace auto-redirect.
+  useEffect(() => {
+    void fetch('/api/projects', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug }),
+    });
+  }, [slug]);
+
   // Esc = focus mode (sembunyikan panel samping). Jangan ke-toggle pas lagi ngetik di chat/form.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
