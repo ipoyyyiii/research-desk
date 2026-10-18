@@ -318,6 +318,8 @@
     "saved": "Saved ✓",
     "discard": "Discard the saved copy",
     "fullPage": "Open full-page Word in a browser tab",
-    "textEditor": "Text editor"
+    "textEditor": "Text editor",
+    "stale": "The chapter changed outside Word (agent wrote?) — unsaved Word edits will be lost; save in Word first before pulling.",
+    "pull": "Pull into Word"
   }
 }

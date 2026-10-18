@@ -98,6 +98,10 @@ export function WordTab({
   const [pending, setPending] = useState<SaveCandidate | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  // Deteksi file berubah di luar Word (agen nulis): versi terakhir dijembatan vs disk.
+  const inWordRef = useRef<string | null>(null);
+  const seenRef = useRef<string | null>(null);
+  const [stale, setStale] = useState<string | null>(null);
 
   const fileName = path.slice(path.lastIndexOf('/') + 1);
 
@@ -162,6 +166,11 @@ export function WordTab({
       for (const type of ['dragenter', 'dragover', 'drop'] as const) {
         target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
       }
+      // Tandai versi yang saat ini di Word + versi disk yang sudah dikonfirmasi.
+      const text = new TextDecoder().decode(bytes);
+      inWordRef.current = text;
+      seenRef.current = text;
+      setStale(null);
       setThrown(true);
       setThrowFailed(false);
     } catch {
@@ -192,6 +201,9 @@ export function WordTab({
         body: JSON.stringify({ path, content }),
       });
       if (res.ok) {
+        inWordRef.current = content;
+        seenRef.current = content;
+        setStale(null);
         setSavedMsg(true);
         setPending(null);
       }
@@ -203,6 +215,30 @@ export function WordTab({
   }, [pending, saving, slug, path]);
 
   const nameMatches = pending !== null && pending.name === fileName;
+
+  // BabBayangan: cek disk tiap 8 detik — file berubah di luar Word (agen nulis) → chip Tarik.
+  useEffect(() => {
+    const poll = window.setInterval(async () => {
+      if (seenRef.current === null) return; // belum pernah lempar apa-apa ke Word
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/raw?path=${encodeURIComponent(path)}`);
+        if (!res.ok) return;
+        const text = new TextDecoder().decode(await res.arrayBuffer());
+        if (text !== seenRef.current) {
+          seenRef.current = text; // kabarin sekali, jangan spam tiap siklus
+          if (text !== inWordRef.current) setStale(text);
+        }
+      } catch {
+        // network gagal → siklus berikutnya
+      }
+    }, 8000);
+    return () => window.clearInterval(poll);
+  }, [slug, path]);
+
+  const pullLatest = useCallback(async () => {
+    await throwFile();
+    setStale(null);
+  }, [throwFile]);
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-muted/50">
@@ -255,6 +291,26 @@ export function WordTab({
         <p className="flex shrink-0 items-center gap-1 px-2 py-1 text-[11px] text-amber-700">
           <TriangleAlert size={11} /> {t('word.openFailed')}
         </p>
+      )}
+
+      {/* Chip: file berubah di luar Word (agen nulis) → tarik ke Word */}
+      {stale !== null && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-blue-700/30 bg-blue-50 px-2 py-1.5 dark:bg-blue-950/40">
+          <span className="min-w-0 flex-1 text-[11px] text-blue-800 dark:text-blue-200">
+            {t('word.stale')}
+          </span>
+          <Button variant="default" className="h-6 px-2 text-[11px]" onClick={() => void pullLatest()}>
+            {t('word.pull')}
+          </Button>
+          <button
+            type="button"
+            aria-label={t('word.discard')}
+            onClick={() => setStale(null)}
+            className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X size={12} />
+          </button>
+        </div>
       )}
 
       {/* Banner simpan dari Word */}

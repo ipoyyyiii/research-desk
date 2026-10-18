@@ -318,6 +318,8 @@
     "saved": "Kesimpen ✓",
     "discard": "Buang hasil simpanan",
     "fullPage": "Buka Word penuh di tab browser",
-    "textEditor": "Editor teks"
+    "textEditor": "Editor teks",
+    "stale": "File bab berubah di luar Word (agen nulis?) — editan Word yang belum disimpen bakal ilang, sebaiknya Save dulu di Word sebelum Tarik.",
+    "pull": "Tarik ke Word"
   }
 }

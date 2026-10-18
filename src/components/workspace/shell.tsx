@@ -209,7 +209,7 @@ export function WorkspaceShell({
   // path itu sudah ada → bump version, editor remount dan fetch konten baru).
   const handleDocumentCreated = (path: string) => {
     refreshTree();
-    openFileTab(path);
+    openDocument(path);
   };
 
   // Versi nilai-balik untuk menu + tab-bar: true kalau dokumen berhasil dibuat.
