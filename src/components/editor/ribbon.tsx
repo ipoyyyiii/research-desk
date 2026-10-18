@@ -21,6 +21,7 @@ import {
   Minus,
   Outdent,
   Redo2,
+  ScanSearch,
   Search,
   Strikethrough,
   Table as TableIcon,
@@ -32,7 +33,8 @@ import { useT } from '@/lib/preferences';
 import { Button, Modal, TextInput } from '@/components/ui';
 import type { BibEntry } from '@/lib/journals/bib';
 import type { JournalCard } from '@/lib/journals/types';
-import { applyCitationMarks } from '@/components/editor/citation-mark';
+import { applyCitationMarks, normalizeCitationEscapes } from '@/components/editor/citation-mark';
+import { applyQualityFixes, scanQuality, type QualityIssue } from '@/lib/document-quality';
 
 // ── View prefs (tampilan editor saja — file .md gak ikut nyimpennya) ─────────
 const FONT_FAMILIES = [
@@ -132,6 +134,29 @@ export function Ribbon({
   const [linkOpen, setLinkOpen] = useState(false);
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // ── Kualitas draf: scan + auto-bersih sampah tulisan (fase 6) ────────────
+  const [qualityOpen, setQualityOpen] = useState(false);
+  const [qualityIssues, setQualityIssues] = useState<QualityIssue[] | null>(null);
+  const [qualityFixed, setQualityFixed] = useState<number | null>(null);
+
+  const openQuality = () => {
+    setQualityFixed(null);
+    setQualityIssues(scanQuality(normalizeCitationEscapes(editor.getMarkdown())));
+    setQualityOpen(true);
+  };
+
+  const runQualityFix = () => {
+    const md = normalizeCitationEscapes(editor.getMarkdown());
+    const result = applyQualityFixes(md);
+    setQualityFixed(result.fixed);
+    if (result.fixed === 0) return;
+    // emitUpdate:true → autosave + hitung kata di thesis-editor jalan sendiri.
+    editor.commands.setContent(result.md, { emitUpdate: true });
+    // Chip sitasi ditandai ulang — parser setContent gak kenal mark custom.
+    applyCitationMarks(editor);
+    setQualityIssues(scanQuality(result.md));
+  };
 
   // ── Sitasi (fase 4): local bib + OpenAlex simpan&cite ────────────────────
   const [citeOpen, setCiteOpen] = useState(false);
@@ -501,6 +526,12 @@ export function Ribbon({
         </TBtn>
         <Sep />
 
+        {/* ── Kualitas draf: scan + auto-bersih sampah tulisan ─── */}
+        <TBtn editor={editor} title={t('quality.title')} onClick={() => openQuality()}>
+          <ScanSearch size={15} />
+        </TBtn>
+        <Sep />
+
         {/* ── Ekspor Word (.docx): pandoc + citeproc, pilih gaya ─── */}
         <div className="relative">
           <TBtn
@@ -565,6 +596,47 @@ export function Ribbon({
       {exportError && <p className="px-1 pb-1 text-[11px] text-red-600">{exportError}</p>}
 
       {uploadError && <p className="px-1 pb-1 text-[11px] text-red-600">{t('toolbar.uploadFailed')}: {uploadError}</p>}
+
+      {/* Dialog kualitas draf — scan + perbaikan otomatis */}
+      <Modal open={qualityOpen} onClose={() => setQualityOpen(false)} title={t('quality.title')}>
+        <div className="space-y-3">
+          {qualityFixed !== null && (
+            <p className="text-xs font-medium text-green-700">{t('quality.fixed').replace('{n}', String(qualityFixed))}</p>
+          )}
+          {qualityIssues === null || qualityIssues.length === 0 ? (
+            <p className="px-1 py-4 text-center text-xs text-muted-foreground">{t('quality.noIssues')}</p>
+          ) : (
+            <>
+              <p className="text-[11px] text-muted-foreground">
+                {t('quality.autoCount').replace('{n}', String(qualityIssues.filter((item) => item.fixable).length))}
+                {' · '}
+                {t('quality.manualCount').replace('{n}', String(qualityIssues.filter((item) => !item.fixable).length))}
+              </p>
+              <ul className="max-h-56 space-y-0.5 overflow-y-auto">
+                {qualityIssues.map((issue, index) => (
+                  <li
+                    key={`${issue.rule}-${index}`}
+                    className="flex items-center gap-2 rounded-sm border-l-2 py-0.5 pl-2 text-[11px]"
+                    style={{ borderColor: issue.fixable ? 'var(--accent)' : '#dc2626' }}
+                  >
+                    <span className="shrink-0 rounded-sm bg-muted px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+                      {t(`quality.rule.${issue.rule}`)}
+                    </span>
+                    <span className="shrink-0 font-mono text-[9px] text-muted-foreground">:{issue.line}</span>
+                    <span className="min-w-0 truncate text-foreground">{issue.snippet}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setQualityOpen(false)}>
+                  {t('quality.close')}
+                </Button>
+                <Button onClick={runQualityFix}>{t('quality.autofix')}</Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
 
       {/* Input file gambar */}
       <input

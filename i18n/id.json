@@ -290,5 +290,20 @@
     "targetHint": "Target kesimpen di browser ini.",
     "loading": "Menghitung…",
     "openHint": "Klik buat buka bab"
+  },
+  "quality": {
+    "title": "Kualitas draf",
+    "noIssues": "Bersih — gak ada temuan.",
+    "autofix": "Perbaiki otomatis",
+    "close": "Tutup",
+    "fixed": "{n} diperbaiki. Sisanya butuh tulisan lo sendiri.",
+    "autoCount": "{n} bisa dibenerin otomatis",
+    "manualCount": "{n} perlu diisi manual",
+    "rule.filler": "Basa-basi",
+    "rule.noteQuote": "Catatan kutip",
+    "rule.bibSection": "Daftar Pustaka nyelip",
+    "rule.midDot": "Judul ada \"·\"",
+    "rule.titleSplit": "Judul nangkeung kalimat",
+    "rule.ellipsis": "Kalimat gantung …"
   }
 }

@@ -97,6 +97,10 @@ export function ensureProjectAgentConfig(
             '(3) Sebelum menambah jurnal, tampilkan singkat: judul, penulis, tahun, DOI, jumlah sitasi — jangan asal comot. ' +
             '(4) Kamu boleh membaca/mengubah berkas di dalam folder project ini saja. ' +
             '(5) Jawab singkat dan terstruktur; kalau konteks dari dossier tidak jelas, tanyakan lewat TEKS jawaban biasa — tool `question` sudah DIMATIKAN karena app belum bisa menjawabnya (bikin turn gantung selamanya). ' +
+            '(6) GAYA TULIS DALAM FILE WAJIB akademik formal: tanpa kata basa-basi/sampah (yuuhuuuu, wkwk, cok, lol, test, placeholder, emoji), tanpa kalimat gantung ellipsis "…" — kalimat harus selesai dan padat. ' +
+            '(7) JANGAN PERNAH menulis daftar pustaka atau sitasi bernomor ([1], [Vaswani 2017]) ke dalam file bab — sitasi cukup ditulis marker [@kunci]; daftar pustaka dibikin otomatis saat ekspor (pandoc citeproc). ' +
+            '(8) JANGAN PERNAH menulis catatan metadata (blok kutip "> Catatan sumber:", DOI notes, dsb.) ke dalam file bab — metadata sumber cukup tersimpan di references.bib; penjelasan panjang cukup dikirim ke chat. ' +
+            '(9) FORMAT JUDUL BAB: baris pertama `# BAB I` (angka Romawi), baris kedua `# PENDAHULUAN` (huruf besar) — tanpa tanda "·", tanpa kalimat lain nyangkut di heading; tinggalkan baris kosong antar-heading sebelum isi. ' +
             'Kemampuan web/jurnal ikuti blok "Kemampuan AI" di AGENTS.md — kalau dimatikan, jangan coba-coba.',
           // Tool `question` gak boleh dipakai: app chat gak punya mekanisme jawab
           // → turn nge-gantung + semua prompt berikut ngantre (kasus nyata 2026-10-18).

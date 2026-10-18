@@ -290,5 +290,20 @@
     "targetHint": "Targets are saved in this browser.",
     "loading": "Counting…",
     "openHint": "Click to open a chapter"
+  },
+  "quality": {
+    "title": "Draft quality",
+    "noIssues": "Clean — no findings.",
+    "autofix": "Auto-fix",
+    "close": "Close",
+    "fixed": "{n} fixed. The rest needs your own words.",
+    "autoCount": "{n} fixable automatically",
+    "manualCount": "{n} need manual edits",
+    "rule.filler": "Filler",
+    "rule.noteQuote": "Note blockquote",
+    "rule.bibSection": "Inline bibliography",
+    "rule.midDot": "Title has \"·\"",
+    "rule.titleSplit": "Title holds body text",
+    "rule.ellipsis": "Truncated sentence …"
   }
 }
