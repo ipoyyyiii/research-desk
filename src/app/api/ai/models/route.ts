@@ -28,26 +28,27 @@ export async function GET() {
       if (entries.length > 0) groups.push({ providerID, label, free, models: entries });
     };
 
-    const seen = new Set<string>();
+    // Group 1: model gratis provider 'opencode' (selalu ada, gak butuh login).
+    const freeEntries: ModelEntry[] = [];
+    const freeSeen = new Set<string>();
     for (const m of models) {
-      if (!m?.providerID || !m?.id || seen.has(`${m.providerID}/${m.id}`)) continue;
-      seen.add(`${m.providerID}/${m.id}`);
-      const entry: ModelEntry = { providerID: m.providerID, modelID: m.id, name: m.name ?? m.id };
-      if (m.providerID === 'opencode') {
-        const free = groups.find((g) => g.providerID === 'opencode');
-        if (free) free.models.push(entry);
-        else push('opencode', 'Model gratis', true, [entry]);
-      }
+      if (m?.providerID !== 'opencode' || !m?.id || freeSeen.has(m.id)) continue;
+      freeSeen.add(m.id);
+      freeEntries.push({ providerID: 'opencode', modelID: m.id, name: m.name ?? m.id });
     }
-    // Provider lain yang AKTIF (sudah login) → group sendiri.
+    push('opencode', 'Model gratis', true, freeEntries);
+
+    // Group per provider lain yang sudah login (mis. openai/ChatGPT).
     for (const providerID of auth.providers.filter((p) => p !== 'opencode')) {
       const entries: ModelEntry[] = [];
+      const groupSeen = new Set<string>();
       for (const m of models) {
-        if (m.providerID !== providerID || seen.has(`${m.providerID}/${m.id}`)) continue;
-        seen.add(`${m.providerID}/${m.id}`);
-        entries.push({ providerID: m.providerID, modelID: m.id, name: m.name ?? m.id });
+        if (m?.providerID !== providerID || !m?.id || groupSeen.has(m.id)) continue;
+        groupSeen.add(m.id);
+        entries.push({ providerID, modelID: m.id, name: m.name ?? m.id });
       }
-      if (entries.length > 0) push(providerID, providerID, false, entries);
+      const label = providerID === 'openai' ? 'ChatGPT / OpenAI' : providerID;
+      push(providerID, label, false, entries);
     }
 
     const override = await readAgentModelOverride();
