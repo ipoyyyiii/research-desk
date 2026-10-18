@@ -11,6 +11,9 @@ importers:
       '@opencode/client':
         specifier: 2.0.32
         version: 2.0.32(effect@4.0.1)
+      '@tiptap/core':
+        specifier: 3.32.0
+        version: 3.32.0(@tiptap/pm@3.32.0)
       '@tiptap/extension-image':
         specifier: ^3.32.0
         version: 3.32.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))

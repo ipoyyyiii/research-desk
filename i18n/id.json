@@ -40,7 +40,7 @@
     "taskList": "Checklist",
     "orderedList": "Nomor",
     "table": "Tabel",
-    "cite": "Cite",
+    "cite": "Sitasi",
     "ask": "Tanya-AI",
     "citeHint": "Fase 4",
     "askHint": "Fase 2",
@@ -73,7 +73,17 @@
     "linkPlaceholder": "Ketik/paste URL…",
     "apply": "Terapkan",
     "unset": "Lepas",
-    "uploadFailed": "Upload gambar gagal"
+    "uploadFailed": "Upload gambar gagal",
+    "citeSearch": "Cari di referensi tersimpan…",
+    "citeEmpty": "Gak ada yang match — pakai opsi jurnal di bawah",
+    "citeSavedBadge": "Tersimpan",
+    "citeSaveAndCite": "Simpan & sitasi",
+    "citeSaving": "Menyimpan…",
+    "exportLabel": "Ekspor Word",
+    "exportApa": "APA",
+    "exportIeee": "IEEE",
+    "exportBusy": "Mengekspor…",
+    "exportDone": "Siap — klik untuk unduh"
   },
   "chat": {
     "title": "Chat",
@@ -222,7 +232,9 @@
     "agentCall": "Agent gagal dipanggil: {r}",
     "agentServer": "Gagal terhubung ke server agent.",
     "permission": "Gagal memproses izin.",
-    "loadFocus": "Gagal memuat — coba lagi saat window fokus"
+    "loadFocus": "Gagal memuat — coba lagi saat window fokus",
+    "export": "Ekspor .docx gagal (cek log server)",
+    "citeSave": "Simpan jurnal gagal"
   },
   "w": {
     "tagline": "Satu tempat untuk nulis skripsi + baca jurnal + tanya AI.",

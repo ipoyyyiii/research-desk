@@ -1,13 +1,15 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
   AlignCenter,
   AlignJustify,
   AlignLeft,
   AlignRight,
+  BookMarked,
   Bold,
+  Download,
   ImagePlus,
   Indent,
   Italic,
@@ -15,9 +17,11 @@ import {
   List,
   ListOrdered,
   ListTodo,
+  Loader2,
   Minus,
   Outdent,
   Redo2,
+  Search,
   Strikethrough,
   Table as TableIcon,
   Trash2,
@@ -26,6 +30,9 @@ import {
 } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Button, Modal, TextInput } from '@/components/ui';
+import type { BibEntry } from '@/lib/journals/bib';
+import type { JournalCard } from '@/lib/journals/types';
+import { applyCitationMarks } from '@/components/editor/citation-mark';
 
 // ── View prefs (tampilan editor saja — file .md gak ikut nyimpennya) ─────────
 const FONT_FAMILIES = [
@@ -110,11 +117,13 @@ const selectClass =
 export function Ribbon({
   editor,
   slug,
+  filePath,
   prefs,
   setPrefs,
 }: {
   editor: Editor;
   slug: string;
+  filePath: string;
   prefs: ViewPrefs;
   setPrefs: (p: ViewPrefs) => void;
 }) {
@@ -123,6 +132,104 @@ export function Ribbon({
   const [linkOpen, setLinkOpen] = useState(false);
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // ── Sitasi (fase 4): local bib + OpenAlex simpan&cite ────────────────────
+  const [citeOpen, setCiteOpen] = useState(false);
+  const [citeQuery, setCiteQuery] = useState('');
+  const [localRefs, setLocalRefs] = useState<BibEntry[]>([]);
+  const [oaResults, setOaResults] = useState<JournalCard[]>([]);
+  const [citeSavingId, setCiteSavingId] = useState<string | null>(null);
+  const [citeError, setCiteError] = useState<string | null>(null);
+
+  const localKeys = new Set(localRefs.map((r) => r.key));
+
+  const openCite = async () => {
+    setCiteOpen((prev) => !prev);
+    setCiteError(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/bib`);
+      const data = await res.json();
+      if (res.ok) setLocalRefs(data.entries ?? []);
+    } catch {
+      // kosongkan — popover tetap bisa jalan buat OpenAlex
+    }
+  };
+
+  const insertCite = (key: string) => {
+    editor.chain().focus().insertContent(`[@${key}]`).run();
+    applyCitationMarks(editor);
+    setCiteOpen(false);
+    setCiteQuery('');
+    setOaResults([]);
+  };
+
+  const saveAndCite = async (paper: JournalCard) => {
+    setCiteSavingId(paper.id);
+    setCiteError(null);
+    try {
+      const res = await fetch('/api/journals/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, paper }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.bibKey) {
+        setCiteError(t('err.citeSave'));
+        return;
+      }
+      insertCite(data.bibKey);
+    } catch {
+      setCiteError(t('err.server'));
+    } finally {
+      setCiteSavingId(null);
+    }
+  };
+
+  // OpenAlex suggestions — debounce 400ms, min 3 huruf, buang yang udah tersimpan.
+  useEffect(() => {
+    const query = citeQuery.trim();
+    if (!citeOpen || query.length < 3) {
+      setOaResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/journals/search?q=${encodeURIComponent(query)}&limit=6`);
+        const data = await res.json();
+        setOaResults(res.ok ? ((data.results ?? []) as JournalCard[]) : []);
+      } catch {
+        setOaResults([]);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [citeQuery, citeOpen]);
+
+  // ── Ekspor DOCX (pandoc + citeproc) ───────────────────────────────────────
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportResult, setExportResult] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const doExport = async (style: 'apa' | 'ieee') => {
+    setExportOpen(false);
+    setExportBusy(true);
+    setExportError(null);
+    setExportResult(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePath, style }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.out) setExportResult(data.out);
+      else setExportError(t('err.export'));
+    } catch {
+      setExportError(t('err.server'));
+    } finally {
+      setExportBusy(false);
+    }
+  };
 
   const uploadAndInsert = async (file: File) => {
     setUploadError(null);
@@ -310,6 +417,75 @@ export function Ribbon({
             </div>
           )}
         </div>
+        {/* ── Sitasi: chip `[@key]` (bib lokal + OpenAlex simpan-cite) ── */}
+        <div className="relative">
+          <TBtn editor={editor} title={t('toolbar.cite')} active={() => citeOpen} onClick={() => void openCite()}>
+            <BookMarked size={15} />
+          </TBtn>
+          {citeOpen && (
+            <div className="absolute left-0 top-8 z-40 w-80 rounded-md border border-border bg-card p-2 text-xs shadow-lg">
+              <div className="flex items-center gap-1.5">
+                <Search size={12} className="shrink-0 text-muted-foreground" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={citeQuery}
+                  onChange={(event) => setCiteQuery(event.target.value)}
+                  placeholder={t('toolbar.citeSearch')}
+                  className="h-6 min-w-0 flex-1 rounded border border-border bg-background px-1.5 outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                />
+              </div>
+              <div className="mt-1 max-h-64 overflow-y-auto">
+                {localRefs
+                  .filter((r) =>
+                    citeQuery.trim().length === 0 ||
+                    `${r.key} ${r.title} ${r.authors.join(' ')}`.toLowerCase().includes(citeQuery.trim().toLowerCase()),
+                  )
+                  .slice(0, 12)
+                  .map((r) => (
+                    <button
+                      key={r.key}
+                      type="button"
+                      title={`${r.title}${r.year ? ` (${r.year})` : ''}`}
+                      onClick={() => insertCite(r.key)}
+                      className="block w-full cursor-pointer truncate rounded px-1.5 py-1 text-left transition-colors hover:bg-muted"
+                    >
+                      <span className="font-mono text-[10px] text-primary">[@{r.key}]</span>
+                      <span className="ml-1 text-muted-foreground">{r.title || '—'}</span>
+                    </button>
+                  ))}
+
+                <div className="mx-1 my-1 h-px bg-border" />
+                {citeError && <p className="px-1.5 py-1 text-[10px] text-red-600">{citeError}</p>}
+                {oaResults.length === 0 && (
+                  <p className="px-1.5 py-1 text-[10px] text-muted-foreground">{t('toolbar.citeEmpty')}</p>
+                )}
+                {oaResults
+                  .filter((p) => !localKeys.has(String(p.id)))
+                  .slice(0, 6)
+                  .map((paper) => (
+                    <button
+                      key={paper.id}
+                      type="button"
+                      disabled={citeSavingId === paper.id}
+                      title={t('toolbar.citeSaveAndCite')}
+                      onClick={() => void saveAndCite(paper)}
+                      className="flex w-full cursor-pointer items-center gap-1 truncate rounded px-1.5 py-1 text-left transition-colors hover:bg-muted disabled:opacity-50"
+                    >
+                      {citeSavingId === paper.id ? (
+                        <Loader2 size={11} className="shrink-0 animate-spin text-primary" />
+                      ) : (
+                        <BookMarked size={11} className="shrink-0 text-muted-foreground" />
+                      )}
+                      <span className="truncate">{paper.title}</span>
+                      {paper.year != null && <span className="shrink-0 text-muted-foreground">· {paper.year}</span>}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <TBtn editor={editor} title={t('toolbar.link')} onClick={() => setLinkOpen(true)}>
           <Link2 size={15} />
         </TBtn>
@@ -323,7 +499,55 @@ export function Ribbon({
         <TBtn editor={editor} title={t('toolbar.clear')} onClick={(ed) => ed.chain().focus().clearNodes().unsetAllMarks().run()}>
           <Trash2 size={15} />
         </TBtn>
+        <Sep />
+
+        {/* ── Ekspor Word (.docx): pandoc + citeproc, pilih gaya ─── */}
+        <div className="relative">
+          <TBtn
+            editor={editor}
+            title={t('toolbar.exportLabel')}
+            active={() => exportOpen}
+            disabled={() => exportBusy}
+            onClick={() => setExportOpen((v) => !v)}
+          >
+            {exportBusy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+          </TBtn>
+          {exportOpen && (
+            <div className="absolute right-0 top-8 z-40 w-40 rounded-md border border-border bg-card p-1 text-xs shadow-lg">
+              <button
+                type="button"
+                className="w-full cursor-pointer rounded px-2 py-1 text-left transition-colors hover:bg-muted"
+                onClick={() => void doExport('apa')}
+              >
+                .docx — {t('toolbar.exportApa')}
+              </button>
+              <button
+                type="button"
+                className="w-full cursor-pointer rounded px-2 py-1 text-left transition-colors hover:bg-muted"
+                onClick={() => void doExport('ieee')}
+              >
+                .docx — {t('toolbar.exportIeee')}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {exportBusy && <p className="px-1 pb-1 text-[11px] text-muted-foreground">{t('toolbar.exportBusy')}</p>}
+      {exportResult && (
+        <p className="px-1 pb-1 text-[11px] text-muted-foreground">
+          <a
+            href={`/api/projects/${encodeURIComponent(slug)}/raw?path=${encodeURIComponent(exportResult)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2"
+          >
+            {exportResult}
+          </a>{' '}
+          — {t('toolbar.exportDone')}
+        </p>
+      )}
+      {exportError && <p className="px-1 pb-1 text-[11px] text-red-600">{exportError}</p>}
 
       {uploadError && <p className="px-1 pb-1 text-[11px] text-red-600">{t('toolbar.uploadFailed')}: {uploadError}</p>}
 

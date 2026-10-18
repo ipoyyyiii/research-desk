@@ -61,3 +61,90 @@ export function extractBibKeys(content: string): string[] {
   }
   return keys;
 }
+
+/** Entry ter-parse dari references.bib — buat list sitasi + chip tooltip. */
+export type BibEntry = {
+  key: string;
+  title: string;
+  authors: string[];
+  year: string | null;
+  venue: string | null;
+  doi: string | null;
+};
+
+function field(block: string, name: string): string | null {
+  // Word-boundary: `title` tidak match di dalam `booktitle`.
+  const re = new RegExp(`\\b${name}\\s*=\\s*\\{`, 'i');
+  const match = re.exec(block);
+  if (!match) return null;
+
+  // Scan brace seimbang (field bisa punya `{...}` nested).
+  let depth = 1;
+  let i = match.index + match[0].length;
+  const out: string[] = [];
+  while (i < block.length && depth > 0) {
+    const ch = block[i];
+    if (ch === '{') {
+      depth += 1;
+    } else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) break;
+    }
+    out.push(ch);
+    i += 1;
+  }
+  return out.join('').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Parse file BibTeX (nested brace ditangani — sebagian entry berasal dari
+ * sumber luar, jadi formatnya variatif). Struktur: @type{key, ...fields }
+ */
+export function parseBib(content: string): BibEntry[] {
+  const entries: BibEntry[] = [];
+  let cursor = 0;
+
+  while (cursor < content.length) {
+    const at = content.indexOf('@', cursor);
+    if (at < 0) break;
+
+    const brace = content.indexOf('{', at);
+    const nl = content.indexOf('\n', at);
+    // '@' tapi bukan awal entry (mis. di dalam teks) → lanjut cari berikutnya.
+    if (brace < 0 || (nl >= 0 && nl < brace)) {
+      cursor = at + 1;
+      continue;
+    }
+
+    const keyStart = content.indexOf(',', brace);
+    if (keyStart < 0) break;
+    const key = content.slice(brace + 1, keyStart).trim();
+
+    let depth = 1;
+    let end = keyStart + 1;
+    while (end < content.length && depth > 0) {
+      const ch = content[end];
+      if (ch === '{') depth += 1;
+      else if (ch === '}') depth -= 1;
+      end += 1;
+    }
+
+    const block = content.slice(keyStart + 1, end > 0 ? end - 1 : undefined);
+    if (key.length > 0) {
+      entries.push({
+        key,
+        title: field(block, 'title') ?? '',
+        authors: (field(block, 'author') ?? '')
+          .split(/ and /i)
+          .map((a) => a.trim())
+          .filter(Boolean),
+        year: field(block, 'year'),
+        venue: field(block, 'journal') ?? field(block, 'venue') ?? field(block, 'booktitle'),
+        doi: field(block, 'doi'),
+      });
+    }
+    cursor = end;
+  }
+
+  return entries;
+}

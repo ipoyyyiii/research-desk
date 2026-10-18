@@ -73,7 +73,17 @@
     "linkPlaceholder": "Type/paste URL…",
     "apply": "Apply",
     "unset": "Remove",
-    "uploadFailed": "Image upload failed"
+    "uploadFailed": "Image upload failed",
+    "citeSearch": "Search saved references…",
+    "citeEmpty": "No match — use the journal options below",
+    "citeSavedBadge": "Saved",
+    "citeSaveAndCite": "Save & cite",
+    "citeSaving": "Saving…",
+    "exportLabel": "Export Word",
+    "exportApa": "APA",
+    "exportIeee": "IEEE",
+    "exportBusy": "Exporting…",
+    "exportDone": "Ready — click to download"
   },
   "chat": {
     "title": "Chat",
@@ -222,7 +232,9 @@
     "agentCall": "Agent call failed: {r}",
     "agentServer": "Failed to reach the agent server.",
     "permission": "Failed to process the permission.",
-    "loadFocus": "Failed to load — retry when the window regains focus"
+    "loadFocus": "Failed to load — retry when the window regains focus",
+    "export": "DOCX export failed (see server logs)",
+    "citeSave": "Failed to save the paper"
   },
   "w": {
     "tagline": "One place to write your thesis + read journals + ask the AI.",

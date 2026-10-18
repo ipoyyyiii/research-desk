@@ -11,6 +11,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import TaskItem from '@tiptap/extension-task-item';
 import TaskList from '@tiptap/extension-task-list';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
+import { CitationMark, applyCitationMarks, normalizeCitationEscapes } from '@/components/editor/citation-mark';
 import {
   Bold,
   Italic,
@@ -108,6 +109,8 @@ function EditorSurface({
     extensions: [
       StarterKit,
       Markdown.configure({ markedOptions: { gfm: true } }),
+      // Chip sitasi `[@key]` — chip tampil, file tetap plain buat pandoc.
+      CitationMark,
       // Override render: src relatif di .md (gambar/x.png) → URL raw API utk tampilan;
       // keluaran markdown tetap path relatif.
       createMappedImage(slug),
@@ -121,6 +124,10 @@ function EditorSurface({
       TableCell,
     ],
     content: initialMarkdown,
+    // Konten awal bisa mengandung `[@key]` mentah → ubah jadi chip sebelum ditulis.
+    onCreate: ({ editor: created }) => {
+      applyCitationMarks(created);
+    },
     editorProps: {
       attributes: {
         class: 'tiptap paper outline-none',
@@ -188,6 +195,8 @@ function EditorSurface({
           const current = editor.getMarkdown();
           if (md === current) return;
           editor.commands.setContent(md, { emitUpdate: false });
+          // Agent gak ngerti chip → `[@key]` mentah dari file: chip-kan lagi.
+          applyCitationMarks(editor);
           setStatus('clean');
           setWords(countWords(editor));
         } catch {
@@ -205,7 +214,8 @@ function EditorSurface({
 
   const save = useCallback(async () => {
     if (!editor || editor.isDestroyed) return;
-    const md = editor.getMarkdown();
+    // Escape `[@key]` → balik plain biar pandoc --citeproc kenal pas ekspor.
+    const md = normalizeCitationEscapes(editor.getMarkdown());
     setStatus('saving');
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/file`, {
@@ -253,7 +263,7 @@ function EditorSurface({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Ribbon editor={editor} slug={slug} prefs={prefs} setPrefs={setPrefs} />
+      <Ribbon editor={editor} slug={slug} filePath={filePath} prefs={prefs} setPrefs={setPrefs} />
       {imgError && (
         <p className="shrink-0 bg-red-50 px-3 py-1 text-[11px] text-red-600 dark:bg-red-950/40">
           {t('toolbar.uploadFailed')}: {imgError}
