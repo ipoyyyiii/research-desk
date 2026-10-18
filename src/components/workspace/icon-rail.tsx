@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  BookMarked,
   BookOpenText,
   Database,
   FolderClosed,
@@ -11,13 +12,14 @@ import {
 } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 
-export type LeftTab = 'drafts' | 'outline' | 'journals' | 'figures' | 'data' | 'files';
+export type LeftTab = 'drafts' | 'outline' | 'journals' | 'zotero' | 'figures' | 'data' | 'files';
 
 // Views berbasis tujuan dulu (kiri atas), view file-manager mentah paling bawah.
 const TABS: Array<{ id: LeftTab; icon: LucideIcon; labelKey: string }> = [
   { id: 'drafts', icon: ScrollText, labelKey: 'views.drafts' },
   { id: 'outline', icon: ListTree, labelKey: 'left.tabOutline' },
   { id: 'journals', icon: BookOpenText, labelKey: 'tabs.journal' },
+  { id: 'zotero', icon: BookMarked, labelKey: 'left.tabZotero' },
   { id: 'figures', icon: Images, labelKey: 'views.figures' },
   { id: 'data', icon: Database, labelKey: 'views.data' },
   { id: 'files', icon: FolderClosed, labelKey: 'tabs.file' },

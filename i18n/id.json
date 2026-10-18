@@ -170,7 +170,8 @@
   "left": {
     "journalComing": "Fase 3: pencarian jurnal (OpenAlex + Crossref) muncul di sini.",
     "libraryComing": "Fase 3-4: daftar referensi.bib + PDF viewer muncul di sini.",
-    "tabOutline": "Outline"
+    "tabOutline": "Outline",
+    "tabZotero": "Zotero"
   },
   "journal": {
     "searchPlaceholder": "cari jurnal — topik, judul, penulis…",
@@ -339,6 +340,8 @@
     "errForbidden": "Ditolak — ID/key salah atau library private tanpa key read",
     "errUser": "ID user gak ketemu di Zotero",
     "errNetwork": "Gagal nyambung ke zotero.org",
-    "errUpstream": "Zotero responds janggal — coba lagi sebentar"
+    "errUpstream": "Zotero responds janggal — coba lagi sebentar",
+    "bibTotal": "references.bib sekarang: {n} entri",
+    "apiKeyNew": "Key baru (kalo mau ganti sambungan)"
   }
 }

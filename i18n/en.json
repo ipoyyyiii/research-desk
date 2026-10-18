@@ -170,7 +170,8 @@
   "left": {
     "journalComing": "Phase 3: journal search (OpenAlex + Crossref) shows up here.",
     "libraryComing": "Phase 3-4: references.bib list + PDF viewer show up here.",
-    "tabOutline": "Outline"
+    "tabOutline": "Outline",
+    "tabZotero": "Zotero"
   },
   "journal": {
     "searchPlaceholder": "search journals — topic, title, author…",
@@ -339,6 +340,8 @@
     "errForbidden": "Denied — wrong ID/key or a private library without a read key",
     "errUser": "Zotero user ID not found",
     "errNetwork": "Failed to reach zotero.org",
-    "errUpstream": "Zotero responded oddly — try again shortly"
+    "errUpstream": "Zotero responded oddly — try again shortly",
+    "bibTotal": "references.bib now: {n} entries",
+    "apiKeyNew": "New key (to replace the connection)"
   }
 }

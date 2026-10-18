@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui';
 import { JournalPanel } from '@/components/panels/journal-panel';
 import { OutlineView } from '@/components/panels/outline-view';
 import { LibraryPanel } from '@/components/panels/library-panel';
+import { ZoteroPanel } from '@/components/panels/zotero-panel';
 import { IconRail, type LeftTab } from '@/components/workspace/icon-rail';
 import {
   DataView,
@@ -318,6 +319,13 @@ export function LeftPanel({
           <OutlineView slug={slug} entries={entries} onOpenFile={onOpenFile} />,
         )}
 
+      {activeTab === 'zotero' && (
+        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+          {tabHeader(t('left.tabZotero'))}
+          <ZoteroPanel slug={slug} />
+        </div>
+      )}
+
       {activeTab === 'figures' &&
         viewPane(
           t('views.figures'),
@@ -330,8 +338,7 @@ export function LeftPanel({
 
       {activeTab === 'journals' && (
         <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
-          {tabHeader(t('journal.header'), `${pdfFiles.length} PDF`)}
-          <div className="flex shrink-0 gap-1 border-b border-border bg-card px-2 pb-1.5">
+          {tabHeader(t('journal.header'), `${pdfFiles.length} PDF`)}          <div className="flex shrink-0 gap-1 border-b border-border bg-card px-2 pb-1.5">
             <button
               type="button"
               onClick={() => setJournalMode('search')}
