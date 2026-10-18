@@ -168,17 +168,21 @@ export function AgentPanel({
         />
       </div>
 
-      {!connected ? (
-        // Auth belum tersambung → seluruh badan jadi CTA.
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
-            <Sparkles size={17} />
-          </span>
-          <p className="text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">{t('ai.connectHint')}</p>
-          <Button onClick={onConnect}>{t('ai.connect')}</Button>
-        </div>
-      ) : activeTab === 'chat' ? (
+      {activeTab === 'chat' ? (
         <>
+          {!connected && (
+            // Belum login provider Plus → chat tetap jalan (model gratis); CTA ramping di atas.
+            <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+              <span className="min-w-0 flex-1 leading-snug">{t('ai.freeBanner')}</span>
+              <Button
+                variant="outline"
+                className="shrink-0 px-2 py-0.5 text-[11px]"
+                onClick={onConnect}
+              >
+                {t('ai.connect')}
+              </Button>
+            </div>
+          )}
           {/* Banner status session */}
           <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-neutral-200 px-2.5 dark:border-neutral-800">
             <StatusDot tone="idle" />

@@ -111,7 +111,8 @@
     "restartAuth": "Restart",
     "linkModeLabel": "Switch to link mode",
     "deviceModeLabel": "Switch to device code",
-    "linkPortHint": "this port must be forwarded (VS Code: Ports panel → Forward a Port), or switch to device code."
+    "linkPortHint": "this port must be forwarded (VS Code: Ports panel → Forward a Port), or switch to device code.",
+    "freeBanner": "Chat runs on the free model. Connect ChatGPT to use your Plus model."
   },
   "newDoc": {
     "label": "New document title",

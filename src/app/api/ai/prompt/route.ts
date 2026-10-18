@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
-import { ensureServer } from '@/lib/opencode/service';
+import { ensureServer, getAuthState } from '@/lib/opencode/service';
 import { buildDossier } from '@/lib/opencode/agent-config';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -47,6 +47,26 @@ export async function POST(request: Request) {
     });
 
     const client = await ensureServer();
+    try {
+      // User baru nyambung ChatGPT sementara session masih model gratis →
+      // pindah ke model openai pertama sekali sebelum kirim.
+      const auth = await getAuthState();
+      const current = await client.session.get({ sessionID: sessionId });
+      const isOpenai = current?.model?.providerID === 'openai';
+      if (auth.connected && !isOpenai) {
+        const models = (await client.model.list())?.data ?? [];
+        const openaiModel = models.find((m) => m.providerID === 'openai');
+        if (openaiModel?.id) {
+          await client.session.switchModel({
+            sessionID: sessionId,
+            model: { providerID: 'openai', id: openaiModel.id },
+          });
+        }
+      }
+    } catch {
+      // biarkan model yang sudah ter-set
+    }
+
     const composed = `${dossier}\n\n[PERINTAH USER]\n${text}`;
 
     // Attachment file aktif (format URI biar agent tau konteks file yang terbuka).

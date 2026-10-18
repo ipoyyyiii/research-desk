@@ -175,9 +175,8 @@ export function AgentView({
     [],
   );
 
-  // ── ensure session per project + buka stream ────────────────────────────────
+  // ── ensure session per project + buka stream (JALAN TANPA LOGIN — model gratis) ──
   useEffect(() => {
-    if (!connected) return;
     let cancelled = false;
 
     const ensure = async () => {
@@ -207,7 +206,7 @@ export function AgentView({
       esRef.current?.close();
       esRef.current = null;
     };
-  }, [slug, connected, pushSystem, openStream]);
+  }, [slug, pushSystem, openStream]);
 
   const send = useCallback(
     async (text: string) => {

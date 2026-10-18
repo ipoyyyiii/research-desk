@@ -111,7 +111,8 @@
     "restartAuth": "Mulai ulang",
     "linkModeLabel": "Pindah ke mode tautan",
     "deviceModeLabel": "Pindah ke kode perangkat",
-    "linkPortHint": "port ini harus di-forward (VS Code: panel Ports → Forward a Port), atau pindah ke kode perangkat."
+    "linkPortHint": "port ini harus di-forward (VS Code: panel Ports → Forward a Port), atau pindah ke kode perangkat.",
+    "freeBanner": "Chat udah jalan pakai model gratis. Hubungkan ChatGPT kalau mau pake model Plus kamu."
   },
   "newDoc": {
     "label": "Judul dokumen baru",
