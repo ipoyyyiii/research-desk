@@ -1,18 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { Check, ChevronDown, ChevronRight, FileText, SendHorizontal, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button, SegmentedGroup, StatusDot } from '@/components/ui';
+import {
+  AgentComposer,
+  type AgentAttachment,
+  type ModelEntryView,
+  type ModelGroupView,
+  type ProviderPickView,
+} from '@/components/panels/agent-composer';
+
+// Tipe model picker disimpan di agent-composer (milik komposer ala-Codex),
+// diekspor ulang di sini biar import agent-view gak berubah.
+export type { ModelEntryView, ModelGroupView, ProviderPickView };
 
 // Panel kanan fase 2 (pratinjau UI — belum nyambung API; wiring nyata menyusul).
-
-export type ModelEntryView = { providerID: string; modelID: string; name: string };
-export type ModelGroupView = { providerID: string; label: string; free: boolean; models: ModelEntryView[] };
-/** Satu integrasi popular di bagian "Login pakai API key" dropdown model. */
-export type ProviderPickView = { integrationID: string; name: string; connected: boolean };
 
 export type ChatToolEvent = {
   id: string;
@@ -70,12 +76,16 @@ const TOOL_DOT_TONE: Record<ChatToolEvent['status'], 'green' | 'amber' | 'red'> 
   error: 'red',
 };
 
-/** Chip saran (fase 3.5): prompt cepat di atas input — key i18n `chat.suggest*`. */
+/** Chip saran (fase 3.5): prompt cepat di atas input — key i18n `chat.suggest*`.
+ * Dikirim ke composer sebagai kalimat translate; masa tayang dikelola composer
+ * (localStorage "chat-suggestions-seen" → cuma tampil sekali). */
 const SUGGESTION_KEYS = ['chat.suggestProgress', 'chat.suggestJournals', 'chat.suggestReview'] as const;
 
-function basename(path: string): string {
-  const index = path.lastIndexOf('/');
-  return index === -1 ? path : path.slice(index + 1);
+/** ID lampiran: cukup unik per panel — bila unggah dua kali banyak file berturut. */
+let attachmentSeq = 0;
+function attachmentId(): string {
+  attachmentSeq += 1;
+  return `lamp-${Date.now().toString(36)}-${attachmentSeq}`;
 }
 
 type ActivityFilter = 'all' | 'read-edit' | 'run';
@@ -236,18 +246,17 @@ export function AgentPanel({
   const t = useT();
   const [activeTab, setActiveTab] = useState<'chat' | 'activity'>('chat');
   const [draft, setDraft] = useState('');
-  const [modelOpen, setModelOpen] = useState(false);
+  /** Lampiran aktif: di-pick di composer → di-upload ke <project>/attachments/ →
+   * pas submit dirangkai jadi blok <lampiranPaths> di ekor pesan. */
+  const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   /** Popover Kemampuan AI (fase 2.5). */
   const [capsOpen, setCapsOpen] = useState(false);
   /** Filter chip di tab Aktivitas (dipertahankan saat pindah-pindah tab). */
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
-  /** Integrasi yang lagi dibuka form input key-nya (id, atau null). */
-  const [keyOpenId, setKeyOpenId] = useState<string | null>(null);
-  const [keyDraft, setKeyDraft] = useState('');
-  const pickerRef = useRef<HTMLDivElement>(null);
   const capsRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Popover kemampuan ikut ketutup pas klik di luar-nya.
   useEffect(() => {
@@ -259,19 +268,13 @@ export function AgentPanel({
     return () => document.removeEventListener('mousedown', onDown);
   }, [capsOpen]);
 
-  // Dropdown model ketutup kalau klik di luar-nya.
-  useEffect(() => {
-    if (!modelOpen) return;
-    const onDown = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) setModelOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [modelOpen]);
+  // Dropdown model pindah ke composer (ala-Codex) — klik-diluar jadi urusan composer.
 
-  // Ganti project → draft dibersihkan (chat/session itu per project).
+  // Ganti project → draft + lampiran dibersihkan (chat/session itu per project).
   useEffect(() => {
     setDraft('');
+    setAttachments([]);
+    setUploadError(null);
   }, [slug]);
 
   // Pesan baru / streaming / busy → tetap di ekor daftar.
@@ -279,7 +282,6 @@ export function AgentPanel({
     if (activeTab === 'chat' && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, busy, activeTab]);
 
-  const canSend = !sending && draft.trim() !== '';
   // Timeline dikelompokkan per pesan assistant, pesan terbaru dulu → event baru nongol di atas.
   const activityGroups: Array<{ message: ChatMessage; events: ChatToolEvent[] }> = [];
   for (const message of [...messages].reverse()) {
@@ -291,26 +293,53 @@ export function AgentPanel({
     .filter((group) => group.events.length > 0);
   const visibleCount = visibleGroups.reduce((total, group) => total + group.events.length, 0);
 
+  /** Kirim: draft + blok `<lampiranPaths>` (path relatif folder project) — agent
+   * baca langsung dari attachments/. Setelah kirim: reset draft + lampiran. */
   const submitDraft = () => {
     const text = draft.trim();
-    if (!text || sending) return;
-    onSend(text);
-    setDraft('');
-  };
-
-  // Enter = kirim, Shift+Enter = baris baru; isComposing guard biar IME aman.
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      submitDraft();
+    if ((!text && attachments.length === 0) || sending) return;
+    let final = text;
+    if (attachments.length > 0) {
+      const block = `<lampiranPaths>\n${attachments.map((a) => a.path).join('\n')}\n</lampiranPaths>`;
+      final = text ? `${text}\n\n${block}` : block;
     }
+    onSend(final);
+    setDraft('');
+    setAttachments([]);
   };
 
-  // Chip saran: isi draft + fokus ke textarea. Gak auto-kirim — user yang
-  // menekan Enter (jujur & aman, pesannya masih bisa diedit).
-  const applySuggestion = (text: string) => {
-    setDraft(text);
-    textareaRef.current?.focus();
+  /** [+] composer: setiap file di-POST ke /api/projects/{slug}/attachments
+   * (simpan di folder project user, gak data/). Gagal → uploadError di baris hint. */
+  const handlePickFiles = (files: File[]) => {
+    setUploadError(null);
+    setUploading(true);
+    void (async () => {
+      const saved: AgentAttachment[] = [];
+      for (const file of files) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/attachments`, {
+            method: 'POST',
+            body: formData,
+          });
+          const data = (await res.json()) as { path?: string; name?: string; size?: number; error?: string };
+          if (!res.ok || !data.path || !data.name) throw new Error(data.error ?? 'upload gagal');
+          saved.push({ id: attachmentId(), name: data.name, path: data.path, size: data.size ?? file.size });
+        } catch {
+          setUploadError(t('composer.uploadErr'));
+        }
+      }
+      if (saved.length > 0) {
+        setUploadError(null);
+        setAttachments((prev) => [...prev, ...saved]);
+      }
+      setUploading(false);
+    })();
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
   };
 
   return (
@@ -331,140 +360,6 @@ export function AgentPanel({
         >
           {projectTitle}
         </span>
-        <div ref={pickerRef} className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setModelOpen((v) => !v)}
-            className={`flex items-center gap-0.5 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] transition-colors ${
-              currentModel ? 'text-primary' : 'text-muted-foreground'
-            }`}
-            title={t('ai.models')}
-          >
-            <span className="max-w-20 truncate">{currentModel?.name ?? t('ai.autoModel')}</span>
-            <ChevronDown size={11} />
-          </button>
-          {modelOpen && (
-            <div className="absolute right-0 top-8 z-40 max-h-72 w-64 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg">
-              {models.length === 0 && (
-                <p className="px-2 py-2 text-[11px] text-muted-foreground">{t('ai.modelsEmpty')}</p>
-              )}
-              {models.map((group) => (
-                <div key={group.providerID} className="mb-0.5">
-                  <p className="px-2 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">
-                    {group.label}
-                  </p>
-                  {group.models.map((model) => {
-                    const active =
-                      currentModel?.providerID === model.providerID && currentModel?.modelID === model.modelID;
-                    return (
-                      <button
-                        key={`${model.providerID}/${model.modelID}`}
-                        type="button"
-                        onClick={() => {
-                          onSelectModel(model);
-                          setModelOpen(false);
-                        }}
-                        className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] transition-colors ${
-                          active
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-foreground hover:bg-muted'
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1 truncate">{model.name}</span>
-                        {active && <Check size={11} className="shrink-0 text-primary" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-              {/* Login provider lain pakai API key — langsung dari dropdown. */}
-              {providerPicks.length > 0 && (
-                <div className="mt-0.5 border-t border-border px-1 pt-1">
-                  <p className="px-1 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">
-                    {t('ai.providersLogin')}
-                  </p>
-                  {providerPicks.map((pick) => {
-                    const open = keyOpenId === pick.integrationID;
-                    return (
-                      <div key={pick.integrationID}>
-                        <div className="flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-muted">
-                          <StatusDot
-                            tone={pick.connected ? 'green' : 'idle'}
-                            title={pick.connected ? t('ai.providerConnected') : t('ai.providerNotConnected')}
-                          />
-                          <span className="min-w-0 flex-1 truncate text-[11px] text-foreground">
-                            {pick.name}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setKeyOpenId(open ? null : pick.integrationID);
-                              setKeyDraft('');
-                            }}
-                            disabled={Boolean(keyOpenId) && !open}
-                            className="rounded px-1.5 py-0.5 text-[10px] text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
-                          >
-                            {open ? t('ai.providerCancel') : pick.connected ? t('ai.providerReplace') : t('ai.providerConnect')}
-                          </button>
-                          {pick.connected && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (window.confirm(t('ai.providerDisconnectConfirm').replace('{name}', pick.name))) {
-                                  void onProviderDisconnect(pick.integrationID);
-                                  setModelOpen(false);
-                                }
-                              }}
-                              className="rounded px-1.5 py-0.5 text-[10px] text-destructive transition-colors hover:bg-destructive/10"
-                            >
-                              {t('ai.providerDisconnect')}
-                            </button>
-                          )}
-                        </div>
-                        {open && (
-                          <div className="flex items-center gap-1 px-1 py-1">
-                            <input
-                              autoFocus
-                              type="password"
-                              value={keyDraft}
-                              onChange={(e) => setKeyDraft(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && keyDraft.trim()) {
-                                  void onProviderConnect(pick.integrationID, keyDraft.trim());
-                                  setKeyDraft('');
-                                  setKeyOpenId(null);
-                                }
-                                if (e.key === 'Escape') setKeyOpenId(null);
-                              }}
-                              placeholder={t('ai.providerKeyPlaceholder')}
-                              className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1 text-[11px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                            />
-                            <button
-                              type="button"
-                              disabled={!keyDraft.trim()}
-                              onClick={() => {
-                                void onProviderConnect(pick.integrationID, keyDraft.trim());
-                                setKeyDraft('');
-                                setKeyOpenId(null);
-                              }}
-                              className="shrink-0 rounded-lg bg-primary px-2 py-1 text-[10px] text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              {t('ai.providerSave')}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <p className="px-1 pb-1 text-[9px] leading-snug text-muted-foreground">{t('ai.providerKeyHint')}</p>
-                </div>
-              )}
-              <p className="border-t border-border px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
-                {t('ai.providersNote')}
-              </p>
-            </div>
-          )}
-        </div>
         <div ref={capsRef} className="relative shrink-0">
           <button
             type="button"
@@ -605,63 +500,31 @@ export function AgentPanel({
             )}
           </div>
 
-          <form
-            className="border-t border-border bg-card p-2.5"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submitDraft();
-            }}
-          >
-            {/* Chip saran (fase 3.5): isi draft + fokus, gak auto-kirim. */}
-            {!busy && (
-              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {t('chat.suggestLabel')}
-                </span>
-                {SUGGESTION_KEYS.map((key) => {
-                  const text = t(key);
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => applySuggestion(text)}
-                      className="cursor-pointer rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-                    >
-                      {text}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {activeFilePath && (
-              <div
-                className="mb-1.5 flex max-w-full items-center gap-1 self-start rounded-full border border-border bg-muted/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground"
-                title={activeFilePath}
-              >
-                <FileText size={11} className="shrink-0" />
-                <span className="min-w-0 truncate">{t('ai.contextFile', { file: basename(activeFilePath) })}</span>
-              </div>
-            )}
-            <div className="flex items-end gap-1.5">
-              <textarea
-                ref={textareaRef}
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={t('ai.placeholder')}
-                rows={2}
-                className="min-h-0 max-h-28 flex-1 resize-none rounded-xl border border-border bg-background px-2.5 py-1.5 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={!canSend}
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <SendHorizontal size={14} />
-                {t('ai.send')}
-              </button>
-            </div>
-          </form>
+          {/* Komposer ala-Codex (ss2): saran chip sekali-tampil + card textarea
+              + baris bawah [+] · model ▾ · effort ▾ · ↑. Semua markup di agent-composer. */}
+          <div className="shrink-0 px-2.5 pb-2.5">
+            <AgentComposer
+              draft={draft}
+              onDraftChange={setDraft}
+              onSubmit={submitDraft}
+              sending={sending}
+              busy={busy}
+              suggestions={SUGGESTION_KEYS.map((key) => t(key))}
+              suggestLabel={t('chat.suggestLabel')}
+              activeFilePath={activeFilePath}
+              attachments={attachments}
+              uploading={uploading}
+              uploadError={uploadError}
+              onPickFiles={handlePickFiles}
+              onRemoveAttachment={removeAttachment}
+              models={models}
+              currentModel={currentModel}
+              onSelectModel={onSelectModel}
+              providerPicks={providerPicks}
+              onProviderConnect={onProviderConnect}
+              onProviderDisconnect={onProviderDisconnect}
+            />
+          </div>
         </>
       ) : (
         // Tab Aktivitas: chip filter + timeline collapsible (grup per pesan, terbaru di atas).

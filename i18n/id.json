@@ -175,7 +175,10 @@
     "effortMax": "Max",
     "effortCap": "Model ini maksimal {level}",
     "effortNote": "Disimpen per project; berlaku pas chat baru.",
-    "close": "Tutup"
+    "close": "Tutup",
+    "general": "Umum",
+    "customize": "Kustomisasi",
+    "searchPh": "Cari setelan…"
   },
   "left": {
     "journalComing": "Fase 3: pencarian jurnal (OpenAlex + Crossref) muncul di sini.",
@@ -399,6 +402,18 @@
     "errNoSkill": "SKILL.md gak ketemu di root repo",
     "errExists": "Nama sudah dipakai",
     "errName": "Nama wajib diisi",
-    "errUrl": "URL / command wajib diisi"
+    "errUrl": "URL / command wajib diisi",
+    "navMcp": "MCP",
+    "navSkills": "Skills"
+  },
+  "composer": {
+    "attach": "Lampir file",
+    "send": "Kirim",
+    "remove": "Buang lampiran",
+    "uploadErr": "Gagal unggah file",
+    "selectEffort": "Pilih effort",
+    "selectModel": "Pilih model",
+    "attachHint": "File disalin ke folder attachments project — agent bisa langsung baca.",
+    "dismiss": "Sembunyikan saran"
   }
 }

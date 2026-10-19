@@ -7,21 +7,21 @@ import {
   FolderClosed,
   Images,
   ListTree,
-  Puzzle,
   ScrollText,
   type LucideIcon,
 } from 'lucide-react';
 import { useT } from '@/lib/preferences';
+import { SettingsDialog } from '@/components/workspace/settings-dialog';
 
-export type LeftTab = 'drafts' | 'outline' | 'journals' | 'zotero' | 'extensions' | 'figures' | 'data' | 'files';
+export type LeftTab = 'drafts' | 'outline' | 'journals' | 'zotero' | 'figures' | 'data' | 'files';
 
 // Views berbasis tujuan dulu (kiri atas), view file-manager mentah paling bawah.
+// MCP & Skills pindah ke dialog Settings — tab 'extensions' gak ada lagi.
 const TABS: Array<{ id: LeftTab; icon: LucideIcon; labelKey: string }> = [
   { id: 'drafts', icon: ScrollText, labelKey: 'views.drafts' },
   { id: 'outline', icon: ListTree, labelKey: 'left.tabOutline' },
   { id: 'journals', icon: BookOpenText, labelKey: 'tabs.journal' },
   { id: 'zotero', icon: BookMarked, labelKey: 'left.tabZotero' },
-  { id: 'extensions', icon: Puzzle, labelKey: 'mcp.tab' },
   { id: 'figures', icon: Images, labelKey: 'views.figures' },
   { id: 'data', icon: Database, labelKey: 'views.data' },
   { id: 'files', icon: FolderClosed, labelKey: 'tabs.file' },
@@ -52,6 +52,10 @@ export function IconRail({ active, onChange }: { active: LeftTab; onChange: (tab
           </button>
         );
       })}
+
+      {/* Dialog Settings: gear bukan tab (gak masuk LeftTab) — state dialog
+          self-contained di komponennya, dipasang sebagai child terakhir nav. */}
+      <SettingsDialog />
     </nav>
   );
 }

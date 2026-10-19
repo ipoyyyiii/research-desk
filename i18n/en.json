@@ -175,7 +175,10 @@
     "effortMax": "Max",
     "effortCap": "This model goes up to {level}",
     "effortNote": "Saved per project; takes effect on new chats.",
-    "close": "Close"
+    "close": "Close",
+    "general": "General",
+    "customize": "Customize",
+    "searchPh": "Search settings…"
   },
   "left": {
     "journalComing": "Phase 3: journal search (OpenAlex + Crossref) shows up here.",
@@ -399,6 +402,18 @@
     "errNoSkill": "SKILL.md not found at the repo root",
     "errExists": "Name already in use",
     "errName": "Name is required",
-    "errUrl": "URL / command is required"
+    "errUrl": "URL / command is required",
+    "navMcp": "MCP",
+    "navSkills": "Skills"
+  },
+  "composer": {
+    "attach": "Attach file",
+    "send": "Send",
+    "remove": "Remove attachment",
+    "uploadErr": "Upload failed",
+    "selectEffort": "Select effort",
+    "selectModel": "Select model",
+    "attachHint": "Files are copied into the project attachments folder — the agent can read them directly.",
+    "dismiss": "Hide suggestions"
   }
 }

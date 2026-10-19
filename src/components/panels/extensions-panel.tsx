@@ -6,10 +6,13 @@ import { useT } from '@/lib/preferences';
 import { Button, SegmentedGroup } from '@/components/ui';
 
 /**
- * Tab MCP & Skills: kelola server MCP project (config `.opencode/opencode.json`
- * yang dibaca server OpenCode saat sesi chat baru dibuat — tanpa restart) dan
- * pasang skill agent dari repo GitHub ke `.opencode/skills/`.
- * Estetik & pola meniru zotero-panel: list + form + spinner + msg-line.
+ * Pane MCP & Skills buat dialog Settings (pindahan dari tab 'extensions' di
+ * rail kiri). Dua komponen: McpPane (kelola server MCP project — config
+ * `.opencode/opencode.json` yang dibaca server OpenCode saat sesi chat baru
+ * dibuat — tanpa restart) dan SkillsPane (pasang skill agent dari repo GitHub
+ * ke `.opencode/skills/`). Isi & logika identik dengan panel lama; header
+ * judul/desc-nya rendah di dialog, bukan di pane. Keduanya zero-props: slug
+ * project aktif dibaca dari URL `/p/<slug>`.
  */
 
 type McpItem = {
@@ -36,10 +39,29 @@ function unwrapNamed(code: string): { key: string; name?: string } {
   return { key: code };
 }
 
-export function ExtensionsPanel({ slug }: { slug: string }) {
+/** Slug project aktif dari URL workspace (`/p/<slug>`). */
+function slugFromLocation(): string | null {
+  const match = /^\/p\/([^/?#]+)\/?/.exec(window.location.pathname);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/** Pane hidup cuma di browser — baca slug dari URL sekali saat mount. */
+function useProjectSlug(): string | null {
+  const [slug, setSlug] = useState<string | null>(null);
+  useEffect(() => {
+    setSlug(slugFromLocation());
+  }, []);
+  return slug;
+}
+
+const inputClass =
+  'mb-1 w-full rounded-md border border-border bg-background px-2 py-1.5 outline-none placeholder:text-muted-foreground/70 focus:ring-1 focus:ring-ring';
+const labelClass = 'mb-1 block text-[11px] font-medium text-card-foreground';
+
+export function McpPane() {
   const t = useT();
+  const slug = useProjectSlug();
   const [mcpItems, setMcpItems] = useState<McpItem[]>([]);
-  const [skills, setSkills] = useState<SkillItem[]>([]);
   const [configError, setConfigError] = useState(false);
 
   const [name, setName] = useState('');
@@ -47,19 +69,27 @@ export function ExtensionsPanel({ slug }: { slug: string }) {
   const [command, setCommand] = useState('');
   const [url, setUrl] = useState('');
   const [env, setEnv] = useState('');
-  const [skillUrl, setSkillUrl] = useState('');
 
-  const [busy, setBusy] = useState<'add' | 'install' | null>(null);
+  const [busy, setBusy] = useState<'add' | null>(null);
   const [busyRow, setBusyRow] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
+  const applyResult = (ok: boolean, serverError?: string, fallback = 'mcp.errSave') => {
+    if (ok) return true;
+    setMsg(serverError && serverError.startsWith('mcp.') ? serverError : fallback);
+    return false;
+  };
+
   const loadList = useCallback(async () => {
+    if (!slug) {
+      setConfigError(true);
+      return;
+    }
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/extensions`);
       const data = (await res.json()) as ExtensionsData;
       setMcpItems(res.ok ? (data.mcp ?? []) : []);
-      setSkills(res.ok ? (data.skills ?? []) : []);
-      setConfigError(Boolean(data.configError));
+      setConfigError(!res.ok || Boolean(data.configError));
     } catch {
       setConfigError(true);
     }
@@ -71,14 +101,8 @@ export function ExtensionsPanel({ slug }: { slug: string }) {
 
   const busyOther = busy !== null || busyRow !== null;
 
-  const applyResult = (ok: boolean, serverError?: string, fallback = 'mcp.errSave') => {
-    if (ok) return true;
-    setMsg(serverError && serverError.startsWith('mcp.') ? serverError : fallback);
-    return false;
-  };
-
   const addServer = async () => {
-    if (busyOther) return;
+    if (busyOther || !slug) return;
     setBusy('add');
     setMsg(null);
     try {
@@ -104,7 +128,7 @@ export function ExtensionsPanel({ slug }: { slug: string }) {
   };
 
   const toggleServer = async (item: McpItem) => {
-    if (busyOther) return;
+    if (busyOther || !slug) return;
     setBusyRow(item.name);
     setMsg(null);
     try {
@@ -124,7 +148,7 @@ export function ExtensionsPanel({ slug }: { slug: string }) {
   };
 
   const removeServer = async (item: McpItem) => {
-    if (busyOther) return;
+    if (busyOther || !slug) return;
     setBusyRow(item.name);
     setMsg(null);
     try {
@@ -143,29 +167,6 @@ export function ExtensionsPanel({ slug }: { slug: string }) {
     }
   };
 
-  const installSkill = async () => {
-    if (busyOther) return;
-    setBusy('install');
-    setMsg(null);
-    try {
-      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/skills`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: skillUrl }),
-      });
-      const data = (await res.json()) as { name?: string; error?: string };
-      if (res.ok && applyResult(Boolean(data.name), data.error, 'mcp.errInstall')) {
-        setMsg(`mcp.installed:${data.name}`);
-        setSkillUrl('');
-        await loadList();
-      }
-    } catch {
-      setMsg('mcp.errInstall');
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const canAdd =
     name.trim().length > 0 &&
     (kind === 'remote' ? url.trim().length > 0 : command.trim().length > 0);
@@ -174,15 +175,9 @@ export function ExtensionsPanel({ slug }: { slug: string }) {
   const kindLabel = (type: 'local' | 'remote') =>
     t(type === 'local' ? 'mcp.typeLocal' : 'mcp.typeRemote').replace(/\s*\(.*\)$/, '').trim();
 
-  const inputClass =
-    'mb-1 w-full rounded-md border border-border bg-background px-2 py-1.5 outline-none placeholder:text-muted-foreground/70 focus:ring-1 focus:ring-ring';
-  const labelClass = 'mb-1 block text-[11px] font-medium text-card-foreground';
-
   return (
-    <section className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 text-[12px]">
-        <p className="mb-3 text-[11px] leading-snug text-muted-foreground">{t('mcp.desc')}</p>
-
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto text-[12px]">
         {configError && (
           <p className="mb-2.5 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
             {t('mcp.errConfig')}
@@ -237,7 +232,7 @@ export function ExtensionsPanel({ slug }: { slug: string }) {
           </ul>
         )}
 
-        <div className="mb-4 border-t border-border pt-3">
+        <div className="border-t border-border pt-3">
           <label className={labelClass}>{t('mcp.name')}</label>
           <input
             value={name}
@@ -274,15 +269,13 @@ export function ExtensionsPanel({ slug }: { slug: string }) {
               <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{t('mcp.envNote')}</p>
             </>
           ) : (
-            <>
-              <input
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder={t('mcp.urlPh')}
-                aria-label={t('mcp.add')}
-                className={`${inputClass} font-mono`}
-              />
-            </>
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder={t('mcp.urlPh')}
+              aria-label={t('mcp.add')}
+              className={`${inputClass} font-mono`}
+            />
           )}
           <Button
             variant="default"
@@ -295,31 +288,108 @@ export function ExtensionsPanel({ slug }: { slug: string }) {
           </Button>
         </div>
 
-        <div className="border-t border-border pt-3">
-          <h3 className="text-[11px] font-medium text-card-foreground">{t('mcp.skillsTitle')}</h3>
-          <p className="mt-0.5 mb-2 text-[10px] leading-snug text-muted-foreground">
-            {t('mcp.skillsDesc')}
+        {msg && (
+          <p className="mt-2.5 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
+            {(() => {
+              const { key, name: named } = unwrapNamed(msg);
+              return named ? t(key, { name: named }) : t(key);
+            })()}
           </p>
+        )}
+      </div>
+    </section>
+  );
+}
 
-          {skills.length === 0 ? (
-            <p className="mb-2 text-[11px] text-muted-foreground">{t('mcp.skillsEmpty')}</p>
-          ) : (
-            <ul className="mb-2.5 space-y-1">
-              {skills.map((skill) => (
-                <li key={skill.name} className="rounded-md bg-muted/50 px-2 py-1.5">
-                  <p className="truncate font-mono text-[11px] text-card-foreground" title={skill.name}>
-                    {skill.name}
+export function SkillsPane() {
+  const t = useT();
+  const slug = useProjectSlug();
+  const [skills, setSkills] = useState<SkillItem[]>([]);
+  const [configError, setConfigError] = useState(false);
+
+  const [skillUrl, setSkillUrl] = useState('');
+  const [busy, setBusy] = useState<'install' | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const applyResult = (ok: boolean, serverError?: string, fallback = 'mcp.errSave') => {
+    if (ok) return true;
+    setMsg(serverError && serverError.startsWith('mcp.') ? serverError : fallback);
+    return false;
+  };
+
+  const loadList = useCallback(async () => {
+    if (!slug) {
+      setConfigError(true);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/extensions`);
+      const data = (await res.json()) as ExtensionsData;
+      setSkills(res.ok ? (data.skills ?? []) : []);
+      setConfigError(!res.ok || Boolean(data.configError));
+    } catch {
+      setConfigError(true);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    void loadList();
+  }, [loadList]);
+
+  const busyOther = busy !== null;
+
+  const installSkill = async () => {
+    if (busyOther || !slug) return;
+    setBusy('install');
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/skills`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: skillUrl }),
+      });
+      const data = (await res.json()) as { name?: string; error?: string };
+      if (res.ok && applyResult(Boolean(data.name), data.error, 'mcp.errInstall')) {
+        setMsg(`mcp.installed:${data.name}`);
+        setSkillUrl('');
+        await loadList();
+      }
+    } catch {
+      setMsg('mcp.errInstall');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto text-[12px]">
+        {configError && (
+          <p className="mb-2.5 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
+            {t('mcp.errConfig')}
+          </p>
+        )}
+
+        {skills.length === 0 ? (
+          <p className="mb-2 text-[11px] text-muted-foreground">{t('mcp.skillsEmpty')}</p>
+        ) : (
+          <ul className="mb-2.5 space-y-1">
+            {skills.map((skill) => (
+              <li key={skill.name} className="rounded-md bg-muted/50 px-2 py-1.5">
+                <p className="truncate font-mono text-[11px] text-card-foreground" title={skill.name}>
+                  {skill.name}
+                </p>
+                {skill.description && (
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">
+                    {skill.description}
                   </p>
-                  {skill.description && (
-                    <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">
-                      {skill.description}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
 
+        <div className="border-t border-border pt-3">
           <input
             value={skillUrl}
             onChange={(e) => setSkillUrl(e.target.value)}

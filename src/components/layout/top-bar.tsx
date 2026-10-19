@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { FilePlus2, Columns2, MessagesSquare } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Button, IconButton, Modal, TextInput, StatusDot } from '@/components/ui';
-import { SettingsMenu } from '@/components/workspace/settings-menu';
 
 export function TopBar({
   projectName,
@@ -84,8 +83,6 @@ export function TopBar({
           <FilePlus2 size={15} />
           {t('common.newDocument')}
         </Button>
-        {/* Settings unified ala Claude: Bahasa + Tema + Effort AI (dropdown). */}
-        <SettingsMenu />
         <StatusDot tone="amber" title={`OpenCode: ${t('chat.statusOff')} (fase 2)`} />
       </div>
 

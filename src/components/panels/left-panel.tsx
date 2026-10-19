@@ -8,7 +8,6 @@ import { JournalPanel } from '@/components/panels/journal-panel';
 import { OutlineView } from '@/components/panels/outline-view';
 import { LibraryPanel } from '@/components/panels/library-panel';
 import { ZoteroPanel } from '@/components/panels/zotero-panel';
-import { ExtensionsPanel } from '@/components/panels/extensions-panel';
 import { IconRail, type LeftTab } from '@/components/workspace/icon-rail';
 import {
   DataView,
@@ -324,13 +323,6 @@ export function LeftPanel({
         <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
           {tabHeader(t('left.tabZotero'))}
           <ZoteroPanel slug={slug} />
-        </div>
-      )}
-
-      {activeTab === 'extensions' && (
-        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
-          {tabHeader(t('mcp.tab'))}
-          <ExtensionsPanel slug={slug} />
         </div>
       )}
 
