@@ -107,6 +107,14 @@ function useFileTree(slug: string, version: number) {
     };
   }, [fetchTree]);
 
+  // Aksi panel ditempat lain (bikin draf, unggah) minta refresh LANGSUNG —
+  // gak lelew throttle fokus 3 detik.
+  useEffect(() => {
+    const refresh = () => void fetchTree();
+    window.addEventListener('workspace:tree-refresh', refresh);
+    return () => window.removeEventListener('workspace:tree-refresh', refresh);
+  }, [fetchTree]);
+
   return { entries, loading, error };
 }
 
@@ -234,13 +242,6 @@ export function LeftPanel({
     return (
       <li
         key={node.path}
-        // Drag baris file → pane Basis Pengetahuan (application/x-rd-path).
-        // Drag hanya bonus — klik file masih lewat onClick button di dalam.
-        draggable
-        onDragStart={(event) => {
-          event.dataTransfer.setData('application/x-rd-path', node.path);
-          event.dataTransfer.effectAllowed = 'copy';
-        }}
       >
         <button
           onClick={() => openable && onOpenFile(node.path)}
@@ -378,7 +379,11 @@ export function LeftPanel({
             {journalMode === 'search' ? (
               <JournalPanel slug={slug} pdfFiles={pdfFiles} onOpenPdf={onOpenFile} />
             ) : (
-              <LibraryPanel slug={slug} />
+              <LibraryPanel
+                slug={slug}
+                onSearch={() => setJournalMode('search')}
+                pdfCount={pdfFiles.length}
+              />
             )}
           </div>
         </div>

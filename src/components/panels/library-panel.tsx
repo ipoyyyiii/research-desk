@@ -1,19 +1,32 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { BookOpen, RefreshCw, Search } from 'lucide-react';
 import { useT } from '@/lib/preferences';
+import { EmptyState } from '@/components/panels/views-left';
 import {
   PaperCard,
+  PdfUploadSection,
   parseSavedEntry,
   type SavedJournalEntry,
 } from '@/components/panels/journal-panel';
 
 /**
  * Tab "Perpustakaan" (fase 3): daftar jurnal tersimpan project (ikut references.bib).
- * Import Zotero sekarang punya tab sendiri di rail kiri (zotero-panel.tsx).
+ * Ini juga yang jadi daftar "Tersimpan" di tab Jurnal. Import Zotero sekarang
+ * punya tab sendiri di rail kiri (zotero-panel.tsx).
  */
-export function LibraryPanel({ slug }: { slug: string }) {
+export function LibraryPanel({
+  slug,
+  onSearch,
+  pdfCount = 0,
+}: {
+  slug: string;
+  /** Kosong → tombol "Cari Jurnal" lompat ke mode Cari (state milik LeftPanel). */
+  onSearch?: () => void;
+  /** Jumlah PDF di referensi/ — 0 → tampil strip unggah PDF di bawah daftar. */
+  pdfCount?: number;
+}) {
   const t = useT();
   const [entries, setEntries] = useState<SavedJournalEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,9 +129,16 @@ export function LibraryPanel({ slug }: { slug: string }) {
         ) : error ? (
           <p className="px-1 py-6 text-center text-xs text-red-500">{t('journal.error')}</p>
         ) : entries.length === 0 ? (
-          <p className="px-1 py-6 text-center text-xs leading-relaxed text-muted-foreground">
-            {t('library.empty')}
-          </p>
+          <EmptyState
+            icon={BookOpen}
+            title={t('es.journalSavedTitle')}
+            desc={t('es.journalSavedDesc')}
+            action={
+              onSearch
+                ? { label: t('es.journalSavedAction'), onClick: onSearch, icon: Search }
+                : undefined
+            }
+          />
         ) : (
           <ul className="space-y-2">
             {entries.map((entry) => (
@@ -135,6 +155,9 @@ export function LibraryPanel({ slug }: { slug: string }) {
             ))}
           </ul>
         )}
+
+        {/* Tab Tersimpan ikut dapet strip unggah PDF saat referensi/ kosong. */}
+        {pdfCount === 0 && <PdfUploadSection slug={slug} />}
       </div>
     </section>
   );

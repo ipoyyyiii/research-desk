@@ -444,24 +444,6 @@
     "ready": "Ready",
     "creating": "Setting up project…"
   },
-  "knowledge": {
-    "title": "Knowledge Base",
-    "desc": "Files the agent can search in detail.",
-    "searchPh": "Search knowledge…",
-    "empty": "No knowledge files yet",
-    "emptyDesc": "Add a workspace file so the agent can search its content without attaching it to every chat.",
-    "addFile": "Add file",
-    "dropHint": "Drag files here",
-    "added": "{name} added to knowledge base.",
-    "removed": "{name} removed from knowledge.",
-    "emptySearch": "No matches.",
-    "pickTitle": "Pick a workspace file",
-    "count": "{n} files",
-    "dropNow": "Drop to add",
-    "invalidFile": "That file is not inside the project folder.",
-    "removeAction": "Remove from knowledge",
-    "missing": "File no longer on disk"
-  },
   "question": {
     "title": "Agent asks",
     "freePh": "Or type your own answer…",
@@ -470,5 +452,31 @@
     "yes": "Yes",
     "no": "No",
     "skip": "Skip"
+  },
+  "es": {
+    "draftsTitle": "No drafts yet",
+    "draftsDesc": "Start writing — each chapter lives here; the agent can help.",
+    "draftsAction": "New draft",
+    "figuresTitle": "No figures yet",
+    "figuresDesc": "Charts and plates to drop into your draft.",
+    "figuresAction": "Upload image",
+    "dataTitle": "No data files yet",
+    "dataDesc": "CSV / Excel / JSON for tables and analysis.",
+    "dataAction": "Upload data",
+    "journalSavedTitle": "No saved journals yet",
+    "journalSavedDesc": "Search journals in the Search tab, then save the relevant ones here.",
+    "journalSavedAction": "Search journals",
+    "journalPdfTitle": "No journal PDFs yet",
+    "journalPdfDesc": "Downloaded PDFs in referensi/ open right from here.",
+    "journalPdfAction": "Upload PDF",
+    "libTitle": "No saved references yet",
+    "libDesc": "Save papers from the Journals tab; the bib builds itself.",
+    "libAction": "Open journals",
+    "drop": "Drop to upload",
+    "uploading": "Uploading…",
+    "uploaded": "{n} files added",
+    "created": "{name} is ready to open.",
+    "uploadFail": "Upload failed — try again.",
+    "createFail": "Failed to create the draft — try again."
   }
 }

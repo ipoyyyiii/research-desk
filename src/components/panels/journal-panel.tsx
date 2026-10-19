@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { ChevronDown, FileText, Quote, Search, X } from 'lucide-react';
 import { useT } from '@/lib/preferences';
-import { formatSize, rawUrl, type PdfRef } from '@/components/panels/views-left';
+import {
+  DropOverlay,
+  EmptyState,
+  formatSize,
+  rawUrl,
+  useFolderUpload,
+  type PdfRef,
+} from '@/components/panels/views-left';
 
 // Tab "Jurnal" (fase 3): cari paper lintas OpenAlex/Crossref/Semantic Scholar,
 // simpan ke perpustakaan project (backend ikut menambah entri BibTeX).
@@ -322,6 +329,43 @@ export function PaperCard({
   );
 }
 
+/**
+ * Strip unggah PDF referensi (ss7 ringan) — tampil saat folder referensi/
+ * masih kosong. Drag & drop file OS = bonus; tombol utama tetap sebagai
+ * alternatif WCAG. Dipakai tab Jurnal (Cari) DAN tab Tersimpan (Perpustakaan).
+ */
+export function PdfUploadSection({ slug }: { slug: string }) {
+  const t = useT();
+  const up = useFolderUpload(slug, 'referensi', 'application/pdf');
+  return (
+    <div
+      className="relative mt-3 border-t border-border pt-2"
+      onDragEnter={up.dnd.onDragEnter}
+      onDragOver={up.dnd.onDragOver}
+      onDragLeave={up.dnd.onDragLeave}
+      onDrop={up.dnd.onDrop}
+    >
+      <EmptyState
+        compact
+        icon={FileText}
+        title={t('es.journalPdfTitle')}
+        desc={t('es.journalPdfDesc')}
+        action={{ label: t('es.journalPdfAction'), onClick: up.pick, busy: up.busy }}
+        note={up.failed ? { text: t('es.uploadFail'), tone: 'error' } : null}
+      />
+      <input
+        ref={up.inputRef}
+        type="file"
+        accept={up.accept}
+        multiple
+        className="hidden"
+        onChange={up.onInputChange}
+      />
+      {up.dragActive && <DropOverlay label={t('es.drop')} />}
+    </div>
+  );
+}
+
 /** Tab Jurnal: header pencarian + daftar hasil + aksi simpan/PDF/terelasi. */
 export function JournalPanel({
   slug,
@@ -558,6 +602,9 @@ export function JournalPanel({
             ))}
           </ul>
         )}
+
+        {/* Folder referensi/ masih kosong → strip ss7 unggah PDF (bonus: drag file OS). */}
+        {pdfFiles.length === 0 && <PdfUploadSection slug={slug} />}
       </div>
     </section>
   );

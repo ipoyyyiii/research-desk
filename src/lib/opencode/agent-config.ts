@@ -1,9 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { desc, eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { knowledgeFiles, projects } from '@/lib/db/schema';
-import { ensureKnowledgeSchema } from '@/lib/db/knowledge';
 import { listTree, type TreeEntry } from '@/lib/workspace/files';
 
 /**
@@ -189,32 +185,6 @@ export async function buildDossier(opts: {
   lines.push(`Judul project: ${opts.title}`);
   lines.push(`Folder: ${opts.folderRealPath}`);
   if (opts.activeFilePath) lines.push(`File aktif di editor: ${opts.activeFilePath}`);
-
-  // File pengetahuan yang di-pin user — agent dibaca dulu untuk konteks
-  // mendalam, tanpa perlu nempel file ke tiap chat. Bagian opsional: kalau
-  // tabel belum siap atau project gak dikenal, skip diam-diam.
-  try {
-    ensureKnowledgeSchema();
-    const proj = await db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(eq(projects.slug, opts.slug))
-      .limit(1);
-    if (proj.length > 0) {
-      const items = await db
-        .select({ path: knowledgeFiles.path })
-        .from(knowledgeFiles)
-        .where(eq(knowledgeFiles.projectId, proj[0].id))
-        .orderBy(desc(knowledgeFiles.addedAt))
-        .limit(20);
-      if (items.length > 0) {
-        lines.push('Basis pengetahuan (file yang diprioritaskan untuk dicari):');
-        for (const item of items) lines.push(`- ${item.path}`);
-      }
-    }
-  } catch {
-    // Gagal akses DB gak boleh bikin dossier gagal — daftar dokumen di bawah tetap jalan.
-  }
 
   try {
     const tree = await listTree(opts.folderRealPath);

@@ -444,24 +444,6 @@
     "ready": "Siap",
     "creating": "Menyiaping project…"
   },
-  "knowledge": {
-    "title": "Basis Pengetahuan",
-    "desc": "File yang isinya bakal dicari agent secara detail.",
-    "searchPh": "Cari pengetahuan…",
-    "empty": "Belum ada file pengetahuan",
-    "emptyDesc": "Tambah file workspace biar agent bisa nyari isinya tanpa perlu nempel di tiap chat.",
-    "addFile": "Tambah File",
-    "dropHint": "Geser file ke sini",
-    "added": "{name} masuk basis pengetahuan.",
-    "removed": "{name} dibuang dari pengetahuan.",
-    "emptySearch": "Gak ada yang cocok.",
-    "pickTitle": "Pilih file workspace",
-    "count": "{n} file",
-    "dropNow": "Ilepas buat nambahin",
-    "invalidFile": "File itu gak ada di folder project.",
-    "removeAction": "Buang dari pengetahuan",
-    "missing": "File gak ada lagi di disk"
-  },
   "question": {
     "title": "Agent nanya",
     "freePh": "Atau tulis jawaban sendiri…",
@@ -470,5 +452,31 @@
     "yes": "Ya",
     "no": "Tidak",
     "skip": "Lewati"
+  },
+  "es": {
+    "draftsTitle": "Belum ada draf",
+    "draftsDesc": "Mulai nulis — tiap bab dikerjain di sini, agent bisa bantuin.",
+    "draftsAction": "Bikin Draf",
+    "figuresTitle": "Belum ada gambar",
+    "figuresDesc": "Gambar grafik/plat buat dipasang ke draf.",
+    "figuresAction": "Unggah Gambar",
+    "dataTitle": "Belum ada data",
+    "dataDesc": "CSV / Excel / JSON buat tabel dan analisis.",
+    "dataAction": "Unggah Data",
+    "journalSavedTitle": "Belum ada jurnal tersimpan",
+    "journalSavedDesc": "Cari jurnal di tab Cari, terus simpan yang relevan ke sini.",
+    "journalSavedAction": "Cari Jurnal",
+    "journalPdfTitle": "Belum ada PDF jurnal",
+    "journalPdfDesc": "PDF unduhan di folder referensi/ dibuka langsung dari sini.",
+    "journalPdfAction": "Unggah PDF",
+    "libTitle": "Belum ada referensi tersimpan",
+    "libDesc": "Simpan paper dari tab Jurnal, nanti nge-bib otomatis.",
+    "libAction": "Buka Jurnal",
+    "drop": "Ilepas buat unggah",
+    "uploading": "Nggunggah…",
+    "uploaded": "{n} file masuk",
+    "created": "{name} siap dibuka.",
+    "uploadFail": "Unggah gagal — coba lagi.",
+    "createFail": "Gagal bikin draf — coba lagi."
   }
 }
