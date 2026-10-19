@@ -425,5 +425,50 @@
     "sessionsEmpty": "Belum ada sesi lain",
     "sessionSwitch": "Ganti sesi",
     "sessionSwitchBusy": "Ngganti sesi…"
+  },
+  "home": {
+    "title": "Projekan Lo",
+    "sub": "Satu repo kecil buat tiap thesis. Pilih buat lanjut, atau bikin baru.",
+    "searchPh": "Cari project…",
+    "new": "Baru",
+    "newProject": "Projek Baru",
+    "newProjectHint": "Sambungkan folder kerja yang udah ada (~/Documents/...), atau kasih folder baru.",
+    "allProjects": "Semua Projek",
+    "projectCount": "{n} Projek",
+    "loading": "Memuat…",
+    "emptySearch": "Gak ada project yang cocok. Coba kata lain.",
+    "emptyAll": "Belum ada project — sambungkan folder thesis lu buat mulai.",
+    "open": "Buka",
+    "lastOpened": "Dibuka terakhir",
+    "neverOpened": "Belum pernah dibuka",
+    "ready": "Siap",
+    "creating": "Menyiaping project…"
+  },
+  "knowledge": {
+    "title": "Basis Pengetahuan",
+    "desc": "File yang isinya bakal dicari agent secara detail.",
+    "searchPh": "Cari pengetahuan…",
+    "empty": "Belum ada file pengetahuan",
+    "emptyDesc": "Tambah file workspace biar agent bisa nyari isinya tanpa perlu nempel di tiap chat.",
+    "addFile": "Tambah File",
+    "dropHint": "Geser file ke sini",
+    "added": "{name} masuk basis pengetahuan.",
+    "removed": "{name} dibuang dari pengetahuan.",
+    "emptySearch": "Gak ada yang cocok.",
+    "pickTitle": "Pilih file workspace",
+    "count": "{n} file",
+    "dropNow": "Ilepas buat nambahin",
+    "invalidFile": "File itu gak ada di folder project.",
+    "removeAction": "Buang dari pengetahuan",
+    "missing": "File gak ada lagi di disk"
+  },
+  "question": {
+    "title": "Agent nanya",
+    "freePh": "Atau tulis jawaban sendiri…",
+    "answered": "Sudah dijawab",
+    "expired": "Pertanyaan hangus — jawab pake teks chat aja.",
+    "yes": "Ya",
+    "no": "Tidak",
+    "skip": "Lewati"
   }
 }

@@ -425,5 +425,50 @@
     "sessionsEmpty": "No other sessions yet",
     "sessionSwitch": "Switch session",
     "sessionSwitchBusy": "Switching session…"
+  },
+  "home": {
+    "title": "Your Projects",
+    "sub": "One small repo per thesis. Open one to continue, or start something new.",
+    "searchPh": "Search projects…",
+    "new": "New",
+    "newProject": "New Project",
+    "newProjectHint": "Connect an existing working folder (~/Documents/…), or give a fresh one.",
+    "allProjects": "All Projects",
+    "projectCount": "{n} Projects",
+    "loading": "Loading…",
+    "emptySearch": "No project matches. Try another word.",
+    "emptyAll": "No projects yet — connect your thesis folder to get started.",
+    "open": "Open",
+    "lastOpened": "Last opened",
+    "neverOpened": "Never opened",
+    "ready": "Ready",
+    "creating": "Setting up project…"
+  },
+  "knowledge": {
+    "title": "Knowledge Base",
+    "desc": "Files the agent can search in detail.",
+    "searchPh": "Search knowledge…",
+    "empty": "No knowledge files yet",
+    "emptyDesc": "Add a workspace file so the agent can search its content without attaching it to every chat.",
+    "addFile": "Add file",
+    "dropHint": "Drag files here",
+    "added": "{name} added to knowledge base.",
+    "removed": "{name} removed from knowledge.",
+    "emptySearch": "No matches.",
+    "pickTitle": "Pick a workspace file",
+    "count": "{n} files",
+    "dropNow": "Drop to add",
+    "invalidFile": "That file is not inside the project folder.",
+    "removeAction": "Remove from knowledge",
+    "missing": "File no longer on disk"
+  },
+  "question": {
+    "title": "Agent asks",
+    "freePh": "Or type your own answer…",
+    "answered": "Answered",
+    "expired": "Question expired — answer in chat instead.",
+    "yes": "Yes",
+    "no": "No",
+    "skip": "Skip"
   }
 }

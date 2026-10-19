@@ -1,5 +1,6 @@
-import { redirect } from 'next/navigation';
+import { HomePage } from '@/components/home/home-page';
 
-export default function HomePage() {
-  redirect('/workspace');
+/** `/` selalu tampil homepage daftar project — gak ada lagi redirect auto. */
+export default function Page() {
+  return <HomePage />;
 }

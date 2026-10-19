@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic';
  * - tool-event   { type: session.tool.*, id, data }
  * - agent-event  { type: session.step.*|session.idle|..., id, data }
  * - permission   { type: permission.asked, id, data }
+ * - question     { type: form.created|form.replied|form.cancelled (tool `question`), id, data }
  * - fs-change    { type: filesystem.changed, id, data }
  */
 export async function GET(request: Request) {
@@ -67,6 +68,17 @@ export async function GET(request: Request) {
 
           if (type === 'filesystem.changed') {
             send('fs-change', { id: ev.id, data });
+            continue;
+          }
+
+          // Pertanyaan agent (tool `question`): form kind=question dibuat /
+          // dijawab / dibatalkan → kartu pertanyaan di chat.
+          if (type === 'form.created' || type === 'form.replied' || type === 'form.cancelled') {
+            const formPayload = data as { sessionID?: string; form?: { sessionID?: string } } | undefined;
+            const questionSession = formPayload?.sessionID ?? formPayload?.form?.sessionID;
+            if (questionSession === sessionId) {
+              send('question', { id: ev.id, type, data });
+            }
             continue;
           }
 

@@ -1,5 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { desc, eq } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { knowledgeFiles, projects } from '@/lib/db/schema';
+import { ensureKnowledgeSchema } from '@/lib/db/knowledge';
 import { listTree, type TreeEntry } from '@/lib/workspace/files';
 
 /**
@@ -111,7 +115,7 @@ export function ensureProjectAgentConfig(
             '(2) Untuk merevisi isi dokumen, edit file markdown di folder dokumen/ secara konservatif (replace terhadap teks yang ada, bukan tulis ulang seluruh bab) dan sebut nama file yang kamu ubah. ' +
             '(3) Sebelum menambah jurnal, tampilkan singkat: judul, penulis, tahun, DOI, jumlah sitasi — jangan asal comot. ' +
             '(4) Kamu boleh membaca/mengubah berkas di dalam folder project ini saja. ' +
-            '(5) Jawab singkat dan terstruktur; kalau konteks dari dossier tidak jelas, tanyakan lewat TEKS jawaban biasa — tool `question` sudah DIMATIKAN karena app belum bisa menjawabnya (bikin turn gantung selamanya). ' +
+            '(5) Jawab singkat dan terstruktur; kalau konteks dari dossier tidak jelas, gunakan tool `question` (pilihan user datang balik sebagai jawaban di chat); kalau pertanyaannya longgar/tidak berpilihan, tanyakan lewat teks biasa juga boleh. ' +
             '(6) GAYA TULIS DALAM FILE WAJIB akademik formal: tanpa kata basa-basi/sampah (yuuhuuuu, wkwk, cok, lol, test, placeholder, emoji), tanpa kalimat gantung ellipsis "…" — kalimat harus selesai dan padat. ' +
             '(7) JANGAN PERNAH menulis daftar pustaka atau sitasi bernomor ([1], [Vaswani 2017]) ke dalam file bab — sitasi cukup ditulis marker [@kunci]; daftar pustaka dibikin otomatis saat ekspor (pandoc citeproc). ' +
             '(8) JANGAN PERNAH menulis catatan metadata (blok kutip "> Catatan sumber:", DOI notes, dsb.) ke dalam file bab — metadata sumber cukup tersimpan di references.bib; penjelasan panjang cukup dikirim ke chat. ' +
@@ -119,10 +123,13 @@ export function ensureProjectAgentConfig(
             '(10) INSTALL SKILL (kalau user minta): bikin folder `<project>/.opencode/skills/<nama>/SKILL.md` — nama HARUS huruf kecil/angka/tanda hubung (tanpa spasi, maksimal 64 char) dan SAMA dengan nama foldernya; file diawali YAML frontmatter berisi `name:` + `description:` (maks 1024 char, spesifik) lalu isi instruksi. Skill itu muncul di tool `skill` untuk sesi baru; kalau belum muncul, sarankan user mulai sesi baru. ' +
             '(11) ADD MCP SERVER (kalau user minta): edit `.opencode/opencode.json` di project ini — BACA dulu isinya lalu gabungkan key `mcp` baru (JANGAN menimpa key lain; config ini juga menampung pengaturan research-desk). Format lokal: {"type":"local","command":["npx","-y","<paket>"],"enabled":true}; remote: {"type":"remote","url":"https://...","enabled":true}. MCP baru biasanya aktif untuk sesi baru; kalau tool-nya belum terlihat, sarankan user mulai sesi baru atau muat ulang app. ' +
             'Kemampuan web/jurnal ikuti blok "Kemampuan AI" di AGENTS.md — kalau dimatikan, jangan coba-coba.',
-          // Tool `question` gak boleh dipakai: app chat gak punya mekanisme jawab
-          // → turn nge-gantung + semua prompt berikut ngantre (kasus nyata 2026-10-18).
-          // websearch ngikutin toggle panel Kemampuan AI (explicit true/false).
-          tools: { question: false, websearch: caps.websearch },
+          // Tool `question` AKTIF (kartu pertanyaan implement, probe Lane C
+          // 2026-10-19 di /tmp/opencode/question-probe): agent tool `question`
+          // → event `form.created` (metadata.kind=question) → app jawab via
+          // session.form.reply/cancel → terbukti agent lanjut turn, tidak hang
+          // lagi (kasus 2026-10-18). websearch ngikutin toggle panel Kemampuan
+          // AI (explicit true/false).
+          tools: { websearch: caps.websearch },
         },
       };
 
@@ -182,6 +189,32 @@ export async function buildDossier(opts: {
   lines.push(`Judul project: ${opts.title}`);
   lines.push(`Folder: ${opts.folderRealPath}`);
   if (opts.activeFilePath) lines.push(`File aktif di editor: ${opts.activeFilePath}`);
+
+  // File pengetahuan yang di-pin user — agent dibaca dulu untuk konteks
+  // mendalam, tanpa perlu nempel file ke tiap chat. Bagian opsional: kalau
+  // tabel belum siap atau project gak dikenal, skip diam-diam.
+  try {
+    ensureKnowledgeSchema();
+    const proj = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.slug, opts.slug))
+      .limit(1);
+    if (proj.length > 0) {
+      const items = await db
+        .select({ path: knowledgeFiles.path })
+        .from(knowledgeFiles)
+        .where(eq(knowledgeFiles.projectId, proj[0].id))
+        .orderBy(desc(knowledgeFiles.addedAt))
+        .limit(20);
+      if (items.length > 0) {
+        lines.push('Basis pengetahuan (file yang diprioritaskan untuk dicari):');
+        for (const item of items) lines.push(`- ${item.path}`);
+      }
+    }
+  } catch {
+    // Gagal akses DB gak boleh bikin dossier gagal — daftar dokumen di bawah tetap jalan.
+  }
 
   try {
     const tree = await listTree(opts.folderRealPath);

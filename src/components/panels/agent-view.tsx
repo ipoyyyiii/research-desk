@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ArrowUp,
+} from 'lucide-react';
+import {
   AgentPanel,
   type AgentSessionView,
   type ChatMessage,
@@ -22,6 +25,41 @@ type PermissionCard = {
   message?: string;
 };
 
+/** Payload form dari tool `question` (probe Lane C 2026-10-19):
+ * event `form.created` data.form — metadata.kind = "question". */
+type QuestionFormPayload = {
+  id: string;
+  title?: string;
+  fields?: Array<{
+    key?: string;
+    title?: string;
+    description?: string;
+    type?: string;
+    options?: Array<{ value?: string; label?: string; description?: string }>;
+    custom?: boolean;
+  }>;
+};
+
+type QuestionOption = { value: string; label: string; description?: string };
+
+type QuestionField = {
+  key: string;
+  question: string;
+  type: string;
+  options: QuestionOption[];
+  custom: boolean;
+};
+
+type QuestionCard = {
+  id: string;
+  fields: QuestionField[];
+  status: 'pending' | 'answered' | 'cancelled';
+  /** jawaban bertahap sebelum semua question-field selesai dijawab */
+  partial?: Record<string, string>;
+  /** ringkasan jawaban yang dikirim (label opsi / teks bebas) */
+  answer?: string;
+};
+
 const uid = () => Math.random().toString(36).slice(2);
 
 function toolTitle(event: StreamEvent): string {
@@ -33,6 +71,38 @@ function toolTitle(event: StreamEvent): string {
   if (input.description) return input.description;
   if (input.pattern) return input.pattern;
   return 'Aksi agent';
+}
+
+/** Event `form.created` → pertanyaan + opsi untuk kartu. Field type lain
+ * (bool/number/bg-apa) tetap bisa dijawab via opsi/freetext; multiselect
+ * dijawab via teks bebas (pisah koma) — UI pilih-multi belum ada. */
+function mapFormFields(fields: QuestionFormPayload['fields']): QuestionField[] {
+  const out: QuestionField[] = [];
+  for (const field of fields ?? []) {
+    if (typeof field?.key !== 'string') continue;
+    out.push({
+      key: field.key,
+      question: field.description ?? field.title ?? field.key,
+      type: field.type ?? 'string',
+      options: (field.options ?? [])
+        .filter((option): option is QuestionOption => typeof option?.value === 'string' && typeof option?.label === 'string')
+        .map((option) => ({ value: option.value, label: option.label, ...(option.description ? { description: option.description } : {}) })),
+      custom: Boolean(field.custom),
+    });
+  }
+  return out;
+}
+
+/** Label opsi terpilih (atau teks bebas) — untuk kartu "Sudah dijawab". */
+function answerLabel(fields: QuestionField[], answers: Record<string, string>): string {
+  const parts: string[] = [];
+  for (const field of fields) {
+    const value = answers[field.key];
+    if (value === undefined) continue;
+    const matched = field.options.find((option) => option.value === value || option.label === value);
+    parts.push(matched ? matched.label : value);
+  }
+  return parts.join(' · ');
 }
 
 /**
@@ -70,6 +140,8 @@ export function AgentView({
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [permission, setPermission] = useState<PermissionCard | null>(null);
+  const [question, setQuestion] = useState<QuestionCard | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [models, setModels] = useState<ModelGroupView[]>([]);
   const [currentModel, setCurrentModel] = useState<ModelEntryView | null>(null);
   const [providerPicks, setProviderPicks] = useState<ProviderPickView[]>([]);
@@ -196,6 +268,10 @@ export function AgentView({
   const openStream = useCallback(
     (sid: string) => {
       esRef.current?.close();
+      // Sesi ganti → kartu pertanyaan milik sesi lama jangan bocor; kartu yang
+      // masih pending di sesi aktif dihidupkan ulang lewat restorePendingQuestion.
+      setQuestion(null);
+      setDrafts({});
       const es = new EventSource(`/api/ai/stream?sessionId=${encodeURIComponent(sid)}`);
 
       es.addEventListener('delta', (raw) => {
@@ -293,10 +369,133 @@ export function AgentView({
         }
       });
 
+      // Pertanyaan agent (tool `question`): form dibuat / dijawab / dibatalkan.
+      // Kartu pertanyaan: pilih opsi pill atau jawab bebas; reply via
+      // POST /api/ai/question (session.form.reply/cancel) — TIDAK mengunci turn.
+      es.addEventListener('question', (raw) => {
+        const ev = JSON.parse((raw as MessageEvent).data) as StreamEvent;
+        if (ev.type === 'form.created') {
+          const form = (ev.data as { form?: QuestionFormPayload } | undefined)?.form;
+          if (!form?.id) return;
+          const mapped = mapFormFields(form.fields);
+          if (mapped.length === 0) return;
+          setQuestion({ id: form.id, fields: mapped, status: 'pending' });
+        } else if (ev.type === 'form.replied') {
+          const replied = ev.data as { id?: string; answer?: Record<string, unknown> } | undefined;
+          const formID = replied?.id ?? '';
+          const answer = (replied?.answer ?? {}) as Record<string, string>;
+          setQuestion((prev) =>
+            prev && prev.id === formID && prev.status !== 'answered'
+              ? { ...prev, status: 'answered', answer: answerLabel(prev.fields, answer), partial: undefined }
+              : prev,
+          );
+        } else if (ev.type === 'form.cancelled') {
+          const formID = (ev.data as { id?: string } | undefined)?.id ?? '';
+          setQuestion((prev) =>
+            prev && prev.id === formID && prev.status === 'pending' ? { ...prev, status: 'cancelled' } : prev,
+          );
+        }
+      });
+
       esRef.current = es;
     },
     [refreshUsage],
   );
+
+  // ── kartu pertanyaan (tool `question`): kirim jawaban ke form OpenCode ───────
+  /** POST /api/ai/question → session.form.reply; gagal → kartu balik pending.
+   * Teks yang muncul di kartu = label opsi/teks yang user pilih. */
+  const submitAnswers = useCallback(
+    async (form: QuestionCard, answers: Record<string, string>) => {
+      const sid = sessionRef.current;
+      if (!sid) return;
+      const coerced: Record<string, string | number | boolean | string[]> = {};
+      for (const field of form.fields) {
+        const raw = answers[field.key];
+        if (raw === undefined) continue;
+        coerced[field.key] =
+          field.type === 'boolean'
+            ? raw === 'true'
+            : field.type === 'number' || field.type === 'integer'
+              ? Number(raw)
+              : field.type === 'multiselect'
+                ? raw.split(',').map((part) => part.trim()).filter(Boolean)
+                : raw;
+      }
+      const text = answerLabel(form.fields, answers);
+      setQuestion((prev) => (prev?.id === form.id ? { ...prev, status: 'answered', answer: text, partial: undefined } : prev));
+      try {
+        const res = await fetch('/api/ai/question', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid, formId: form.id, answer: coerced }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(payload.error ?? String(res.status));
+        }
+      } catch {
+        pushSystem(t('err.server'));
+        setQuestion((prev) => (prev?.id === form.id ? { ...form, status: 'pending', partial: answers } : prev));
+      }
+    },
+    [pushSystem, t],
+  );
+
+  /** Klik opsi / kirim teks bebas pada satu question-field. Reply baru jalan
+   * pas SEMUA pertanyaan di form udah ada jawabannya (probe: form multi-field
+   * jawabannya satu record). */
+  const answerField = useCallback(
+    (fieldKey: string, value: string) => {
+      const form = question;
+      if (!form || form.status !== 'pending') return;
+      const next = { ...(form.partial ?? {}), [fieldKey]: value };
+      setDrafts((prev) => ({ ...prev, [fieldKey]: '' }));
+      if (form.fields.every((field) => field.key in next)) {
+        void submitAnswers(form, next);
+        return;
+      }
+      setQuestion({ ...form, partial: next });
+    },
+    [question, submitAnswers],
+  );
+
+  /** Lewati tanpa jawaban → session.form.cancel; agent nerima tool error dan
+   * turn tetap lanjut (bukti probe: gak ada turn gantung). */
+  const skipQuestion = useCallback(
+    async () => {
+      const form = question;
+      if (!form || form.status !== 'pending') return;
+      setQuestion({ ...form, status: 'cancelled' });
+      try {
+        const res = await fetch('/api/ai/question', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sessionRef.current, formId: form.id, cancel: true, message: 'User skip' }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+      } catch {
+        pushSystem(t('err.server'));
+      }
+    },
+    [question, pushSystem, t],
+  );
+
+  /** Tab refresh / ganti sesi → kartu pertanyaan yang masih pending dihidupkan
+   * ulang dari server (soal turn gantung gak nyembunyiin pertanyaan). */
+  const restorePendingQuestion = useCallback(async (sid: string) => {
+    try {
+      const res = await fetch(`/api/ai/question?sessionId=${encodeURIComponent(sid)}`);
+      const data = (await res.json()) as { forms?: QuestionFormPayload[] };
+      const form = (data.forms ?? [])[0];
+      const mapped = form?.id ? mapFormFields(form.fields) : [];
+      if (form?.id && mapped.length > 0) {
+        setQuestion({ id: form.id, fields: mapped, status: 'pending' });
+      }
+    } catch {
+      // restore gagal → event berikutnya akan menampilkan kartu.
+    }
+  }, []);
 
   // ── daftar model + pilihan tersimpan (refresh pas connect berubah) ───────────
   const refreshModels = useCallback(async () => {
@@ -465,6 +664,7 @@ export function AgentView({
         setSessionReady(true);
         setActiveSessionId(data.sessionId);
         openStream(data.sessionId);
+        void restorePendingQuestion(data.sessionId);
         void refreshSessions();
       } catch {
         if (!cancelled) pushSystem(t('err.agentServer'));
@@ -477,7 +677,7 @@ export function AgentView({
       esRef.current?.close();
       esRef.current = null;
     };
-  }, [slug, pushSystem, openStream, t, refreshSessions]);
+  }, [slug, pushSystem, openStream, t, refreshSessions, restorePendingQuestion]);
 
   // ── aksi multi-sesi: buat sesi baru / ganti sesi (picker + slash menu) ────────
   /** "Sesi baru" → create fresh + bind + bersihkan obrolan + buka stream baru. */
@@ -501,6 +701,7 @@ export function AgentView({
       setBusy(false);
       setMessages([]); // sesi baru = obrolan kosong
       openStream(data.sessionId);
+      void restorePendingQuestion(data.sessionId);
       void refreshUsage();
       void refreshSessions();
     } catch {
@@ -508,7 +709,7 @@ export function AgentView({
     } finally {
       setSwitching(false);
     }
-  }, [switching, slug, pushSystem, t, openStream, refreshUsage, refreshSessions]);
+  }, [switching, slug, pushSystem, t, openStream, restorePendingQuestion, refreshUsage, refreshSessions]);
 
   /** Ganti sesi aktif → bind ke project → rebuild history dari sesi itu. */
   const switchSession = useCallback(
@@ -540,6 +741,7 @@ export function AgentView({
         assistantRef.current = null;
         setBusy(false);
         openStream(targetId);
+        void restorePendingQuestion(targetId);
         void refreshUsage();
         void refreshSessions();
       } catch {
@@ -548,7 +750,7 @@ export function AgentView({
         setSwitching(false);
       }
     },
-    [switching, activeSessionId, slug, pushSystem, t, mapHistory, openStream, refreshUsage, refreshSessions],
+    [switching, activeSessionId, slug, pushSystem, t, mapHistory, openStream, restorePendingQuestion, refreshUsage, refreshSessions],
   );
 
   const send = useCallback(
@@ -760,21 +962,130 @@ export function AgentView({
         onSwitchSession={(id) => void switchSession(id)}
       />
 
-      {/* Kartu izin (agent minta akses) */}
-      {permission && (
-        <div className="absolute inset-x-2 bottom-16 z-30 rounded-lg border border-amber-300 bg-white p-3 text-xs shadow-lg dark:border-amber-700 dark:bg-neutral-900">
-          <p className="mb-1 font-semibold">
-            {t('ai.permissionAsk')} {permission.action}
-          </p>
-          <p className="mb-2 break-all text-neutral-500">
-            {permission.resources.join(' · ') || permission.message || '…'}
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => void answerPermission('reject')}>
-              {t('ai.permissionReject')}
-            </Button>
-            <Button onClick={() => void answerPermission('once')}>{t('ai.permissionAllow')}</Button>
-          </div>
+      {/* Kartu pertanyaan + izin (agent nanya opsi via tool `question`, atau minta akses).
+          Ditaruh di area chat (di atas composer); kartu = UI saja, reply jalan via route —
+          TIDAK ada mekanisme yang menahan turn di browser. */}
+      {(question || permission) && (
+        <div className="absolute inset-x-2 bottom-16 z-30 space-y-2">
+          {question && (
+            <div
+              className={`rounded-lg border bg-card p-3 text-xs shadow-lg transition-colors [transition-property:border-color] ${
+                question.status === 'pending' ? 'border-primary/60' : 'border-border'
+              }`}
+            >
+              <p className="mb-1 font-semibold">{t('question.title')}</p>
+              {question.status === 'pending' && (
+                <div className="space-y-3">
+                  {question.fields.map((field) => {
+                    const draft = drafts[field.key] ?? '';
+                    return (
+                      <div key={field.key}>
+                        <p className="mb-1 text-foreground">{field.question}</p>
+                        {field.options.length > 0 && field.type !== 'multiselect' && (
+                          <div className="space-y-1.5">
+                            {field.options.map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => answerField(field.key, option.value)}
+                                className="block w-full cursor-pointer rounded-lg border border-border bg-background px-3 py-1.5 text-left transition-colors [transition-property:color,background-color,border-color] hover:border-primary/40 hover:bg-muted"
+                              >
+                                <span className="font-medium">{option.label}</span>
+                                {option.description && (
+                                  <span className="text-muted-foreground"> · {option.description}</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {/* Jawaban bebas: opt-in `custom` dari form, ATAU field tanpa
+                            opsi pilihan sama sekali. Boolean dijawab lewat pill Ya/Tidak. */}
+                        {field.type !== 'boolean' && (field.custom || field.options.length === 0) && (
+                          <form
+                            className="mt-1.5 flex items-center gap-1.5"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              const value = draft.trim();
+                              if (!value) return;
+                              answerField(field.key, field.type === 'multiselect' ? value.split(',').join(', ') : value);
+                            }}
+                          >
+                            <input
+                              value={draft}
+                              onChange={(event) =>
+                                setDrafts((prev) => ({ ...prev, [field.key]: event.target.value }))
+                              }
+                              placeholder={t('question.freePh')}
+                              inputMode={field.type === 'number' || field.type === 'integer' ? 'numeric' : 'text'}
+                              className="w-full rounded-md border border-border bg-transparent px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
+                            <button
+                              type="submit"
+                              aria-label={t('composer.send')}
+                              title={t('composer.send')}
+                              className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors [transition-property:color,background-color] hover:bg-primary/90"
+                            >
+                              <ArrowUp size={14} />
+                            </button>
+                          </form>
+                        )}
+                        {field.type === 'boolean' && (
+                          <div className="space-y-1.5">
+                            {[
+                              { value: 'true', label: t('question.yes') },
+                              { value: 'false', label: t('question.no') },
+                            ].map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => answerField(field.key, option.value)}
+                                className="block w-full cursor-pointer rounded-lg border border-border bg-background px-3 py-1.5 text-left transition-colors [transition-property:color,background-color,border-color] hover:border-primary/40 hover:bg-muted"
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void skipQuestion()}
+                      className="cursor-pointer rounded px-2 py-1 text-[11px] text-muted-foreground transition-colors [transition-property:color,background-color] hover:bg-muted hover:text-foreground"
+                    >
+                      {t('question.skip')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {question.status === 'answered' && (
+                <p className="text-muted-foreground">
+                  {t('question.answered')}: <span className="font-medium text-foreground">{question.answer}</span>
+                </p>
+              )}
+              {question.status === 'cancelled' && (
+                <p className="text-muted-foreground">{t('question.expired')}</p>
+              )}
+            </div>
+          )}
+          {permission && (
+            <div className="rounded-lg border border-amber-300 bg-white p-3 text-xs shadow-lg dark:border-amber-700 dark:bg-neutral-900">
+              <p className="mb-1 font-semibold">
+                {t('ai.permissionAsk')} {permission.action}
+              </p>
+              <p className="mb-2 break-all text-neutral-500">
+                {permission.resources.join(' · ') || permission.message || '…'}
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => void answerPermission('reject')}>
+                  {t('ai.permissionReject')}
+                </Button>
+                <Button onClick={() => void answerPermission('once')}>{t('ai.permissionAllow')}</Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

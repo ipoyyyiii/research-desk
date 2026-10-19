@@ -232,7 +232,16 @@ export function LeftPanel({
     const active = openFile === node.path;
     const badge = extBadge(node.name);
     return (
-      <li key={node.path}>
+      <li
+        key={node.path}
+        // Drag baris file → pane Basis Pengetahuan (application/x-rd-path).
+        // Drag hanya bonus — klik file masih lewat onClick button di dalam.
+        draggable
+        onDragStart={(event) => {
+          event.dataTransfer.setData('application/x-rd-path', node.path);
+          event.dataTransfer.effectAllowed = 'copy';
+        }}
+      >
         <button
           onClick={() => openable && onOpenFile(node.path)}
           onDoubleClick={() => openable && setPendingDelete(node)}

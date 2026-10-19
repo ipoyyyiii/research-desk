@@ -40,3 +40,18 @@ export const savedPapers = sqliteTable('saved_papers', {
 
 export type SavedPaper = typeof savedPapers.$inferSelect;
 export type NewSavedPaper = typeof savedPapers.$inferInsert;
+
+// File pengetahuan (pane Basis Pengetahuan di panel agent) — 1 baris per
+// (project_id, path). DDL fisiknya dibuat idempotent lewat src/lib/db/knowledge.ts
+// (drizzle-kit push DILARANG); definisi drizzle ini sekadar tipe terinferensi.
+export const knowledgeFiles = sqliteTable('knowledge_files', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull(),
+  path: text('path').notNull(),
+  addedAt: integer('added_at').notNull(),
+}, (table) => ({
+  projectPathUniq: unique('knowledge_files_project_path_uniq').on(table.projectId, table.path),
+}));
+
+export type KnowledgeFile = typeof knowledgeFiles.$inferSelect;
+export type NewKnowledgeFile = typeof knowledgeFiles.$inferInsert;

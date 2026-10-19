@@ -15,6 +15,7 @@ import {
   type ModelGroupView,
   type ProviderPickView,
 } from '@/components/panels/agent-composer';
+import { KnowledgePane } from '@/components/panels/knowledge-pane';
 
 // Tipe model picker disimpan di agent-composer (milik komposer ala-Codex),
 // diekspor ulang di sini biar import agent-view gak berubah.
@@ -260,7 +261,7 @@ export function AgentPanel({
   onSwitchSession,
 }: AgentPanelProps) {
   const t = useT();
-  const [activeTab, setActiveTab] = useState<'chat' | 'activity'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'activity' | 'knowledge'>('chat');
   const [draft, setDraft] = useState('');
   /** Lampiran aktif: di-pick di composer → di-upload ke <project>/attachments/ →
    * pas submit dirangkai jadi blok <lampiranPaths> di ekor pesan. */
@@ -382,9 +383,10 @@ export function AgentPanel({
           options={[
             { value: 'chat', label: t('ai.chat') },
             { value: 'activity', label: t('ai.activity') },
+            { value: 'knowledge', label: t('knowledge.title') },
           ]}
           active={activeTab}
-          onSelect={(value) => setActiveTab(value as 'chat' | 'activity')}
+          onSelect={(value) => setActiveTab(value as 'chat' | 'activity' | 'knowledge')}
         />
         <span
           className="ml-auto min-w-0 max-w-28 truncate font-serif text-sm font-semibold tracking-tight text-foreground"
@@ -652,6 +654,9 @@ export function AgentPanel({
             />
           </div>
         </>
+      ) : activeTab === 'knowledge' ? (
+        // Tab Basis Pengetahuan: list file workspace yang boleh dicari agent (ss7).
+        <KnowledgePane slug={slug} />
       ) : (
         // Tab Aktivitas: chip filter + timeline collapsible (grup per pesan, terbaru di atas).
         <div className="flex min-h-0 flex-1 flex-col">
