@@ -582,6 +582,20 @@ export function AgentPanel({
                 </div>
               )}
             </div>
+            {/* Tombol "+" rapet abis pill Sesi (pola ss5) — sesi baru sekali
+                klik, gak perlu buka dropdown dulu. */}
+            <button
+              type="button"
+              onClick={onCreateSession}
+              disabled={switching}
+              aria-label={t('agent.sessionNew')}
+              title={t('agent.sessionNew')}
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors [transition-property:color,background-color] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                switching ? 'cursor-not-allowed bg-transparent opacity-50' : 'cursor-pointer bg-muted/60'
+              }`}
+            >
+              {switching ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} className="text-accent" />}
+            </button>
             {!sessionReady && (
               <Button
                 variant="outline"

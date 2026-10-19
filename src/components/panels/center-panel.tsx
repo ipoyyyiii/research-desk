@@ -1,7 +1,7 @@
 'use client';
 
 import { ClipboardList, FilePlus2, Globe, Loader2, PencilRuler, PenLine, Plus, Table2, X, type LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useT } from '@/lib/preferences';
 import { ThesisEditor } from '@/components/editor/thesis-editor';
 import { WebView } from '@/components/center/web-view';
@@ -137,6 +137,10 @@ function TabBar({
   const t = useT();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Posisi menu "+ (fixed)": diukur dari tombol waktu dibuka — tombolnya nempel
+   * tab terakhir di dalam scroller, jadi gak bisa di-anchor CSS biasa. */
+  const [menuPos, setMenuPos] = useState({ x: 16, y: 40 });
+  const plusRef = useRef<HTMLButtonElement>(null);
   const [naming, setNaming] = useState(false);
   const [docTitle, setDocTitle] = useState('');
   const [creating, setCreating] = useState(false);
@@ -220,11 +224,20 @@ function TabBar({
 
   return (
     <div className="flex h-9 shrink-0 items-stretch border-b border-border bg-card">
-      <div className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto px-1">{tabs.map(chip)}</div>
-      <div className="relative flex shrink-0">
+      <div className="flex min-w-0 items-end gap-0.5 overflow-x-auto px-1">
+        {tabs.map(chip)}
+        {/* Tombol + nempel PERSIS abis tab terakhir (ss5) — di dalam scroller
+            biar menggulir bareng chips, gak nongol jauh di ujung kanan. */}
         <button
+          ref={plusRef}
           type="button"
           onClick={() => {
+            const rect = plusRef.current?.getBoundingClientRect();
+            if (rect) {
+              // Klem biar menu w-48 (192px) gak keluar layar kanan/kiri.
+              const x = Math.max(8, Math.min(rect.left, window.innerWidth - 200));
+              setMenuPos({ x, y: rect.bottom + 2 });
+            }
             setMenuOpen((prev) => !prev);
             setNaming(false);
             setCreateError(null);
@@ -232,28 +245,30 @@ function TabBar({
           title={t('center.newWeb')}
           aria-label={t('center.newWeb')}
           aria-expanded={menuOpen}
-          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-end text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <Plus size={14} />
         </button>
+      </div>
 
-        {menuOpen && (
-          <>
-            {/* Backdrop transparan untuk klik-diluar; di bawah menu. */}
-            <button
-              type="button"
-              aria-hidden
-              tabIndex={-1}
-              onClick={() => setMenuOpen(false)}
-              className="fixed inset-0 z-40 cursor-default"
-            />
-            <div
-              role="menu"
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') setMenuOpen(false);
-              }}
-              className="absolute right-1 top-10 z-50 w-48 rounded-lg border border-border bg-card p-1 shadow-lg"
-            >
+      {menuOpen && (
+        <>
+          {/* Backdrop transparan untuk klik-diluar; fixed = lolos clip scroller. */}
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            onClick={() => setMenuOpen(false)}
+            className="fixed inset-0 z-40 cursor-default"
+          />
+          <div
+            role="menu"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setMenuOpen(false);
+            }}
+            style={{ left: menuPos.x, top: menuPos.y }}
+            className="fixed z-50 w-48 rounded-lg border border-border bg-card p-1 shadow-lg"
+          >
               {naming ? (
                 <form
                   className="p-1.5"
@@ -309,7 +324,6 @@ function TabBar({
             </div>
           </>
         )}
-      </div>
     </div>
   );
 }
