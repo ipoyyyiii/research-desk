@@ -490,48 +490,41 @@ export function AgentPanel({
               </Button>
             </div>
           )}
-          {/* Strip multi-sesi: dot status + pill "Sesi ▾" — ganti/lanjut sesi ala OpenCode. */}
-          <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-border px-2.5">
-            <StatusDot
-              tone={switching ? 'amber' : sessionReady ? 'green' : 'idle'}
-              title={
-                switching
-                  ? t('agent.sessionSwitchBusy')
-                  : sessionReady
-                    ? t('ai.sessionReady')
-                    : t('agent.sessionsTitle')
-              }
-            />
+          {/* Strip multi-sesi — desain SAMA persis dengan header tab panel tengah:
+              chip tab (rounded-t-lg + garis bawah aktif) + tombol + polos kotak. */}
+          <div className="flex h-9 shrink-0 items-stretch border-b border-border bg-card">
             <div ref={sessionsRef} className="relative min-w-0 shrink-0">
               <button
                 type="button"
                 onClick={() => setSessionsOpen((v) => !v)}
                 aria-expanded={sessionsOpen}
                 title={t('composer.slashHint')}
-                className={`flex h-6 min-w-0 max-w-64 items-center gap-1 rounded-full border border-border bg-muted/60 px-2 text-[11px] transition-colors [transition-property:color,background-color] hover:bg-muted ${
-                  switching ? 'text-muted-foreground' : 'text-foreground'
-                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+                className={`flex h-9 min-w-0 max-w-56 shrink-0 cursor-pointer items-center gap-1.5 rounded-t-lg border-b-2 px-3 transition-colors [transition-property:color,background-color] ${
+                  sessionsOpen
+                    ? 'border-b-primary bg-background text-card-foreground'
+                    : 'border-b-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
               >
                 {switching ? (
                   <>
-                    <Loader2 size={10} className="shrink-0 animate-spin" />
-                    <span className="min-w-0 flex-1 truncate">{t('agent.sessionSwitchBusy')}</span>
+                    <Loader2 size={11} className="shrink-0 animate-spin" />
+                    <span className="min-w-0 flex-1 truncate text-xs">{t('agent.sessionSwitchBusy')}</span>
                   </>
                 ) : (
                   <>
-                    <span className="shrink-0">{t('agent.sessionsTitle')}</span>
-                    <span
-                      className="min-w-0 flex-1 truncate font-medium"
-                      title={activeSession?.title ?? projectTitle}
-                    >
-                      {activeSession?.title || ''}
+                    <StatusDot
+                      tone={sessionReady ? 'green' : 'idle'}
+                      title={sessionReady ? t('ai.sessionReady') : t('agent.sessionsTitle')}
+                    />
+                    <span className="max-w-40 truncate text-xs" title={activeSession?.title ?? projectTitle}>
+                      {activeSession?.title || t('agent.sessionsTitle')}
                     </span>
-                    <ChevronDown size={10} className="shrink-0 text-muted-foreground" />
+                    <ChevronDown size={12} className="shrink-0 text-muted-foreground" />
                   </>
                 )}
               </button>
               {sessionsOpen && (
-                <div className="absolute left-0 top-8 z-50 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
+                <div className="absolute left-0 top-full mt-0.5 z-50 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
                   {/* "Sesi baru" selalu di atas (pola slash-menu). */}
                   <button
                     type="button"
@@ -582,24 +575,23 @@ export function AgentPanel({
                 </div>
               )}
             </div>
-            {/* Tombol "+" rapet abis pill Sesi (pola ss5) — sesi baru sekali
-                klik, gak perlu buka dropdown dulu. */}
+            {/* Tombol + polos kotak — identik tombol + di header tab tengah. */}
             <button
               type="button"
               onClick={onCreateSession}
               disabled={switching}
               aria-label={t('agent.sessionNew')}
               title={t('agent.sessionNew')}
-              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors [transition-property:color,background-color] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                switching ? 'cursor-not-allowed bg-transparent opacity-50' : 'cursor-pointer bg-muted/60'
+              className={`flex h-9 w-9 shrink-0 items-center justify-center text-muted-foreground transition-colors [transition-property:color,background-color] hover:bg-muted hover:text-foreground ${
+                switching ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
               }`}
             >
-              {switching ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} className="text-accent" />}
+              {switching ? <Loader2 size={12} className="animate-spin" /> : <Plus size={14} />}
             </button>
             {!sessionReady && (
               <Button
                 variant="outline"
-                className="px-2 py-0.5 text-xs"
+                className="mt-1.5 self-center px-2 py-0.5 text-xs"
                 onClick={() => void onEnsureSession()}
               >
                 {t('ai.startSession')}
