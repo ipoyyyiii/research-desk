@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ExternalLink, FileText, Loader2, PenLine, TriangleAlert, Upload, X } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Button } from '@/components/ui';
+import { seedWordcraftFonts } from '@/lib/wordcraft/seed-fonts';
 
 type SaveCandidate = { name: string; bytes: ArrayBuffer };
 
@@ -104,6 +105,21 @@ export function WordTab({
   const [stale, setStale] = useState<string | null>(null);
 
   const fileName = path.slice(path.lastIndexOf('/') + 1);
+
+  // Gate font: tanam pack font lengkap (metric Word + Google Docs) ke
+  // IndexedDB `wordcraft` SEBELUM iframe Word dibuat - WordCraft membaca
+  // seluruh store saat boot, jadi langsum masuk ke daftar Font di Word.
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const deadline = new Promise<void>((resolve) => window.setTimeout(resolve, 15000));
+    Promise.race([seedWordcraftFonts().catch(() => undefined), deadline]).finally(() => {
+      if (alive) setFontsReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Sinkron: suntik hook begitu document iframe siap penuh.
   useEffect(() => {
@@ -216,6 +232,24 @@ export function WordTab({
 
   const nameMatches = pending !== null && pending.name === fileName;
 
+  // Hint sekali-soal "Load system fonts" (font bawaan Windows) — dismissable.
+  const [sysHint, setSysHint] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('rd.wordcraft.sysHint.ack') !== '1') setSysHint(true);
+    } catch {
+      /* storage penuh/tidak tersedia → tampil sekali per visit */
+    }
+  }, []);
+  const dismissHint = useCallback(() => {
+    setSysHint(false);
+    try {
+      localStorage.setItem('rd.wordcraft.sysHint.ack', '1');
+    } catch {
+      /* abaikan */
+    }
+  }, []);
+
   // BabBayangan: cek disk tiap 8 detik — file berubah di luar Word (agen nulis) → chip Tarik.
   useEffect(() => {
     const poll = window.setInterval(async () => {
@@ -251,7 +285,7 @@ export function WordTab({
         {!booted && (
           <span className="shrink-0 text-[11px] text-muted-foreground">
             <Loader2 size={11} className="mr-1 inline animate-spin" />
-            {t('word.loading')}
+            {fontsReady ? t('word.loading') : t('word.fontPack')}
           </span>
         )}
         <a
@@ -291,6 +325,21 @@ export function WordTab({
         <p className="flex shrink-0 items-center gap-1 px-2 py-1 text-[11px] text-amber-700">
           <TriangleAlert size={11} /> {t('word.openFailed')}
         </p>
+      )}
+
+      {/* Hint sekali: font bawaan Windows via "Load system fonts" */}
+      {sysHint && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-2 py-1">
+          <span className="min-w-0 flex-1 text-[11px] text-muted-foreground">{t('word.sysFontHint')}</span>
+          <button
+            type="button"
+            aria-label={t('word.discard')}
+            onClick={dismissHint}
+            className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X size={12} />
+          </button>
+        </div>
       )}
 
       {/* Chip: file berubah di luar Word (agen nulis) → tarik ke Word */}
@@ -341,13 +390,21 @@ export function WordTab({
         </div>
       )}
 
-      {/* Kanvas WordCraft penuh */}
-      <iframe
-        ref={frameRef}
-        src="/wordcraft/index.html"
-        title={t('word.title')}
-        className="h-full w-full flex-1 border-0 bg-background"
-      />
+      {/* Kanvas WordCraft penuh — baru muncul setelah pack font ditanam */}
+      {fontsReady && (
+        <iframe
+          ref={frameRef}
+          src="/wordcraft/index.html"
+          title={t('word.title')}
+          className="h-full w-full flex-1 border-0 bg-background"
+        />
+      )}
+      {!fontsReady && (
+        <div className="flex flex-1 items-center justify-center gap-2 text-[12px] text-muted-foreground">
+          <Loader2 size={14} className="animate-spin" />
+          {t('word.fontPack')}
+        </div>
+      )}
     </div>
   );
 }

@@ -334,7 +334,9 @@
     "fullPage": "Buka Word penuh di tab browser",
     "textEditor": "Editor teks",
     "stale": "File bab berubah di luar Word (agen nulis?) — editan Word yang belum disimpen bakal ilang, sebaiknya Save dulu di Word sebelum Tarik.",
-    "pull": "Tarik ke Word"
+    "pull": "Tarik ke Word",
+    "fontPack": "Menyiapkan font lengkap (Word & Google Docs)…",
+    "sysFontHint": "Mau font bawaan Windows (Calibri, Segoe UI, dll.) ikut kebaca? Di WordCraft: buka menu Fonts → \"Load system fonts\" (Chrome/Edge), cukup sekali."
   },
   "zotero": {
     "title": "Import Zotero",
