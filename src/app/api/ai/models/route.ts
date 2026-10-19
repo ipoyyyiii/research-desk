@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { settings } from '@/lib/db/schema';
 import { ensureServer, getAuthState } from '@/lib/opencode/service';
 import { readAgentModelOverride, type ModelEntry } from '@/lib/opencode/model-pick';
+import { sortVariants } from '@/lib/ai/effort';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,10 @@ export const dynamic = 'force-dynamic';
  *          format "providerID/modelID" (sekali set, semua session mengikuti).
  */
 
-export type ModelGroup = { providerID: string; label: string; free: boolean; models: ModelEntry[] };
+/** Entry model utk UI — plus daftar variant effort ASLI dari server OpenCode. */
+export type ModelsEntry = ModelEntry & { variants: string[] };
+
+export type ModelGroup = { providerID: string; label: string; free: boolean; models: ModelsEntry[] };
 
 export async function GET() {
   try {
@@ -24,34 +28,57 @@ export async function GET() {
     const models = (await client.model.list())?.data ?? [];
 
     const groups: ModelGroup[] = [];
-    const push = (providerID: string, label: string, free: boolean, entries: ModelEntry[]) => {
+    const push = (providerID: string, label: string, free: boolean, entries: ModelsEntry[]) => {
       if (entries.length > 0) groups.push({ providerID, label, free, models: entries });
     };
 
     // Group 1: model gratis provider 'opencode' (selalu ada, gak butuh login).
-    const freeEntries: ModelEntry[] = [];
+    const freeEntries: ModelsEntry[] = [];
     const freeSeen = new Set<string>();
     for (const m of models) {
       if (m?.providerID !== 'opencode' || !m?.id || freeSeen.has(m.id)) continue;
       freeSeen.add(m.id);
-      freeEntries.push({ providerID: 'opencode', modelID: m.id, name: m.name ?? m.id });
+      freeEntries.push({
+        providerID: 'opencode',
+        modelID: m.id,
+        name: m.name ?? m.id,
+        variants: sortVariants((m.variants ?? []).map((v) => v.id)),
+      });
     }
     push('opencode', 'Model gratis', true, freeEntries);
 
     // Group per provider lain yang sudah login (mis. openai/ChatGPT).
     for (const providerID of auth.providers.filter((p) => p !== 'opencode')) {
-      const entries: ModelEntry[] = [];
+      const entries: ModelsEntry[] = [];
       const groupSeen = new Set<string>();
       for (const m of models) {
         if (m?.providerID !== providerID || !m?.id || groupSeen.has(m.id)) continue;
         groupSeen.add(m.id);
-        entries.push({ providerID, modelID: m.id, name: m.name ?? m.id });
+        entries.push({
+          providerID,
+          modelID: m.id,
+          name: m.name ?? m.id,
+          variants: sortVariants((m.variants ?? []).map((v) => v.id)),
+        });
       }
       const label = providerID === 'openai' ? 'ChatGPT / OpenAI' : providerID;
       push(providerID, label, false, entries);
     }
 
-    const override = await readAgentModelOverride();
+    const overrideRaw = await readAgentModelOverride();
+
+    // Override dipasangkan juga dgn variant model-nya (lookup dari groups) —
+    // UI (composer/settings) nggak perlu fetch ulang buat tau batas effort.
+    const override: ModelsEntry | null = overrideRaw
+      ? {
+          ...overrideRaw,
+          variants:
+            groups
+              .flatMap((group) => group.models)
+              .find((entry) => entry.providerID === overrideRaw.providerID && entry.modelID === overrideRaw.modelID)
+              ?.variants ?? [],
+        }
+      : null;
 
     return NextResponse.json({ groups, override, connected: auth.connected });
   } catch (error) {

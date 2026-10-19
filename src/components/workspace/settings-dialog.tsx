@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Blocks, BookOpen, Search, Settings, X, type LucideIcon } from 'lucide-react';
 import { usePreferences, type Locale, type Theme } from '@/lib/preferences';
-import { EFFORT_LEVELS, maxModelEffort, type EffortLevel } from '@/lib/ai/effort';
+import { sortVariants, VARIANT_LABEL_KEYS } from '@/lib/ai/effort';
 import { SegmentedGroup } from '@/components/ui';
 import { McpPane, SkillsPane } from '@/components/panels/extensions-panel';
 
@@ -17,17 +17,11 @@ import { McpPane, SkillsPane } from '@/components/panels/extensions-panel';
 
 type SettingsSection = 'general' | 'mcp' | 'skills';
 
-// Dasar aria/label i18n (effort.tLabel): map ke key dictionary yang sudah ada.
-const EFFORT_LABEL_KEY: Record<EffortLevel, string> = {
-  auto: 'settings.effortAuto',
-  low: 'settings.effortLow',
-  medium: 'settings.effortMedium',
-  high: 'settings.effortHigh',
-  xhigh: 'settings.effortXHigh',
-  max: 'settings.effortMax',
+// Label effort: variant yang dikenali → i18n; id eksotik dari server tampil apa adanya.
+const effortLabelFor = (id: string, t: (key: string) => string): string => {
+  const key = VARIANT_LABEL_KEYS[id];
+  return key ? t(key) : id;
 };
-
-const rank = (level: EffortLevel) => EFFORT_LEVELS.indexOf(level); // 'auto' = 0
 
 type NavItem = { id: SettingsSection; icon: LucideIcon; labelKey: string };
 type NavGroup = { groupKey: string; items: NavItem[] };
@@ -81,9 +75,9 @@ export function SettingsDialog() {
     if (open) searchRef.current?.focus();
   }, [open]);
 
-  // Cap effort dari model aktif: settings.agentModelOverride ("providerID/modelID")
-  // dibaca dari /api/settings; gagal/unknown → 'high'. (Logika persis menu lama.)
-  const [cap, setCap] = useState<EffortLevel>('high');
+  // Variant effort model aktif — langsung dari /api/ai/model (server OpenCode).
+  // null = belum kebaca (fallback aman), [] = model tanpa variant (konsep effort nggak ada).
+  const [variantOptions, setVariantOptions] = useState<string[] | null>(null);
   const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
@@ -91,12 +85,11 @@ export function SettingsDialog() {
     let alive = true;
     void (async () => {
       try {
-        const res = await fetch('/api/settings');
-        const data = (await res.json()) as { settings?: { agentModelOverride?: string | null } };
-        const modelID = (data.settings?.agentModelOverride ?? '').split('/').slice(1).join('/');
-        if (alive) setCap(maxModelEffort(modelID));
+        const res = await fetch('/api/ai/models');
+        const data = (await res.json()) as { override?: { variants?: string[] } | null };
+        if (alive) setVariantOptions(sortVariants(data.override?.variants ?? []));
       } catch {
-        if (alive) setCap('high');
+        if (alive) setVariantOptions([]);
       } finally {
         if (alive) setAttempted(true);
       }
@@ -106,9 +99,9 @@ export function SettingsDialog() {
     };
   }, [open, attempted]);
 
-  // Level yang ditampilkan: 'auto' + low..cap (cap memotong sisanya).
-  const shownLevels = EFFORT_LEVELS.filter((level) => rank(level) <= rank(cap));
-  const selected = aiEffort !== null && rank(aiEffort) <= rank(cap) ? aiEffort : 'auto';
+  // 'auto' di depan + variant nyata model. Belum kebaca → fallback auto..high.
+  const shownLevels: string[] = variantOptions === null ? ['auto', 'low', 'medium', 'high'] : ['auto', ...variantOptions];
+  const selected = aiEffort !== null && shownLevels.includes(aiEffort) ? aiEffort : 'auto';
 
   // Search nav: filter item live; grup tanpa item nyaris hilang sekalian.
   const needle = query.trim().toLowerCase();
@@ -258,11 +251,6 @@ export function SettingsDialog() {
                     <div className="flex items-start justify-between gap-4 py-4">
                       <div className="min-w-0">
                         <span className="block text-[13px] text-foreground">{t('settings.aiEffort')}</span>
-                        {rank(cap) < EFFORT_LEVELS.length - 1 && (
-                          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                            {t('settings.effortCap', { level: t(EFFORT_LABEL_KEY[cap]) })}
-                          </p>
-                        )}
                         <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
                           {t('settings.effortNote')}
                         </p>
@@ -271,10 +259,10 @@ export function SettingsDialog() {
                         <SegmentedGroup
                           options={shownLevels.map((level) => ({
                             value: level,
-                            label: t(EFFORT_LABEL_KEY[level]),
+                            label: effortLabelFor(level, t),
                           }))}
                           active={selected}
-                          onSelect={(value) => setAiEffort(value === 'auto' ? null : (value as EffortLevel))}
+                          onSelect={(value) => setAiEffort(value === 'auto' ? null : value)}
                         />
                       </div>
                     </div>

@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { ArrowUp, Check, ChevronDown, FileText, Info, Loader2, Plus, X } from 'lucide-react';
 import { usePreferences, useT } from '@/lib/preferences';
-import { EFFORT_LEVELS, maxModelEffort, type EffortLevel } from '@/lib/ai/effort';
+import { sortVariants, VARIANT_LABEL_KEYS } from '@/lib/ai/effort';
 import { StatusDot } from '@/components/ui';
 
 // Komposer input AI ala Codex (ss2.png): card rounded-xl dengan textarea atas,
 // baris bawah [+] · pill model ▾ · pill effort ▾ · tombol kirim ↑ (bulat).
 // GAK ADA mic/voice. Popover model dipindah ke sini dari header panel.
 
-export type ModelEntryView = { providerID: string; modelID: string; name: string };
+export type ModelEntryView = { providerID: string; modelID: string; name: string; variants: string[] };
 export type ModelGroupView = { providerID: string; label: string; free: boolean; models: ModelEntryView[] };
 /** Satu integrasi popular di bagian "Login pakai API key" dropdown model. */
 export type ProviderPickView = { integrationID: string; name: string; connected: boolean };
@@ -71,17 +71,12 @@ export type AgentComposerProps = {
 
 const SUGGESTIONS_SEEN_KEY = 'research-desk:chat-suggestions-seen';
 
-/** Label i18n per level effort (duplikasi kecil dari settings-menu — biar gak forgot-import lintas lane). */
-const EFFORT_LABEL_KEY: Record<EffortLevel, string> = {
-  auto: 'settings.effortAuto',
-  low: 'settings.effortLow',
-  medium: 'settings.effortMedium',
-  high: 'settings.effortHigh',
-  xhigh: 'settings.effortXHigh',
-  max: 'settings.effortMax',
+/** Label effort: variant yang dikenali → i18n; id eksotik dari server tetap
+ * ditampilkan apa adanya (jujur, gak ngarang level). */
+const effortLabel = (id: string, t: (key: string) => string): string => {
+  const key = VARIANT_LABEL_KEYS[id];
+  return key ? t(key) : id;
 };
-
-const rank = (level: EffortLevel) => EFFORT_LEVELS.indexOf(level); // 'auto' = 0
 
 function basename(path: string): string {
   const index = path.lastIndexOf('/');
@@ -128,8 +123,6 @@ export function AgentComposer({
   /** Integrasi yang lagi dibuka form input key-nya (id, atau null). */
   const [keyOpenId, setKeyOpenId] = useState<string | null>(null);
   const [keyDraft, setKeyDraft] = useState('');
-  /** Cap effort dari model aktif; default 'high' aman sebelum /api/settings kebaca. */
-  const [effortCap, setEffortCap] = useState<EffortLevel>('high');
   /** null = localStorage belum kebaca (biar gak flash); false = saran tampil pertama kali. */
   const [suggestionsSeen, setSuggestionsSeen] = useState<boolean | null>(null);
 
@@ -222,30 +215,13 @@ export function AgentComposer({
     if (slashOpen) setSlashHighlight(0);
   }, [slashOpen]);
 
-  // Cap effort dari settings.agentModelOverride ("providerID/modelID") → maxModelEffort.
-  // Dipegang tiap popover kebuka — model bisa berganti antar pembukaan.
-  useEffect(() => {
-    if (!effortOpen) return undefined;
-    let alive = true;
-    void (async () => {
-      try {
-        const res = await fetch('/api/settings');
-        const data = (await res.json()) as { settings?: { agentModelOverride?: string | null } };
-        const modelID = (data.settings?.agentModelOverride ?? '').split('/').slice(1).join('/');
-        if (alive) setEffortCap(maxModelEffort(modelID));
-      } catch {
-        if (alive) setEffortCap('high');
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [effortOpen]);
-
-  const shownLevels = EFFORT_LEVELS.filter((level) => rank(level) <= rank(effortCap));
-  const selected: EffortLevel = aiEffort !== null && rank(aiEffort) <= rank(effortCap) ? aiEffort : 'auto';
-  const sliderMax = Math.max(shownLevels.length - 1, 1);
-  const sliderValue = Math.max(shownLevels.indexOf(selected), 0);
+  // ── Effort: level ASLI dari variant model aktif (server OpenCode) ──────────
+  // `currentModel` bawa daftar variant sendiri; tanpa cap buatan. Model tanpa
+  // variant → pill effort disembunyikan (sama seperti OpenCode).
+  const variantOptions = useMemo(() => sortVariants(currentModel?.variants ?? []), [currentModel]);
+  const selected: string | null = aiEffort !== null && variantOptions.includes(aiEffort) ? aiEffort : null;
+  const sliderMax = Math.max(variantOptions.length - 1, 1);
+  const sliderValue = selected ? Math.max(variantOptions.indexOf(selected), 0) : 0;
   const fillPct = (sliderValue / sliderMax) * 100;
 
   const canSend = !sending && !busy && (draft.trim() !== '' || attachments.length > 0);
@@ -597,7 +573,9 @@ export function AgentComposer({
             )}
           </div>
 
-          {/* Pill pilih effort → popover slider 6 titik ala ss2 */}
+          {/* Pill pilih effort — level ASLI dari variant model aktif (server).
+              Model tanpa variant → pill disembunyikan (sama seperti OpenCode). */}
+          {variantOptions.length > 0 && (
           <div
             ref={effortRef}
             className="relative shrink-0"
@@ -616,16 +594,18 @@ export function AgentComposer({
               className="flex h-7 shrink-0 items-center gap-1 rounded-full border border-border bg-muted/60 px-2 text-[11px] text-muted-foreground transition-colors [transition-property:color,background-color,border-color] hover:bg-muted hover:text-foreground"
             >
               <span className="max-w-20 truncate">
-                {selected !== 'auto' ? t(EFFORT_LABEL_KEY[selected]) : t('composer.selectEffort')}
+                {selected ? effortLabel(selected, t) : t('composer.selectEffort')}
               </span>
               <ChevronDown size={10} />
             </button>
             {effortOpen && (
               <div className="absolute bottom-9 right-0 z-50 w-56 rounded-xl border border-border bg-card p-3 shadow-lg">
-                <p className="text-center text-sm font-medium text-primary">{t(EFFORT_LABEL_KEY[selected])}</p>
+                <p className="text-center text-sm font-medium text-primary">
+                  {selected ? effortLabel(selected, t) : t('composer.selectEffort')}
+                </p>
                 <p className="mt-1 flex items-center justify-center gap-1 text-[10px] leading-snug text-muted-foreground">
                   <Info size={11} className="shrink-0 text-accent" />
-                  {t('settings.effortCap', { level: t(EFFORT_LABEL_KEY[effortCap]) })}
+                  {t('settings.effortNote')}
                 </p>
                 <input
                   type="range"
@@ -635,8 +615,8 @@ export function AgentComposer({
                   value={sliderValue}
                   aria-label={t('composer.selectEffort')}
                   onChange={(event) => {
-                    const level = shownLevels[Number(event.target.value) % shownLevels.length] ?? 'auto';
-                    setAiEffort(level === 'auto' ? null : level);
+                    const variant = variantOptions[Number(event.target.value) % variantOptions.length] ?? null;
+                    setAiEffort(variant);
                   }}
                   style={{
                     backgroundImage: `linear-gradient(to right, var(--primary) ${fillPct}%, var(--border) ${fillPct}%)`,
@@ -646,6 +626,7 @@ export function AgentComposer({
               </div>
             )}
           </div>
+          )}
 
           {/* Kirim ↑ bulat — disabled saat kosong/busy */}
           <button

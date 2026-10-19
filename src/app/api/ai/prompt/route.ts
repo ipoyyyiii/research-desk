@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { projects } from '@/lib/db/schema';
+import { projects, settings } from '@/lib/db/schema';
 import { ensureServer } from '@/lib/opencode/service';
 import { applyModelToSession } from '@/lib/opencode/model-pick';
 import { buildDossier } from '@/lib/opencode/agent-config';
@@ -49,9 +49,20 @@ export async function POST(request: Request) {
 
     const client = await ensureServer();
 
-    // Model jujur: override picker > auto-ChatGPT > default service.
+    // Effort tersimpan (variant model ASLI ala OpenCode) — diplom Bareng model
+    // ke session sebelum prompt. null/'auto' → variant bawaan, nggak diset.
+    let effortVariant: string | null = null;
     try {
-      await applyModelToSession(client, sessionId);
+      const options = await db.select().from(settings).where(eq(settings.id, 1)).limit(1);
+      const raw = options[0]?.effort ?? null;
+      if (raw && raw !== 'auto') effortVariant = raw;
+    } catch {
+      effortVariant = null; // baca settings gagal → model default aja
+    }
+
+    // Model jujur: override picker > auto-ChatGPT > default service (+ variant effort).
+    try {
+      await applyModelToSession(client, sessionId, effortVariant);
     } catch {
       // biarkan model yang sudah ter-set
     }

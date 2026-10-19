@@ -1,42 +1,43 @@
 /**
- * Level kerja ("effort") untuk model AI — menu Settings.
+ * Level kerja ("effort") untuk model AI — sumber kebenaran: **variants** dari
+ * server OpenCode (client.model.list() → m.variants). Tiap model punya daftar
+ * variant miliknya sendiri (mis. flash → ["low","high","max"], beam/gpt-6 →
+ * sampai "max", sebagian model bisa tanpa variant sama sekali). Nggak ada lagi
+ * cap keyword buatan — UI mengikuti persis apa yang server laporkan.
  *
- * Catatan jujur: plumbing sampling ke provider masih waktu yang akan datang;
- * nilai disimpen & ditampilkan dulu. mapping di bawah ini keyword-based
- * best-effort sebagai batas tampilan UI, bukan kontrak resmi provider.
+ * Variant dikirim asli ke session via client.session.switchModel({ variant })
+ * (perilaku OpenCode). Nilai disimpan global di settings.effort sebagai string
+ * variant apa adanya; null / 'auto' = bawaan model, nggak ngirim variant.
  */
 
-export type EffortLevel = 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+/** Urutan kanonik tingkat effort buat sortir display (server biasanya sudah urut). */
+export const VARIANT_RANK: Record<string, number> = {
+  none: 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  high: 4,
+  xhigh: 5,
+  max: 6,
+};
 
-/** Semua level urut (auto, low, medium, high, xhigh, max). */
-export const EFFORT_LEVELS = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'] as const satisfies readonly EffortLevel[];
+/** Key i18n label per variant; variant tak dikenal ditampilkan apa adanya. */
+export const VARIANT_LABEL_KEYS: Record<string, string> = {
+  none: 'settings.effortNone',
+  minimal: 'settings.effortMinimal',
+  low: 'settings.effortLow',
+  medium: 'settings.effortMedium',
+  high: 'settings.effortHigh',
+  xhigh: 'settings.effortXHigh',
+  max: 'settings.effortMax',
+};
 
-/** Cek string dari storage/payload valid sebagai EffortLevel. */
-export function isEffortLevel(value: string): value is EffortLevel {
-  return (EFFORT_LEVELS as readonly string[]).includes(value);
+/** Sortir id variant (id tak dikenal ditumpuk di belakang, tetap tampil). */
+export function sortVariants(ids: readonly string[]): string[] {
+  return [...ids].sort((a, b) => (VARIANT_RANK[a] ?? 99) - (VARIANT_RANK[b] ?? 99));
 }
 
-/**
- * Cap maksimal effort untuk sebuah model (keyword-based, best-effort):
- * - 'flash'/'fast'/'free'/'mini' → cap medium (model cepat/murah).
- * - keluarga premium (gpt-5, o3, opus, sonnet, gemini-2, glm-4/5) → cap max.
- * - deepseek non-flash → high; selain itu (unknown/provider lokal) → high
- *   default ('xhigh' memang belum dijanjikan provider lokal).
- */
-export function maxModelEffort(modelId: string): EffortLevel {
-  const id = modelId.toLowerCase();
-  if (id.includes('flash') || id.includes('fast') || id.includes('free') || id.includes('mini')) return 'medium';
-  if (
-    id.includes('gpt-5') ||
-    id.includes('o3') ||
-    id.includes('opus') ||
-    id.includes('sonnet') ||
-    id.includes('gemini-2') ||
-    id.includes('glm-4') ||
-    id.includes('glm-5')
-  ) {
-    return 'max';
-  }
-  if (id.includes('deepseek')) return 'high';
-  return 'high';
+/** Nilai effort yang valid disimpan/kirim: token variant pendek (≤24 char). */
+export function isEffortValue(value: string): boolean {
+  return /^[a-z0-9_-]{1,24}$/i.test(value);
 }

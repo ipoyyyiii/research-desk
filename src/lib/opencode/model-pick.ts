@@ -27,11 +27,17 @@ export async function readAgentModelOverride(): Promise<ModelEntry | null> {
   }
 }
 
-/** Terapkan model yang benar ke session (tanpa error kalau server ribet). */
-export async function applyModelToSession(client: OpenCodeClient, sessionId: string): Promise<string | null> {
+/** Terapkan model (plus variant effort optional) yang benar ke session —
+ * tanpa error kalau server ribet. variant = id variant ASLI dari model
+ * (effort ala OpenCode); null/undefined = biarkan bawaan. */
+export async function applyModelToSession(
+  client: OpenCodeClient,
+  sessionId: string,
+  variant?: string | null,
+): Promise<string | null> {
   try {
     const current = await client.session.get({ sessionID: sessionId });
-    const applied = current?.model as { providerID?: string; id?: string } | undefined;
+    const applied = current?.model as { providerID?: string; id?: string; variant?: string } | undefined;
 
     let desired: ModelEntry | null = await readAgentModelOverride();
     if (!desired) {
@@ -50,12 +56,17 @@ export async function applyModelToSession(client: OpenCodeClient, sessionId: str
     }
     if (!desired) return null;
 
-    if (applied?.providerID === desired.providerID && applied?.id === desired.modelID) {
+    // Skip RPC cuma kalau model DAN variant-nya udah pas.
+    if (
+      applied?.providerID === desired.providerID &&
+      applied?.id === desired.modelID &&
+      (variant ? applied.variant === variant : true)
+    ) {
       return `${desired.providerID}/${desired.modelID}`;
     }
     await client.session.switchModel({
       sessionID: sessionId,
-      model: { providerID: desired.providerID, id: desired.modelID },
+      model: { providerID: desired.providerID, id: desired.modelID, ...(variant ? { variant } : {}) },
     });
     return `${desired.providerID}/${desired.modelID}`;
   } catch {

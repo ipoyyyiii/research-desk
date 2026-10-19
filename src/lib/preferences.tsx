@@ -2,8 +2,6 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import type { EffortLevel } from '@/lib/ai/effort';
-
 // ── i18n ─────────────────────────────────────────────────────────────────────
 // Dictionary ringan (planning §stack): JSON per bahasa, tanpa framework berat.
 
@@ -36,12 +34,12 @@ function flatten(dict: NestedDict, prefix = ''): Record<string, string> {
 interface PreferencesValue {
   locale: Locale;
   theme: Theme;
-  /** Effort AI; null = 'auto' (bawaan). Nilai disimpen dulu — plumbing ke provider menyusul. */
-  aiEffort: EffortLevel | null;
+  /** Effort AI: string variant ASLI dari model aktif (server OpenCode); null = bawaan. */
+  aiEffort: string | null;
   t: (key: string, vars?: Record<string, string | number>) => string;
   setLocale: (locale: Locale) => void;
   setTheme: (theme: Theme) => void;
-  setAiEffort: (effort: EffortLevel | null) => void;
+  setAiEffort: (effort: string | null) => void;
 }
 
 const PreferencesContext = createContext<PreferencesValue | null>(null);
@@ -50,12 +48,10 @@ const LOCALE_STORAGE_KEY = 'research-desk:locale';
 const THEME_STORAGE_KEY = 'research-desk:theme';
 const EFFORT_STORAGE_KEY = 'research-desk:effort';
 
-/** Nilai effort yang disimpan di localStorage ('auto' wakili null). */
-const EFFORT_STORE_VALUES: readonly string[] = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'];
-
-function parseStoredEffort(raw: string): EffortLevel | null {
+/** Nilai effort disimpan: 'auto' = bawaan; lainnya token variant (≤24 char) link. */
+function parseStoredEffort(raw: string): string | null {
   if (raw === 'auto') return null;
-  return EFFORT_STORE_VALUES.indexOf(raw) > 0 ? (raw as EffortLevel) : null;
+  return /^[a-z0-9_-]{1,24}$/i.test(raw) ? raw : null;
 }
 
 export function PreferencesProvider({
@@ -69,7 +65,7 @@ export function PreferencesProvider({
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
   const [theme, setThemeState] = useState<Theme>(initialTheme);
-  const [aiEffort, setAiEffortState] = useState<EffortLevel | null>(null);
+  const [aiEffort, setAiEffortState] = useState<string | null>(null);
 
   // Effort tidak punya initial dari server — pulihkan dari localStorage sekali di mount.
   useEffect(() => {
@@ -133,7 +129,7 @@ export function PreferencesProvider({
   );
 
   const setAiEffort = useCallback(
-    (next: EffortLevel | null) => {
+    (next: string | null) => {
       setAiEffortState(next);
       try {
         localStorage.setItem(EFFORT_STORAGE_KEY, next ?? 'auto');

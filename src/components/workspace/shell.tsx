@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import { useT } from '@/lib/preferences';
@@ -161,6 +161,26 @@ export function WorkspaceShell({
     }
   }, [leftViewCollapsed, rightCollapsed]);
 
+  // Klik ikon rail gaya VS Code/Code: ikon yang SAMA dipencet lagi = toggle
+  // buka/tutup area view, ikon lain = langsung buka view di tab itu. Jadi gak
+  // perlu mondar-mandir ke strip panah kecil cuma buat buka-tutup (feedback user).
+  const handleRailTab = useCallback(
+    (tab: LeftTab) => {
+      if (tab === leftTab) setLeftViewCollapsed((collapsed) => !collapsed);
+      else {
+        setLeftTab(tab);
+        setLeftViewCollapsed(false);
+      }
+    },
+    [leftTab],
+  );
+
+  /** Ganti tab dari event workspace (bukan klik ikon) — area view ikut dibuka. */
+  const openLeftTab = useCallback((tab: LeftTab) => {
+    setLeftTab(tab);
+    setLeftViewCollapsed(false);
+  }, []);
+
   // Path tab file yang aktif — dipakai LeftPanel (highlight) & ChatPanel (konteks).
   const activeTab = center.tabs.find((tab) => tab.id === center.activeId) ?? null;
   const openFile = activeTab && activeTab.kind !== 'web' ? activeTab.path : null;
@@ -308,7 +328,7 @@ export function WorkspaceShell({
               style={{ overflow: 'visible' }}
             >
               <div className="relative flex h-full">
-                <IconRail active={leftTab} onChange={setLeftTab} />
+                <IconRail active={leftTab} onChange={handleRailTab} />
                 {/* Buka area view lagi: strip nempel di tepi kanan rail,
                     setengah nongol ke panel sebelahnya. Cuma tampak saat view
                     kollapsed & gak di focus mode. */}
@@ -338,7 +358,7 @@ export function WorkspaceShell({
                     onOpenFile={openDocument}
                     onFileDeleted={handleDeleteFile}
                     activeTab={leftTab}
-                    onActiveTabChange={setLeftTab}
+                    onActiveTabChange={openLeftTab}
                   />
                   {/* Tutup area view kiri: strip di pinggir kanan panel view
                       (di atas Separator) — rail ikon tetap tampil di kiri. */}

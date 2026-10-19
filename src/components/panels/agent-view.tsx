@@ -304,7 +304,7 @@ export function AgentView({
       const res = await fetch('/api/ai/models');
       const data = (await res.json()) as {
         groups?: ModelGroupView[];
-        override?: { providerID: string; modelID: string; name: string } | null;
+        override?: ModelEntryView | null;
       };
       setModels(data.groups ?? []);
       setCurrentModel(data.override ?? null);
@@ -319,7 +319,8 @@ export function AgentView({
 
   const selectModel = useCallback(
     async (model: ModelEntryView) => {
-      setCurrentModel({ providerID: model.providerID, modelID: model.modelID, name: model.name });
+      // Optimis + bawa variant effort milik model ini (variants field).
+      setCurrentModel(model);
       try {
         await fetch('/api/ai/models', {
           method: 'POST',

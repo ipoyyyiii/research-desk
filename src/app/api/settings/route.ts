@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { settings } from '@/lib/db/schema';
-import { EFFORT_LEVELS } from '@/lib/ai/effort';
+// effort divalidasi regex inline di patchSchema (variant ASLI model, src/lib/ai/effort.ts)
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,11 @@ export async function GET() {
 const patchSchema = z.object({
   locale: z.enum(['id', 'en']).optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
-  effort: z.enum(EFFORT_LEVELS).nullable().optional(), // null = 'auto'; level lain via EFFORT_LEVELS
+  effort: z
+    .string()
+    .regex(/^[a-z0-9_-]{1,24}$/i, 'effort tidak valid') // variant ASLI dari model (src/lib/ai/effort.ts)
+    .nullable()
+    .optional(), // null = bawaan model
   defaultCitationStyle: z.string().min(2).max(40).optional(),
   lastProjectId: z.number().int().optional(),
   agentModelOverride: z.string().min(1).max(200).nullable().optional(),

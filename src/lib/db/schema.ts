@@ -17,7 +17,7 @@ export const settings = sqliteTable('settings', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   locale: text('locale').notNull().default('id'), // 'id' | 'en'
   theme: text('theme').notNull().default('system'), // 'light' | 'dark' | 'system'
-  effort: text('effort'), // null / 'auto' = bawaan; level: 'low'|'medium'|'high'|'xhigh'|'max' (src/lib/ai/effort.ts)
+  effort: text('effort'), // null/'auto' = bawaan model; string variant ASLI dari server OpenCode (src/lib/ai/effort.ts)
   defaultCitationStyle: text('default_citation_style').notNull().default('apa'),
   lastProjectId: integer('last_project_id'),
   agentModelOverride: text('agent_model_override'),
