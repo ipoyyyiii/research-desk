@@ -157,7 +157,7 @@ export function LibraryPanel({
         )}
 
         {/* Tab Tersimpan ikut dapet strip unggah PDF saat referensi/ kosong. */}
-        {pdfCount === 0 && <PdfUploadSection slug={slug} />}
+        {pdfCount === 0 && <PdfUploadSection slug={slug} hasFiles />}
       </div>
     </section>
   );

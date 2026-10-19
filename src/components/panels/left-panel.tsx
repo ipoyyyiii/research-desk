@@ -1,15 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Plus, Search, X } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Modal } from '@/components/ui';
+import { requestNewDocument } from '@/components/panels/new-doc-modal';
 import { JournalPanel } from '@/components/panels/journal-panel';
 import { OutlineView } from '@/components/panels/outline-view';
 import { LibraryPanel } from '@/components/panels/library-panel';
 import { ZoteroPanel } from '@/components/panels/zotero-panel';
 import { type LeftTab } from '@/components/workspace/icon-rail';
 import {
+  DropOverlay,
+  EmptyState,
   DataView,
   DraftsView,
   FiguresView,
@@ -17,6 +20,7 @@ import {
   draftFiles,
   figureFiles,
   referencePdfFiles,
+  type EmptyStateNote,
   type TreeEntry,
 } from '@/components/panels/views-left';
 
@@ -144,6 +148,14 @@ export function LeftPanel({
   const [pendingDelete, setPendingDelete] = useState<TreeEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [filter, setFilter] = useState('');
+  /** Path folder yang lagi jadi drop target internal-move (highlight ring). */
+  const [dropFolder, setDropFolder] = useState<string | null>(null);
+  /** File OS lagi hover pane → overlay "Ilepas buat unggah". */
+  const [filesDropActive, setFilesDropActive] = useState(false);
+  /** Move/upload lagi jalan → aksi drag berikutnya ditahan biar gak dobel. */
+  const [mutating, setMutating] = useState(false);
+  /** Catatan hasil aksi (error move/upload / jumlah file masuk). */
+  const [note, setNote] = useState<EmptyStateNote | null>(null);
 
   // Klik chip sitasi di editor (fase 6) → lompat ke tab Jurnal + mode Tersimpan.
   // Dipasang di sini karena journalMode = state internal panel ini; switch tab
@@ -208,15 +220,138 @@ export function LeftPanel({
     }
   };
 
+  /**
+   * Pindah file di disk: drag baris file → baris folder. Target = folder sama
+   * nama file-nya; kalau file yang dibuka ikut pindah, kabari editor dulu
+   * ('workspace:file-moved') sebelum tree di-refresh.
+   */
+  const moveFile = async (from: string, targetFolder: string) => {
+    const name = from.split('/').pop() ?? from;
+    const to = `${targetFolder}/${name}`;
+    if (to === from) return; // folder yang sama → gak ada yang keubah
+    setNote(null);
+    setMutating(true);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/file/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setNote({ text: data?.error ?? t('es.moveErr'), tone: 'error' });
+        return;
+      }
+      if (openFile === from) {
+        // Event dulu → editor update path sebelum tree refetch bikin row pindah.
+        window.dispatchEvent(
+          new CustomEvent('workspace:file-moved', { detail: { from, to } }),
+        );
+      }
+      window.dispatchEvent(new CustomEvent('workspace:tree-refresh'));
+    } catch {
+      setNote({ text: t('es.moveErr'), tone: 'error' });
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  /** Drag file OS → baris folder: unggah via upload-folder (folder bebas boleh). */
+  const uploadToFolderPath = async (folderPath: string, files: File[]) => {
+    if (files.length === 0) return;
+    setNote(null);
+    setMutating(true);
+    try {
+      const body = new FormData();
+      body.append('folder', folderPath);
+      for (const file of files) body.append('files', file);
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/upload-folder`, {
+        method: 'POST',
+        body,
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { saved?: string[]; error?: string }
+        | null;
+      if (!res.ok) {
+        setNote({ text: data?.error ?? t('es.uploadFail'), tone: 'error' });
+        return;
+      }
+      const saved = data?.saved?.length ?? 0;
+      if (saved > 0) {
+        setNote({ text: t('es.uploaded', { n: saved }), tone: 'ok' });
+        window.dispatchEvent(new CustomEvent('workspace:tree-refresh'));
+      } else {
+        setNote({ text: t('es.uploadFail'), tone: 'error' });
+      }
+    } catch {
+      setNote({ text: t('es.uploadFail'), tone: 'error' });
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  // Drag bisa berakhir di luar semua target (drop di luar, tombol Esc) —
+  // listener jaring aman biar highlight folder/overlay gak nyangkut.
+  useEffect(() => {
+    const clearDrag = () => {
+      setDropFolder(null);
+      setFilesDropActive(false);
+    };
+    window.addEventListener('drop', clearDrag);
+    window.addEventListener('dragend', clearDrag);
+    return () => {
+      window.removeEventListener('drop', clearDrag);
+      window.removeEventListener('dragend', clearDrag);
+    };
+  }, []);
+
   const renderNode = (node: TreeNode, depth: number): React.ReactNode => {
     if (node.type === 'dir') {
       // Saat filter aktif semua folder yang relevan dibuka otomatis — hasil search langsung kelihatan.
       const isOpen = filterActive || expanded.has(node.path);
+      // Drop target: move file internal (ring) & unggah file OS. Drop ≠ klik —
+      // expand-click tetap jalan kayak sedia.
+      const dropTarget = dropFolder === node.path;
       return (
         <li key={node.path}>
           <button
             onClick={() => toggleExpand(node.path)}
-            className="flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-muted"
+            onDragEnter={(event) => {
+              const next = event.relatedTarget as Node | null;
+              if (next && event.currentTarget.contains(next)) return;
+              setDropFolder(node.path);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = event.dataTransfer.types.includes(
+                'application/x-rd-path',
+              )
+                ? 'move'
+                : 'copy';
+              setDropFolder(node.path);
+            }}
+            onDragLeave={(event) => {
+              const next = event.relatedTarget as Node | null;
+              if (next && event.currentTarget.contains(next)) return;
+              if (dropFolder === node.path) setDropFolder(null);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              event.stopPropagation(); // jangan sampe pane juga ngulur drop-nya
+              setDropFolder(null);
+              setFilesDropActive(false);
+              if (mutating) return;
+              const from = event.dataTransfer.getData('application/x-rd-path');
+              if (from) {
+                void moveFile(from, node.path);
+                return;
+              }
+              const files = Array.from(event.dataTransfer.files ?? []);
+              if (files.length > 0) void uploadToFolderPath(node.path, files);
+            }}
+            className={`flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              dropTarget ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted'
+            }`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
             {isOpen ? (
@@ -245,12 +380,19 @@ export function LeftPanel({
       >
         <button
           onClick={() => openable && onOpenFile(node.path)}
-          onDoubleClick={() => openable && setPendingDelete(node)}
-          disabled={!openable}
-          className={`group flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
+          // Drag sumber: path file dibawa via typed dataTransfer (blok agent
+          // & move antar folder pakai tipe yang sama), marker move biar UI drop jelas.
+          draggable
+          onDragStart={(event) => {
+            event.dataTransfer.setData('application/x-rd-path', node.path);
+            event.dataTransfer.effectAllowed = 'move';
+          }}
+          className={`group flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
             active
               ? 'bg-primary/10 font-medium text-primary'
-              : 'cursor-pointer text-foreground hover:bg-muted'
+              : openable
+                ? 'cursor-pointer text-foreground hover:bg-muted'
+                : 'cursor-not-allowed text-foreground opacity-55'
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           title={!openable ? t('tree.fase3Hint') : node.path}
@@ -266,17 +408,20 @@ export function LeftPanel({
                 {badge}
               </span>
             )}
+            {/* X hover — buka modal konfirmasi hapus yang ada (klik terpisah,
+                gak nembak klik buka file). */}
             <span
               role="button"
               tabIndex={-1}
+              aria-label={t('es.removeFile')}
+              title={t('es.removeFile')}
               onClick={(event) => {
                 event.stopPropagation();
                 setPendingDelete(node);
               }}
-              className="hidden text-[11px] text-muted-foreground transition-colors hover:text-destructive group-hover:inline-flex"
-              title="×"
+              className="hidden shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-destructive group-hover:inline-flex"
             >
-              ×
+              <X size={12} />
             </span>
           </span>
         </button>
@@ -390,35 +535,86 @@ export function LeftPanel({
       )}
 
       {activeTab === 'files' && (
-        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+        <div className="relative flex min-w-0 flex-1 flex-col bg-background text-foreground">
           {tabHeader(t('tabs.file'), t('lib.fileCount', { n: entries.length }))}
           <div className="shrink-0 border-b border-border px-3 py-2">
-            <div className="relative">
-              <Search
-                size={13}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                type="text"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                placeholder={t('lib.searchPlaceholder')}
-                aria-label={t('lib.searchPlaceholder')}
-                className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs text-foreground transition-colors placeholder:text-muted-foreground"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  size={13}
+                  className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
+                <input
+                  type="text"
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                  placeholder={t('lib.searchPlaceholder')}
+                  aria-label={t('lib.searchPlaceholder')}
+                  className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs text-foreground transition-colors placeholder:text-muted-foreground"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={requestNewDocument}
+                aria-label={t('common.newDocument')}
+                title={t('common.newDocument')}
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors [transition-property:color,background-color] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Plus size={16} />
+              </button>
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-1 py-2">
+          {note && (
+            <p
+              className={`shrink-0 px-3 pb-1.5 text-[11px] ${
+                note.tone === 'error' ? 'text-destructive' : 'text-accent'
+              }`}
+              role="status"
+            >
+              {note.text}
+            </p>
+          )}
+          <div
+            className="min-h-0 flex-1 overflow-y-auto px-1 py-2"
+            onDragEnter={(event) => {
+              // File OS decak pane mana pun → minta user ilepas di sini
+              // (target akhirnya tetap baris folder — drop di luar basa-basi doang).
+              if (event.dataTransfer.types.includes('Files')) setFilesDropActive(true);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault(); // biar browser gak buka file-nya pas drop ngawur
+              if (event.dataTransfer.types.includes('Files')) setFilesDropActive(true);
+            }}
+            onDragLeave={(event) => {
+              const next = event.relatedTarget as Node | null;
+              if (next && event.currentTarget.contains(next)) return;
+              setFilesDropActive(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setFilesDropActive(false);
+              // Drop file OS di latar pane (bukan baris folder) → peluk doang,
+              // target folder-nya belum jelas.
+            }}
+          >
             {loading ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">…</p>
             ) : error ? (
               <p className="px-2 py-4 text-xs text-destructive">{t('err.loadFocus')}</p>
             ) : entries.length === 0 ? (
-              <p className="px-2 py-4 text-xs text-muted-foreground">{t('tree.empty')}</p>
+              <EmptyState
+                icon={Folder}
+                title={t('es.filesTitle')}
+                desc={t('es.filesDesc')}
+                action={{ label: t('es.filesAction'), onClick: requestNewDocument }}
+              />
+            ) : filterActive && nodes.length === 0 ? (
+              <p className="px-2 py-4 text-xs text-muted-foreground">{t('es.noResults')}</p>
             ) : (
               <ul>{nodes.map((node) => renderNode(node, 0))}</ul>
             )}
           </div>
+          {filesDropActive && <DropOverlay label={t('es.drop')} />}
         </div>
       )}
 

@@ -16,6 +16,31 @@ const FOLDER_RULES: Record<string, readonly string[]> = {
 };
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
+/** Format folder bebas: huruf/angka/_/- di dalam, '/' sebagai pemisah. */
+const SUBFOLDER_PATTERN = /^[\w\-/]+$/;
+
+/**
+ * Folder root yang dipakai fitur lain (upload pengetahuan agent, dll) —
+ * drop manual tidak boleh menimpa isian di sana.
+ */
+const RESERVED_ROOTS = new Set(['pengetahuan', 'node_modules', 'gambar']);
+
+/**
+ * Folder bebas (bukan dokumen/referensi/data): sub-path maksimal 3 segmen.
+ * Tiap segmen non-kosong, tanpa '.' / '..' (traversal ditolak — dot gak lolos
+ * regex), bukan RESERVED_ROOTS. Return string yang sah, null kalau ditolak.
+ */
+function normalizeSubfolder(raw: string): string | null {
+  if (!SUBFOLDER_PATTERN.test(raw)) return null;
+  const segments = raw.split('/');
+  if (segments.some((segment) => segment.length === 0 || segment === '.' || segment === '..')) {
+    return null;
+  }
+  if (segments.length > 3) return null;
+  if (RESERVED_ROOTS.has(segments[0])) return null;
+  return raw;
+}
+
 /**
  * Sanitize nama: buang komponen path, karakter liar → '_', strip titik/underscore
  * di depan (anti dotfile/traversal), kosong → 'file'.
@@ -45,8 +70,11 @@ const extOf = (name: string): string => path.extname(name).toLowerCase().replace
 /**
  * POST FormData:
  *  - `files` (beda field nama, bisa banyak) → simpan ke `<folderProject>/<folder>/`.
- *  - `folder` WAJIB `dokumen | referensi | data`, selain itu 400.
- * Ekstensi luar allowlist → 415 {error:'Tipe file tidak didukung'}; file > 25 MB → 413.
+ *  - `folder` WAJIB:
+ *      · `dokumen | referensi | data` → ekstensi di-limit allowlist per folder (l XIII);
+ *      · folder bebas `[\w\-/]+` maks. 3 segmen (tanpa traversal, bukan folder reserved)
+ *        → TANPA allowlist ekstensi — file apa pun boleh.
+ * File > 25 MB → 413; allowlist dilanggar → 415; folder ilegal → 400.
  * Respons (201): { saved: ['dokumen/a.png', …], skipped: ['b.png', …] } —
  * path relatif dari root project, pemisah selalu '/'.
  */
@@ -66,21 +94,23 @@ export async function POST(
     }
 
     const formData = await request.formData();
-    const folder = formData.get('folder');
-    if (typeof folder !== 'string' || !Object.hasOwn(FOLDER_RULES, folder)) {
-      return NextResponse.json(
-        { error: 'Folder harus dokumen, referensi, atau data' },
-        { status: 400 },
-      );
+    const folderField = formData.get('folder');
+    const folder =
+      typeof folderField === 'string' && folderField.length > 0 ? folderField : null;
+    const isSpecialFolder = folder !== null && Object.hasOwn(FOLDER_RULES, folder);
+    const freeFolder = folder !== null && !isSpecialFolder ? normalizeSubfolder(folder) : null;
+    if (!folder || (!isSpecialFolder && !freeFolder)) {
+      return NextResponse.json({ error: 'Folder tidak valid' }, { status: 400 });
     }
     const files = formData.getAll('files').filter((value): value is File => value instanceof File);
     if (files.length === 0) {
       return NextResponse.json({ error: 'Field "files" wajib ada' }, { status: 400 });
     }
 
-    const allowed = FOLDER_RULES[folder];
+    // Allowlist ekstensi HANYA untuk folder khusus — folder bebas menerima file apa pun.
+    const allowed = isSpecialFolder ? FOLDER_RULES[folder] : null;
     for (const file of files) {
-      if (!allowed.includes(extOf(sanitizeName(file.name)))) {
+      if (allowed && !allowed.includes(extOf(sanitizeName(file.name)))) {
         return NextResponse.json({ error: 'Tipe file tidak didukung' }, { status: 415 });
       }
       if (file.size > MAX_FILE_SIZE) {

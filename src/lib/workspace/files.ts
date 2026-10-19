@@ -214,7 +214,8 @@ function slugifyName(title: string): string {
   return slug || 'dokumen';
 }
 
-/** Buat dokumen baru di dokumen/ sebagai "bab next" — file existing tidak disentuh. */
+/** Buat dokumen baru di dokumen/ — nama file PERSIS dari judul user (slugify,
+ * TANPA prefix `babN-`) dan heading `# {title}` apa adanya; file existing tidak disentuh. */
 export async function createDocument(baseReal: string, title: string): Promise<{ path: string; name: string }> {
   const dokumenDir = path.join(baseReal, 'dokumen');
   fs.mkdirSync(dokumenDir, { recursive: true });
@@ -223,15 +224,7 @@ export async function createDocument(baseReal: string, title: string): Promise<{
     throw new WorkspaceError('PATH_OUT_OF_PROJECT');
   }
 
-  // Nomor bab berikutnya: scan file bab{n}-*.md di dokumen/
-  let nextNumber = 1;
-  const existing = await fsp.readdir(dokumenDir);
-  for (const name of existing) {
-    const match = /^bab(\d+)-/.exec(name);
-    if (match) nextNumber = Math.max(nextNumber, Number(match[1]) + 1);
-  }
-
-  const fileName = `bab${nextNumber}-${slugifyName(title)}.md`;
+  const fileName = `${slugifyName(title)}.md`;
   const relPath = `dokumen/${fileName}`;
   // Kalau nama bentrok → suffix nomor (meski nomor bab beda)
   let finalRel = relPath;
@@ -240,7 +233,7 @@ export async function createDocument(baseReal: string, title: string): Promise<{
   }
 
   const content = [
-    `# BAB ${romanize(nextNumber)} · ${title}`,
+    `# ${title}`,
     '',
     'Mulai tulis di sini…',
     '',
@@ -248,18 +241,4 @@ export async function createDocument(baseReal: string, title: string): Promise<{
   await fsp.writeFile(path.join(baseReal, finalRel), content, 'utf8');
 
   return { path: finalRel, name: fileName };
-}
-
-function romanize(n: number): string {
-  const map: Array<[number, string]> = [
-    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
-  ];
-  let result = '';
-  for (const [value, symbol] of map) {
-    while (n >= value) {
-      result += symbol;
-      n -= value;
-    }
-  }
-  return result;
 }

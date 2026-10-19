@@ -64,6 +64,31 @@ function closeTabState(prev: CenterState, id: string): CenterState {
   return { tabs, activeId: next ? next.id : null };
 }
 
+/** File dipindah (event `workspace:file-moved`, drag-move): tab file/word yang
+ * membuka path lama di-remap ke path baru (id ikut; version +1 → editor remount
+ * & fetch lagi ke path baru). Tab web gak pegang path — gak disentuh. Kalau id
+ * baru bakal bentrok dengan tab lain yang sudah buka path tujuan, id lama
+ * dipertahankan (cukup update path) biar key React gak duplikat. */
+function renameTabState(prev: CenterState, from: string, to: string): CenterState {
+  let remapped = false;
+  const idMap = new Map<string, string>();
+  const tabs = prev.tabs.map((tab) => {
+    if ((tab.kind === 'file' || tab.kind === 'word') && tab.path === from) {
+      const nextId = tab.kind === 'file' ? fileTabId(to) : `word:${to}`;
+      const id = nextId !== tab.id && prev.tabs.some((other) => other.id === nextId) ? tab.id : nextId;
+      idMap.set(tab.id, id);
+      remapped = true;
+      // Spread union literal — cast satu kali di sini, bentuknya tetap CenterTab.
+      return { ...tab, id, path: to, version: tab.version + 1 } as CenterTab;
+    }
+    return tab;
+  });
+  if (!remapped) return prev;
+  const activeId =
+    prev.activeId !== null ? (idMap.get(prev.activeId) ?? prev.activeId) : null;
+  return { tabs, activeId };
+}
+
 /** Restorasi state tab dari localStorage. Balikin null kalau data gak valid
  * (corrupt / bentuk salah / lebih dari 10 tab) — biar state awal gak di-override. */
 function parseStoredCenterState(value: string | null): CenterState | null {
@@ -242,11 +267,16 @@ export function WorkspaceShell({
 
   const openFileTab = (path: string) => setCenter((prev) => openFileTabState(prev, path));
   const openWordTab = (path: string) => setCenter((prev) => openWordTabState(prev, path));
-  /** Klik dokumen: .md langsung ke tab Word; ekstensi lain tetap tab file biasa. */
-  const openDocument = (path: string) =>
-    setCenter((prev) =>
-      path.toLowerCase().endsWith('.md') ? openWordTabState(prev, path) : openFileTabState(prev, path),
-    );
+  /** Klik dokumen: .md langsung ke tab Word; ekstensi lain tetap tab file biasa.
+   * Juga dipakai listener event `workspace:doc-created` di bawah — dibikin
+   * stabil (deps kosong, setCenter ref-stabil) biar listener gak re-bind tiap render. */
+  const openDocument = useCallback(
+    (path: string) =>
+      setCenter((prev) =>
+        path.toLowerCase().endsWith('.md') ? openWordTabState(prev, path) : openFileTabState(prev, path),
+      ),
+    [],
+  );
   const activateTab = (id: string) => setCenter((prev) => ({ ...prev, activeId: id }));
   const closeTab = (id: string) => setCenter((prev) => closeTabState(prev, id));
 
@@ -261,12 +291,38 @@ export function WorkspaceShell({
       tabs: prev.tabs.map((tab) => (tab.id === id && tab.kind === 'web' ? { ...tab, url } : tab)),
     }));
 
-  // Dokumen baru dari TopBar tree yang di-refresh + SELALU buka tab (kalau tab
-  // path itu sudah ada → bump version, editor remount dan fetch konten baru).
+  // Dokumen baru dari panel tengah (bukan lewat modal): tree di-refresh + tab
+  // SELALU dibuka (kalau tab path itu sudah ada → bump version, editor remount
+  // dan fetch konten baru).
   const handleDocumentCreated = (path: string) => {
     refreshTree();
     openDocument(path);
   };
+
+  // Listener event lintas-komponen yang shell-lah pemiliknya (state tab ada di
+  // sini):
+  // - `workspace:doc-created` (new-doc-modal curiga sukses POST): cukup buka
+  //   tabnya — tree SUDAH di-refresh modal sendiri (LeftPanel listen
+  //   `workspace:tree-refresh`), gak dobel.
+  // - `workspace:file-moved` (drag-move file): remap tab yang buka path lama.
+  useEffect(() => {
+    const onDocCreated = (event: Event) => {
+      const path = (event as CustomEvent<{ path?: string }>).detail?.path;
+      if (typeof path === 'string' && path) openDocument(path);
+    };
+    const onFileMoved = (event: Event) => {
+      const detail = (event as CustomEvent<{ from?: string; to?: string }>).detail;
+      const from = typeof detail?.from === 'string' ? detail.from : null;
+      const to = typeof detail?.to === 'string' ? detail.to : null;
+      if (from && to && from !== to) setCenter((prev) => renameTabState(prev, from, to));
+    };
+    window.addEventListener('workspace:doc-created', onDocCreated);
+    window.addEventListener('workspace:file-moved', onFileMoved);
+    return () => {
+      window.removeEventListener('workspace:doc-created', onDocCreated);
+      window.removeEventListener('workspace:file-moved', onFileMoved);
+    };
+  }, [openDocument]);
 
   // Versi nilai-balik untuk menu + tab-bar: true kalau dokumen berhasil dibuat.
   const createDocumentFromTitle = async (title: string): Promise<boolean> => {
@@ -303,7 +359,6 @@ export function WorkspaceShell({
       <TopBar
         projectName={projectName}
         projectSlug={slug}
-        onDocumentCreated={handleDocumentCreated}
         focusMode={focusMode}
         onToggleFocusMode={() => setFocusMode((v) => !v)}
         rightOpen={!rightCollapsed}

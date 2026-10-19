@@ -3,13 +3,25 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
   type DragEvent as ReactDragEvent,
 } from 'react';
-import { FileText, Image as ImageIcon, Loader2, Plus, Table2, type LucideIcon } from 'lucide-react';
+import {
+  FileText,
+  Image as ImageIcon,
+  Loader2,
+  Plus,
+  Search,
+  Table2,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useT } from '@/lib/preferences';
+import { requestNewDocument } from '@/components/panels/new-doc-modal';
+import { Modal } from '@/components/ui';
 
 // ── Views panel kiri berbasis TUJUAN (mental model beeblio) ───────────────────
 // Draf, Gambar, Data — semuanya memfilter isi tree (GET /api/projects/<slug>/tree)
@@ -173,12 +185,173 @@ export function DropOverlay({ label }: { label: string }) {
   );
 }
 
-/** Tanggal lokal YYYY-MM-DD buat nama draf harian. */
-function isoDate(): string {
-  const now = new Date();
-  const pad = (value: number): string => String(value).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+/**
+ * Baris header view: search input rounded-full (ikon Search kiri, placeholder
+ * dari key es.search*) + tombol bulat plus — plus SELALU tampil (bukan cuma
+ * saat kosong) dan drag file OS tetap hidup di container view (DropOverlay).
+ * Gaya persis header Pane Pengetahuan ss7 (ref commit 8144d4f).
+ */
+export function ViewSearchRow({
+  searchPh,
+  filter,
+  onFilter,
+  onPlus,
+  plusTitle,
+  plusBusy = false,
+}: {
+  searchPh: string;
+  filter: string;
+  onFilter: (value: string) => void;
+  onPlus: () => void;
+  /** Label buka plus: aria-label + title (WCAG — ikon butuh teks). */
+  plusTitle: string;
+  /** True → spinner di plus (unggah jalan). */
+  plusBusy?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="relative min-w-0 flex-1">
+        <Search
+          size={13}
+          className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
+        <input
+          type="text"
+          value={filter}
+          onChange={(event) => onFilter(event.target.value)}
+          placeholder={searchPh}
+          aria-label={searchPh}
+          className="h-9 w-full rounded-full border border-border bg-card pl-8 pr-3 text-xs text-foreground outline-none transition-colors [transition-property:color,background-color,border-color] placeholder:text-muted-foreground/70 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={onPlus}
+        disabled={plusBusy}
+        aria-label={plusTitle}
+        title={plusTitle}
+        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors [transition-property:color,background-color] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {plusBusy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={15} />}
+      </button>
+    </div>
+  );
 }
+
+/** Pesan "search tanpa hasil" — kecil, miring tengah per baris tampilan. */
+export function NoResultsNote() {
+  const t = useT();
+  return <p className="px-3 py-6 text-center text-[11px] text-muted-foreground">{t('es.noResults')}</p>;
+}
+
+/**
+ * Tombol X hapus pattern ss7: ikon X 12, sentuh ≥36px, tekanan merah
+ * destructive, muncul pas group hover (di baris lewat wrapper .group, di kartu
+ * gambar pojok absolut via className). Label = t('es.removeFile').
+ */
+export function DeleteButton({
+  onClick,
+  label,
+  className = '',
+}: {
+  onClick: () => void;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={`flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground opacity-0 transition-colors [transition-property:color,opacity] hover:text-destructive hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 ${className}`}
+    >
+      <X size={12} />
+    </button>
+  );
+}
+
+// ── Alur hapus file: konfirmasi Modal → DELETE /api/projects/{slug}/file ─────
+
+/** Kandidat hapus — path + nama file (nama dipakai body konfirmasi). */
+export type PendingFileDelete = { path: string; name: string } | null;
+
+/**
+ * State alur hapus file buat semua view: klik X → buka Modal konfirmasi →
+ * DELETE via route file yang sudah ada; sukses → dispatch
+ * 'workspace:tree-refresh' — list auto-update karena entries dari prop.
+ */
+export function useFileDelete(slug: string) {
+  const [pending, setPending] = useState<PendingFileDelete>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const requestDelete = useCallback((path: string, name: string) => {
+    setPending({ path, name });
+  }, []);
+
+  const cancelDelete = useCallback(() => setPending(null), []);
+
+  const performDelete = useCallback(async (): Promise<boolean> => {
+    if (!pending) return false;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/projects/${encodeURIComponent(slug)}/file?path=${encodeURIComponent(pending.path)}`,
+        { method: 'DELETE' },
+      );
+      if (res.ok) window.dispatchEvent(new CustomEvent('workspace:tree-refresh'));
+      return res.ok;
+    } finally {
+      setDeleting(false);
+      setPending(null);
+    }
+  }, [pending, slug]);
+
+  return { pending, deleting, requestDelete, cancelDelete, performDelete };
+}
+
+/** Modal konfirmasi hapus — body pakai t('tree.deleteConfirm', { name }) (key sudah tersedia). */
+export function DeleteConfirmModal({
+  pending,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  pending: PendingFileDelete;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const t = useT();
+  return (
+    <Modal open={!!pending} onClose={onCancel} title={t('common.delete')}>
+      <p className="text-sm text-foreground">{t('tree.deleteConfirm', { name: pending?.name ?? '' })}</p>
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={deleting}
+          className="cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={onConfirm}
+          className="cursor-pointer rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t('common.delete')}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Filter client-side case-insensitive: cocok nama ATAU path (ala file tree). */
+const textFilter = (query: string): string => query.trim().toLowerCase();
+
+// ── View komponen ────────────────────────────────────────────────────────────
 
 /** Folder target unggahan — persis kontrak backend POST …/upload-folder. */
 export type FolderName = 'dokumen' | 'referensi' | 'data';
@@ -296,96 +469,101 @@ type ViewProps = {
 };
 
 /**
- * Draf: kartu baris, klik → editor tengah. Kosong → ss7 + tombol bikin draf
- * harian draf-YYYY-MM-DD.md di dokumen/ (nement → suffix -2, -3, dst).
+ * Draf: baris kartu, klik → editor tengah. Plus (header & empty state) buka
+ * dialog "Dokumen baru" global via requestNewDocument() — nama file ditentukan
+ * user (bukan draf-tanggal otomatis lagi). X di baris → konfirmasi → hapus.
+ * Kosong → ss7; search tanpa hasil → es.noResults.
  */
 export function DraftsView({ slug, entries, onOpenFile }: ViewProps) {
   const t = useT();
-  const [creating, setCreating] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [createdName, setCreatedName] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const del = useFileDelete(slug);
   const drafts = draftFiles(entries);
-
-  /** Buat draf harian via PUT file route; sukses → refresh tree + buka editor. */
-  const createDraft = async () => {
-    if (creating) return;
-    setFailed(false);
-    setCreating(true);
-    try {
-      const iso = isoDate();
-      const stem = `draf-${iso}`;
-      const taken = new Set(entries.map((entry) => entry.path.toLowerCase()));
-      let path = `dokumen/${stem}.md`;
-      for (let index = 2; taken.has(path); index += 1) path = `dokumen/${stem}-${index}.md`;
-      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/file`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, content: `# Draf ${iso}\n\n` }),
-      });
-      if (!res.ok) throw new Error('gagal bikin draf');
-      setCreatedName(path.slice('dokumen/'.length));
-      window.dispatchEvent(new CustomEvent('workspace:tree-refresh'));
-      onOpenFile?.(path);
-    } catch {
-      setFailed(true);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  if (drafts.length === 0) {
-    return (
-      <EmptyState
-        icon={FileText}
-        title={t('es.draftsTitle')}
-        desc={t('es.draftsDesc')}
-        action={{ label: t('es.draftsAction'), onClick: () => void createDraft(), busy: creating }}
-        note={
-          failed
-            ? { text: t('es.createFail'), tone: 'error' }
-            : createdName && drafts.length === 0
-              ? { text: t('es.created', { name: createdName }), tone: 'ok' }
-              : null
-        }
-      />
-    );
-  }
+  const q = textFilter(query);
+  const visible = useMemo(
+    () => (q ? drafts.filter((d) => d.name.toLowerCase().includes(q) || d.path.toLowerCase().includes(q)) : drafts),
+    [drafts, q],
+  );
 
   return (
-    <ul className="flex flex-col gap-0.5 px-1 py-2">
-      {drafts.map((draft) => (
-        <li key={draft.path}>
-          <button
-            type="button"
-            onClick={() => onOpenFile?.(draft.path)}
-            title={draft.path}
-            className="group flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted"
-          >
-            <FileText
-              size={14}
-              className="shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
-            />
-            <span className="min-w-0 truncate font-serif text-[13px] text-foreground">
-              {stripExt(draft.name, 'md')}
-            </span>
-            <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
-              {formatSize(draft.size)}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="flex min-h-full flex-col">
+      <div className="shrink-0 px-2 py-2">
+        <ViewSearchRow
+          searchPh={t('es.searchDrafts')}
+          filter={query}
+          onFilter={setQuery}
+          onPlus={requestNewDocument}
+          plusTitle={t('es.draftsAction')}
+        />
+      </div>
+      <div className="min-h-0 flex-1">
+        {drafts.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title={t('es.draftsTitle')}
+            desc={t('es.draftsDesc')}
+            action={{ label: t('es.draftsAction'), onClick: requestNewDocument }}
+          />
+        ) : visible.length === 0 ? (
+          <NoResultsNote />
+        ) : (
+          <ul className="flex flex-col gap-0.5 px-1 py-2">
+            {visible.map((draft) => (
+              <li key={draft.path}>
+                <div className="group flex w-full items-center gap-1 rounded-md px-1 transition-colors hover:bg-muted">
+                  <button
+                    type="button"
+                    onClick={() => onOpenFile?.(draft.path)}
+                    title={draft.path}
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-1 py-2 text-left"
+                  >
+                    <FileText
+                      size={14}
+                      className="shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
+                    />
+                    <span className="min-w-0 truncate font-serif text-[13px] text-foreground">
+                      {stripExt(draft.name, 'md')}
+                    </span>
+                    <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground">
+                      {formatSize(draft.size)}
+                    </span>
+                  </button>
+                  <DeleteButton
+                    onClick={() => del.requestDelete(draft.path, draft.name)}
+                    label={t('es.removeFile')}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <DeleteConfirmModal
+        pending={del.pending}
+        deleting={del.deleting}
+        onCancel={del.cancelDelete}
+        onConfirm={() => void del.performDelete()}
+      />
+    </div>
   );
 }
 
 /**
- * Gambar: grid thumbnail 2 kolom, klik → buka di tab baru. Kosong → ss7 +
- * unggah (tombol utama) & drag file OS sebagai bonus. Target: dokumen/.
+ * Gambar: grid thumbnail 2 kolom, klik → buka di tab baru. Plus (unggah) pindah
+ * ke header row — selalu tampil; drag file OS tetap hidup via DropOverlay.
+ * X di kartu (pojok, on-hover) → konfirmasi → hapus file gambar.
  */
 export function FiguresView({ slug, entries }: ViewProps) {
   const t = useT();
   const up = useFolderUpload(slug, 'dokumen', 'image/png,image/jpeg,image/webp,image/gif');
+  const del = useFileDelete(slug);
+  const [query, setQuery] = useState('');
   const figures = figureFiles(entries);
+  const q = textFilter(query);
+  const visible = useMemo(
+    () => (q ? figures.filter((f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q)) : figures),
+    [figures, q],
+  );
   const note: EmptyStateNote | null = up.failed
     ? { text: t('es.uploadFail'), tone: 'error' }
     : up.savedCount > 0 && figures.length === 0
@@ -400,39 +578,60 @@ export function FiguresView({ slug, entries }: ViewProps) {
       onDragLeave={up.dnd.onDragLeave}
       onDrop={up.dnd.onDrop}
     >
-      {figures.length === 0 ? (
-        <EmptyState
-          icon={ImageIcon}
-          title={t('es.figuresTitle')}
-          desc={t('es.figuresDesc')}
-          action={{ label: t('es.figuresAction'), onClick: up.pick, busy: up.busy }}
-          note={note}
+      <div className="shrink-0 px-2 py-2">
+        <ViewSearchRow
+          searchPh={t('es.searchFigures')}
+          filter={query}
+          onFilter={setQuery}
+          onPlus={up.pick}
+          plusTitle={t('es.figuresAction')}
+          plusBusy={up.busy}
         />
-      ) : (
-        <ul className="grid grid-cols-2 gap-2 px-2 py-2">
-          {figures.map((figure) => (
-            <li key={figure.path}>
-              <button
-                type="button"
-                onClick={() => window.open(rawUrl(slug, figure.path), '_blank', 'noopener')}
-                title={t('views.openNewTab')}
-                className="block w-full min-w-0 cursor-pointer text-left"
-              >
-                {/* File kampung via route raw — next/image tak dibutuhkan untuk daftar lokal ini */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={rawUrl(slug, figure.path)}
-                  alt={figure.name}
-                  loading="lazy"
-                  className="aspect-square w-full rounded-lg border border-border bg-card object-cover"
-                />
-                <span className="mt-1 block truncate text-[10px] text-muted-foreground">{figure.name}</span>
-                <span className="block font-mono text-[10px] text-muted-foreground">{formatSize(figure.size)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      </div>
+      <div className="min-h-0 flex-1">
+        {figures.length === 0 ? (
+          <EmptyState
+            icon={ImageIcon}
+            title={t('es.figuresTitle')}
+            desc={t('es.figuresDesc')}
+            action={{ label: t('es.figuresAction'), onClick: up.pick, busy: up.busy }}
+            note={note}
+          />
+        ) : visible.length === 0 ? (
+          <NoResultsNote />
+        ) : (
+          <ul className="grid grid-cols-2 gap-2 px-2 py-2">
+            {visible.map((figure) => (
+              <li key={figure.path}>
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => window.open(rawUrl(slug, figure.path), '_blank', 'noopener')}
+                    title={t('views.openNewTab')}
+                    className="block w-full min-w-0 cursor-pointer text-left"
+                  >
+                    {/* File kampung via route raw — next/image tak dibutuhkan untuk daftar lokal ini */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={rawUrl(slug, figure.path)}
+                      alt={figure.name}
+                      loading="lazy"
+                      className="aspect-square w-full rounded-lg border border-border bg-card object-cover"
+                    />
+                    <span className="mt-1 block truncate text-[10px] text-muted-foreground">{figure.name}</span>
+                    <span className="block font-mono text-[10px] text-muted-foreground">{formatSize(figure.size)}</span>
+                  </button>
+                  <DeleteButton
+                    onClick={() => del.requestDelete(figure.path, figure.name)}
+                    label={t('es.removeFile')}
+                    className="absolute right-1 top-1 z-10 rounded-full border border-border bg-card/90"
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <input
         ref={up.inputRef}
         type="file"
@@ -442,18 +641,32 @@ export function FiguresView({ slug, entries }: ViewProps) {
         onChange={up.onInputChange}
       />
       {up.dragActive && <DropOverlay label={t('es.drop')} />}
+      <DeleteConfirmModal
+        pending={del.pending}
+        deleting={del.deleting}
+        onCancel={del.cancelDelete}
+        onConfirm={() => void del.performDelete()}
+      />
     </section>
   );
 }
 
 /**
- * Data: baris badge ekstensi + nama + ukuran, klik → buka di tab baru.
- * Kosong → ss7 + tombol & drag dari OS → unggah folder data/.
+ * Data: baris badge ekstensi + nama + ukuran, klik → buka di tab baru. Plus
+ * (unggah folder data/) pindah ke header row — selalu tampil; X di baris →
+ * konfirmasi → hapus. Kosong → ss7; drag file OS tetap hidup via DropOverlay.
  */
 export function DataView({ slug, entries }: ViewProps) {
   const t = useT();
   const up = useFolderUpload(slug, 'data', '.csv,.xlsx,.xls,.json');
+  const del = useFileDelete(slug);
+  const [query, setQuery] = useState('');
   const data = dataFiles(entries);
+  const q = textFilter(query);
+  const visible = useMemo(
+    () => (q ? data.filter((f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q)) : data),
+    [data, q],
+  );
   const note: EmptyStateNote | null = up.failed
     ? { text: t('es.uploadFail'), tone: 'error' }
     : up.savedCount > 0 && data.length === 0
@@ -468,34 +681,54 @@ export function DataView({ slug, entries }: ViewProps) {
       onDragLeave={up.dnd.onDragLeave}
       onDrop={up.dnd.onDrop}
     >
-      {data.length === 0 ? (
-        <EmptyState
-          icon={Table2}
-          title={t('es.dataTitle')}
-          desc={t('es.dataDesc')}
-          action={{ label: t('es.dataAction'), onClick: up.pick, busy: up.busy }}
-          note={note}
+      <div className="shrink-0 px-2 py-2">
+        <ViewSearchRow
+          searchPh={t('es.searchData')}
+          filter={query}
+          onFilter={setQuery}
+          onPlus={up.pick}
+          plusTitle={t('es.dataAction')}
+          plusBusy={up.busy}
         />
-      ) : (
-        <ul className="flex flex-col gap-0.5 px-1 py-2">
-          {data.map((file) => (
-            <li key={file.path}>
-              <button
-                type="button"
-                onClick={() => window.open(rawUrl(slug, file.path), '_blank', 'noopener')}
-                title={t('views.openNewTab')}
-                className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted"
-              >
-                <span className="shrink-0 rounded bg-muted px-1.5 text-[10px] font-mono uppercase text-muted-foreground">
-                  {extOf(file.name)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-xs text-foreground">{file.name}</span>
-                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatSize(file.size)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      </div>
+      <div className="min-h-0 flex-1">
+        {data.length === 0 ? (
+          <EmptyState
+            icon={Table2}
+            title={t('es.dataTitle')}
+            desc={t('es.dataDesc')}
+            action={{ label: t('es.dataAction'), onClick: up.pick, busy: up.busy }}
+            note={note}
+          />
+        ) : visible.length === 0 ? (
+          <NoResultsNote />
+        ) : (
+          <ul className="flex flex-col gap-0.5 px-1 py-2">
+            {visible.map((file) => (
+              <li key={file.path}>
+                <div className="group flex w-full items-center gap-1 rounded-md px-1 transition-colors hover:bg-muted">
+                  <button
+                    type="button"
+                    onClick={() => window.open(rawUrl(slug, file.path), '_blank', 'noopener')}
+                    title={t('views.openNewTab')}
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-1 py-2 text-left"
+                  >
+                    <span className="shrink-0 rounded bg-muted px-1.5 text-[10px] font-mono uppercase text-muted-foreground">
+                      {extOf(file.name)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">{file.name}</span>
+                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatSize(file.size)}</span>
+                  </button>
+                  <DeleteButton
+                    onClick={() => del.requestDelete(file.path, file.name)}
+                    label={t('es.removeFile')}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <input
         ref={up.inputRef}
         type="file"
@@ -505,6 +738,12 @@ export function DataView({ slug, entries }: ViewProps) {
         onChange={up.onInputChange}
       />
       {up.dragActive && <DropOverlay label={t('es.drop')} />}
+      <DeleteConfirmModal
+        pending={del.pending}
+        deleting={del.deleting}
+        onCancel={del.cancelDelete}
+        onConfirm={() => void del.performDelete()}
+      />
     </section>
   );
 }

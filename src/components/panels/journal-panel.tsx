@@ -1,13 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { ChevronDown, FileText, Quote, Search, X } from 'lucide-react';
+import { ChevronDown, FileText, Loader2, Plus, Quote, Search, X } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import {
+  DeleteButton,
+  DeleteConfirmModal,
   DropOverlay,
   EmptyState,
   formatSize,
   rawUrl,
+  useFileDelete,
   useFolderUpload,
   type PdfRef,
 } from '@/components/panels/views-left';
@@ -330,11 +333,13 @@ export function PaperCard({
 }
 
 /**
- * Strip unggah PDF referensi (ss7 ringan) — tampil saat folder referensi/
- * masih kosong. Drag & drop file OS = bonus; tombol utama tetap sebagai
- * alternatif WCAG. Dipakai tab Jurnal (Cari) DAN tab Tersimpan (Perpustakaan).
+ * Strip unggah PDF referensi (ss7 ringan). Saat folder referensi/ kosong →
+ * EmptyState penuh (look lama, dipakai tab Jurnal & Perpustakaan). Kalau sudah
+ * ada PDF → baris kecil dengan plus bulat PERMANEN biar unggah tetap bisa
+ * apa pun isi folder. Drag & drop file OS = bonus; tombol utama tetap
+ * alternatif WCAG.
  */
-export function PdfUploadSection({ slug }: { slug: string }) {
+export function PdfUploadSection({ slug, hasFiles = false }: { slug: string; hasFiles?: boolean }) {
   const t = useT();
   const up = useFolderUpload(slug, 'referensi', 'application/pdf');
   return (
@@ -345,14 +350,30 @@ export function PdfUploadSection({ slug }: { slug: string }) {
       onDragLeave={up.dnd.onDragLeave}
       onDrop={up.dnd.onDrop}
     >
-      <EmptyState
-        compact
-        icon={FileText}
-        title={t('es.journalPdfTitle')}
-        desc={t('es.journalPdfDesc')}
-        action={{ label: t('es.journalPdfAction'), onClick: up.pick, busy: up.busy }}
-        note={up.failed ? { text: t('es.uploadFail'), tone: 'error' } : null}
-      />
+      {hasFiles ? (
+        <div className="flex items-center justify-between gap-2 px-1">
+          <span className="truncate text-[11px] text-muted-foreground">{t('es.journalPdfAction')}</span>
+          <button
+            type="button"
+            onClick={up.pick}
+            disabled={up.busy}
+            aria-label={t('es.journalPdfAction')}
+            title={t('es.journalPdfAction')}
+            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors [transition-property:color,background-color] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {up.busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={15} />}
+          </button>
+        </div>
+      ) : (
+        <EmptyState
+          compact
+          icon={FileText}
+          title={t('es.journalPdfTitle')}
+          desc={t('es.journalPdfDesc')}
+          action={{ label: t('es.journalPdfAction'), onClick: up.pick, busy: up.busy }}
+          note={up.failed ? { text: t('es.uploadFail'), tone: 'error' } : null}
+        />
+      )}
       <input
         ref={up.inputRef}
         type="file"
@@ -378,6 +399,7 @@ export function JournalPanel({
   onOpenPdf?: (path: string) => void;
 }) {
   const t = useT();
+  const del = useFileDelete(slug);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('relevance');
   const [results, setResults] = useState<JournalCard[] | null>(null);
@@ -570,6 +592,10 @@ export function JournalPanel({
                       ↗
                     </button>
                   )}
+                  <DeleteButton
+                    onClick={() => del.requestDelete(pdf.path, pdf.name)}
+                    label={t('es.removeFile')}
+                  />
                 </div>
               </li>
             ))}
@@ -603,9 +629,16 @@ export function JournalPanel({
           </ul>
         )}
 
-        {/* Folder referensi/ masih kosong → strip ss7 unggah PDF (bonus: drag file OS). */}
-        {pdfFiles.length === 0 && <PdfUploadSection slug={slug} />}
+        {/* Plus unggah PDF permanen: folder kosong → EmptyState; ada PDF → strip kecil. */}
+        <PdfUploadSection slug={slug} hasFiles={pdfFiles.length > 0} />
       </div>
+
+      <DeleteConfirmModal
+        pending={del.pending}
+        deleting={del.deleting}
+        onCancel={del.cancelDelete}
+        onConfirm={() => void del.performDelete()}
+      />
     </section>
   );
 }

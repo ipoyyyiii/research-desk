@@ -15,7 +15,6 @@
     "library": "Lib"
   },
   "tree": {
-    "empty": "Folder project masih kosong. Buat dokumen baru dulu ✍️",
     "deleteConfirm": "Hapus file \"{name}\"?",
     "fase3Hint": "Buka file ini nanti di fase 3 (viewer/PDF)."
   },
@@ -157,7 +156,7 @@
   "newDoc": {
     "label": "Judul dokumen baru",
     "placeholder": "mis. Pendahuluan",
-    "hint": "File dibuat di dokumen/ sebagai bab berikutnya."
+    "hint": "File dibuat di dokumen/ pakai nama yang lu ketik."
   },
   "settings": {
     "title": "Pengaturan",
@@ -469,14 +468,27 @@
     "journalPdfTitle": "Belum ada PDF jurnal",
     "journalPdfDesc": "PDF unduhan di folder referensi/ dibuka langsung dari sini.",
     "journalPdfAction": "Unggah PDF",
-    "libTitle": "Belum ada referensi tersimpan",
-    "libDesc": "Simpan paper dari tab Jurnal, nanti nge-bib otomatis.",
-    "libAction": "Buka Jurnal",
     "drop": "Ilepas buat unggah",
     "uploading": "Nggunggah…",
     "uploaded": "{n} file masuk",
-    "created": "{name} siap dibuka.",
     "uploadFail": "Unggah gagal — coba lagi.",
-    "createFail": "Gagal bikin draf — coba lagi."
+    "noResults": "Gak ada yang cocok.",
+    "filesTitle": "Belum ada file",
+    "filesDesc": "Folder project masih kosong — mulai dari bikin draf atau unggah file.",
+    "filesAction": "Bikin Draf",
+    "outlineTitle": "Belum ada dokumen",
+    "outlineDesc": "Bikin dokumen buat mulai garap bab.",
+    "outlineAction": "Bikin Dokumen",
+    "searchDrafts": "Cari draf…",
+    "searchFigures": "Cari gambar…",
+    "searchData": "Cari data…",
+    "searchOutline": "Cari bab…",
+    "searchFiles": "Cari file…",
+    "removeFile": "Hapus file",
+    "moveErr": "Gagal mindahin file."
+  },
+  "brand": {
+    "name": "research-desk",
+    "home": "Ke halaman awal"
   }
 }

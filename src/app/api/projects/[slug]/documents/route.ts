@@ -11,7 +11,7 @@ const postSchema = z.object({
   title: z.string().min(1).max(120),
 });
 
-/** Buat dokumen baru (dokumen/bab{n}-slug.md) — bab numbering otomatis. */
+/** Buat dokumen baru di dokumen/ — nama file dari judul user (slugify, tanpa prefix bab). */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ slug: string }> },

@@ -15,7 +15,6 @@
     "library": "Library"
   },
   "tree": {
-    "empty": "Project folder is empty. Create a document first ✍️",
     "deleteConfirm": "Delete file \"{name}\"?",
     "fase3Hint": "This file opens later in phase 3 (viewer/PDF)."
   },
@@ -157,7 +156,7 @@
   "newDoc": {
     "label": "New document title",
     "placeholder": "e.g. Introduction",
-    "hint": "File is created under dokumen/ as the next chapter."
+    "hint": "The file is created in dokumen/ using the name you type."
   },
   "settings": {
     "title": "Settings",
@@ -469,14 +468,27 @@
     "journalPdfTitle": "No journal PDFs yet",
     "journalPdfDesc": "Downloaded PDFs in referensi/ open right from here.",
     "journalPdfAction": "Upload PDF",
-    "libTitle": "No saved references yet",
-    "libDesc": "Save papers from the Journals tab; the bib builds itself.",
-    "libAction": "Open journals",
     "drop": "Drop to upload",
     "uploading": "Uploading…",
     "uploaded": "{n} files added",
-    "created": "{name} is ready to open.",
     "uploadFail": "Upload failed — try again.",
-    "createFail": "Failed to create the draft — try again."
+    "noResults": "No matches.",
+    "filesTitle": "No files yet",
+    "filesDesc": "The project folder is empty — start with a draft or upload files.",
+    "filesAction": "New draft",
+    "outlineTitle": "No documents yet",
+    "outlineDesc": "Create a document to start writing a chapter.",
+    "outlineAction": "New document",
+    "searchDrafts": "Search drafts…",
+    "searchFigures": "Search figures…",
+    "searchData": "Search data…",
+    "searchOutline": "Search chapters…",
+    "searchFiles": "Search files…",
+    "removeFile": "Delete file",
+    "moveErr": "Failed to move file."
+  },
+  "brand": {
+    "name": "research-desk",
+    "home": "Go to homepage"
   }
 }

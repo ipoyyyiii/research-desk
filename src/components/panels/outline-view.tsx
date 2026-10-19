@@ -1,11 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Target } from 'lucide-react';
-import { ListTree } from 'lucide-react';
+import { Columns3, Loader2, ListTree, Target } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { countMarkdownWords, firstHeading } from '@/lib/outline';
-import type { TreeEntry } from '@/components/panels/views-left';
+import { requestNewDocument } from '@/components/panels/new-doc-modal';
+import {
+  DeleteButton,
+  DeleteConfirmModal,
+  EmptyState,
+  ViewSearchRow,
+  useFileDelete,
+  type TreeEntry,
+} from '@/components/panels/views-left';
 
 type ChapterRow = {
   path: string;
@@ -27,9 +34,10 @@ function readTarget(slug: string, path: string): number {
 }
 
 /**
- * Tab purpose view "Outline": daftar bab (dokumen/*.md) + hitungan kata
- * + target per bab (kesimpen localStorage, per browser). Baris progress selalu
- * berangka — gak cuma andalan warna (a11y).
+ * Tab purpose view "Outline": header search + plus (dokumen baru), daftar bab
+ * (dokumen/*.md) + hitungan kata + target per bab (kesimpen localStorage, per
+ * browser). Baris progress selalu berangka — gak cuma andalan warna (a11y).
+ * X di baris bab → konfirmasi → hapus file dokumen.
  */
 export function OutlineView({
   slug,
@@ -42,10 +50,11 @@ export function OutlineView({
 }) {
   const t = useT();
   const [rows, setRows] = useState<ChapterRow[]>([]);
-  const [loading, setLoading] = useState(false);
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [targets, setTargets] = useState<Record<string, number>>({});
+  const [query, setQuery] = useState('');
   const cancelledRef = useRef(false);
+  const del = useFileDelete(slug);
 
   // Daftar bab dari tree — filter dokumen/*.md (abaikan _* cache/test file).
   const docPaths = useMemo(
@@ -79,7 +88,6 @@ export function OutlineView({
       setRows([]);
       return undefined;
     }
-    setLoading(true);
     setRows(docPaths.map((doc) => ({ path: doc.path, name: doc.name, title: null, words: null })));
 
     const load = async () => {
@@ -107,7 +115,6 @@ export function OutlineView({
           return { ...row, words: 0, title: null };
         }),
       );
-      setLoading(false);
     };
 
     void load();
@@ -131,6 +138,17 @@ export function OutlineView({
     [slug],
   );
 
+  // Filter client-side: cocok (title ?? name) + path, case-insensitive.
+  const shownRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(
+      (row) =>
+        (row.title ?? row.name.replace(/\.md$/i, '')).toLowerCase().includes(q) ||
+        row.path.toLowerCase().includes(q),
+    );
+  }, [rows, query]);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-border px-3 py-2">
@@ -139,14 +157,35 @@ export function OutlineView({
           {t('outline.title')}
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">{t('outline.targetHint')}</p>
+        <div className="mt-2">
+          <ViewSearchRow
+            searchPh={t('es.searchOutline')}
+            filter={query}
+            onFilter={setQuery}
+            onPlus={requestNewDocument}
+            plusTitle={t('es.outlineAction')}
+          />
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {rows.length === 0 && !loading ? (
-          <p className="px-3 py-6 text-xs leading-relaxed text-muted-foreground">{t('outline.noDocs')}</p>
+        {docPaths.length === 0 ? (
+          <div className="flex h-full flex-col">
+            <EmptyState
+              icon={Columns3}
+              title={t('es.outlineTitle')}
+              desc={t('es.outlineDesc')}
+              action={{ label: t('es.outlineAction'), onClick: requestNewDocument }}
+            />
+          </div>
+        ) : rows.length === 0 ? (
+          // Menunggu hitung kata jalan — jangan kedip es.noResults duluan.
+          null
+        ) : shownRows.length === 0 ? (
+          <p className="px-3 py-6 text-center text-[11px] text-muted-foreground">{t('es.noResults')}</p>
         ) : (
           <ul className="flex flex-col gap-1">
-            {rows.map((row) => {
+            {shownRows.map((row) => {
               const target = targets[row.path] ?? 0;
               const pct = target > 0 && (row.words ?? 0) > 0 ? Math.min(100, Math.round(((row.words ?? 0) / target) * 100)) : 0;
               const done = target > 0 && (row.words ?? 0) >= target;
@@ -155,19 +194,26 @@ export function OutlineView({
                   key={row.path}
                   className="group rounded-md border border-transparent px-2 py-1.5 transition-colors hover:border-border hover:bg-card"
                 >
-                  <button
-                    type="button"
-                    title={t('outline.openHint')}
-                    onClick={() => onOpenFile(row.path)}
-                    className="flex min-h-[24px] w-full cursor-pointer items-center gap-2 text-left"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-[12px] leading-5 text-foreground">
-                      {row.title ?? row.name.replace(/\.md$/i, '')}
-                    </span>
-                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                      {row.words === null ? <Loader2 size={10} className="inline animate-spin" /> : `${row.words.toLocaleString('id-ID')}`}
-                    </span>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      title={t('outline.openHint')}
+                      onClick={() => onOpenFile(row.path)}
+                      className="flex min-h-[24px] min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[12px] leading-5 text-foreground">
+                        {row.title ?? row.name.replace(/\.md$/i, '')}
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                        {row.words === null ? <Loader2 size={10} className="inline animate-spin" /> : `${row.words.toLocaleString('id-ID')}`}
+                      </span>
+                    </button>
+                    <DeleteButton
+                      onClick={() => del.requestDelete(row.path, row.name)}
+                      label={t('es.removeFile')}
+                      className="-mr-1"
+                    />
+                  </div>
 
                   {target > 0 && (
                     <div className="mt-1 flex items-center gap-2">
@@ -223,6 +269,12 @@ export function OutlineView({
           </ul>
         )}
       </div>
+      <DeleteConfirmModal
+        pending={del.pending}
+        deleting={del.deleting}
+        onCancel={del.cancelDelete}
+        onConfirm={() => void del.performDelete()}
+      />
     </div>
   );
 }
