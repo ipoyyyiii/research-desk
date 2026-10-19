@@ -414,6 +414,15 @@
     "selectEffort": "Pilih effort",
     "selectModel": "Pilih model",
     "attachHint": "File disalin ke folder attachments project — agent bisa langsung baca.",
-    "dismiss": "Sembunyikan saran"
+    "dismiss": "Sembunyikan saran",
+    "slashTitle": "Perintah",
+    "slashHint": "Ketik \"/\" buat sesi baru atau lanjut/switch sesi"
+  },
+  "agent": {
+    "sessionsTitle": "Sesi",
+    "sessionNew": "Sesi baru",
+    "sessionsEmpty": "Belum ada sesi lain",
+    "sessionSwitch": "Ganti sesi",
+    "sessionSwitchBusy": "Ngganti sesi…"
   }
 }

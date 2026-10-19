@@ -414,6 +414,15 @@
     "selectEffort": "Select effort",
     "selectModel": "Select model",
     "attachHint": "Files are copied into the project attachments folder — the agent can read them directly.",
-    "dismiss": "Hide suggestions"
+    "dismiss": "Hide suggestions",
+    "slashTitle": "Commands",
+    "slashHint": "Type \"/\" to create or switch sessions"
+  },
+  "agent": {
+    "sessionsTitle": "Sessions",
+    "sessionNew": "New session",
+    "sessionsEmpty": "No other sessions yet",
+    "sessionSwitch": "Switch session",
+    "sessionSwitchBusy": "Switching session…"
   }
 }

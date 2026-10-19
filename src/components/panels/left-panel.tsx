@@ -8,7 +8,7 @@ import { JournalPanel } from '@/components/panels/journal-panel';
 import { OutlineView } from '@/components/panels/outline-view';
 import { LibraryPanel } from '@/components/panels/library-panel';
 import { ZoteroPanel } from '@/components/panels/zotero-panel';
-import { IconRail, type LeftTab } from '@/components/workspace/icon-rail';
+import { type LeftTab } from '@/components/workspace/icon-rail';
 import {
   DataView,
   DraftsView,
@@ -116,35 +116,40 @@ export function LeftPanel({
   openFile,
   onOpenFile,
   onFileDeleted,
+  activeTab,
+  onActiveTabChange,
 }: {
   slug: string;
   treeVersion: number;
   openFile: string | null;
   onOpenFile: (path: string) => void;
   onFileDeleted: (wasOpen: boolean) => void;
+  /** Tab aktif rail — state-nya di shell (rail tampil permanen di sana). */
+  activeTab: LeftTab;
+  onActiveTabChange: (tab: LeftTab) => void;
 }) {
   const t = useT();
   const { entries, loading, error } = useFileTree(slug, treeVersion);
 
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['dokumen', 'referensi']));
-  const [activeTab, setActiveTab] = useState<LeftTab>('drafts');
   const [journalMode, setJournalMode] = useState<'search' | 'saved'>('search');
   const [pendingDelete, setPendingDelete] = useState<TreeEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [filter, setFilter] = useState('');
 
   // Klik chip sitasi di editor (fase 6) → lompat ke tab Jurnal + mode Tersimpan.
-  // Dipasang di sini karena journalMode = state internal panel ini.
+  // Dipasang di sini karena journalMode = state internal panel ini; switch tab
+  // lewat onActiveTabChange (controlled — state activeTab milik shell).
   useEffect(() => {
     const onOpenBib = (event: Event) => {
       const detail = (event as CustomEvent<{ key?: string }>).detail;
       if (!detail?.key) return;
-      setActiveTab('journals');
+      onActiveTabChange('journals');
       setJournalMode('saved');
     };
     window.addEventListener('workspace:open-bib-entry', onOpenBib);
     return () => window.removeEventListener('workspace:open-bib-entry', onOpenBib);
-  }, []);
+  }, [onActiveTabChange]);
 
   // Filter client-side by path (case-insensitive). Folder induk ikut disertakan
   // biar hasil tetap muncul di dalam pohonnya — buildTree butuh parent dir-nya ada.
@@ -300,8 +305,6 @@ export function LeftPanel({
 
   return (
     <aside className="flex h-full">
-      <IconRail active={activeTab} onChange={setActiveTab} />
-
       {activeTab === 'drafts' &&
         viewPane(
           t('views.drafts'),

@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Loader2, Plus, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button, SegmentedGroup, StatusDot } from '@/components/ui';
 import {
   AgentComposer,
+  formatSessionTime,
   type AgentAttachment,
+  type AgentSessionView,
   type ModelEntryView,
   type ModelGroupView,
   type ProviderPickView,
@@ -16,7 +18,7 @@ import {
 
 // Tipe model picker disimpan di agent-composer (milik komposer ala-Codex),
 // diekspor ulang di sini biar import agent-view gak berubah.
-export type { ModelEntryView, ModelGroupView, ProviderPickView };
+export type { ModelEntryView, ModelGroupView, ProviderPickView, AgentSessionView };
 
 // Panel kanan fase 2 (pratinjau UI — belum nyambung API; wiring nyata menyusul).
 
@@ -68,6 +70,15 @@ export type AgentPanelProps = {
   /** Kemampuan AI (fase 2.5): toggle websearch/jurnal; null = belum ke-load. */
   capabilities: { websearch: boolean; literature: boolean } | null;
   onToggleCapability: (key: 'websearch' | 'literature', enabled: boolean) => void;
+  /** Multi-sesi (picker Sessions di strip + slash menu composer). */
+  sessions: AgentSessionView[];
+  activeSessionId: string | null;
+  /** Pindah/buat sesi masih jalan → pill & item menu menandai sibuk. */
+  switching: boolean;
+  /** Buat sesi baru ("Sesi baru"). */
+  onCreateSession: () => void;
+  /** Pindah ke sesi lain dari picker. */
+  onSwitchSession: (sessionId: string) => void;
 };
 
 const TOOL_DOT_TONE: Record<ChatToolEvent['status'], 'green' | 'amber' | 'red'> = {
@@ -242,6 +253,11 @@ export function AgentPanel({
   usage,
   capabilities,
   onToggleCapability,
+  sessions,
+  activeSessionId,
+  switching,
+  onCreateSession,
+  onSwitchSession,
 }: AgentPanelProps) {
   const t = useT();
   const [activeTab, setActiveTab] = useState<'chat' | 'activity'>('chat');
@@ -253,9 +269,12 @@ export function AgentPanel({
   const [uploadError, setUploadError] = useState<string | null>(null);
   /** Popover Kemampuan AI (fase 2.5). */
   const [capsOpen, setCapsOpen] = useState(false);
+  /** Dropdown Sessions pill di strip (multi-sesi). */
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   /** Filter chip di tab Aktivitas (dipertahankan saat pindah-pindah tab). */
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
   const capsRef = useRef<HTMLDivElement>(null);
+  const sessionsRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Popover kemampuan ikut ketutup pas klik di luar-nya.
@@ -267,6 +286,16 @@ export function AgentPanel({
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [capsOpen]);
+
+  // Dropdown Sessions idem.
+  useEffect(() => {
+    if (!sessionsOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (sessionsRef.current && !sessionsRef.current.contains(event.target as Node)) setSessionsOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [sessionsOpen]);
 
   // Dropdown model pindah ke composer (ala-Codex) — klik-diluar jadi urusan composer.
 
@@ -341,6 +370,9 @@ export function AgentPanel({
   const removeAttachment = (id: string) => {
     setAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
   };
+
+  // Sesi aktif buat pill strip (title kosong → cuma label "Sesi" di pill).
+  const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
 
   return (
     <aside className="flex h-full flex-col border-l border-border bg-background">
@@ -458,15 +490,98 @@ export function AgentPanel({
               </Button>
             </div>
           )}
-          {/* Banner status session */}
+          {/* Strip multi-sesi: dot status + pill "Sesi ▾" — ganti/lanjut sesi ala OpenCode. */}
           <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-border px-2.5">
-            <StatusDot tone="idle" />
-            <span
-              className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground"
-              title={projectTitle}
-            >
-              {sessionReady ? t('ai.sessionReady') : projectTitle}
-            </span>
+            <StatusDot
+              tone={switching ? 'amber' : sessionReady ? 'green' : 'idle'}
+              title={
+                switching
+                  ? t('agent.sessionSwitchBusy')
+                  : sessionReady
+                    ? t('ai.sessionReady')
+                    : t('agent.sessionsTitle')
+              }
+            />
+            <div ref={sessionsRef} className="relative min-w-0 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSessionsOpen((v) => !v)}
+                aria-expanded={sessionsOpen}
+                title={t('composer.slashHint')}
+                className={`flex h-6 min-w-0 max-w-64 items-center gap-1 rounded-full border border-border bg-muted/60 px-2 text-[11px] transition-colors [transition-property:color,background-color] hover:bg-muted ${
+                  switching ? 'text-muted-foreground' : 'text-foreground'
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+              >
+                {switching ? (
+                  <>
+                    <Loader2 size={10} className="shrink-0 animate-spin" />
+                    <span className="min-w-0 flex-1 truncate">{t('agent.sessionSwitchBusy')}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="shrink-0">{t('agent.sessionsTitle')}</span>
+                    <span
+                      className="min-w-0 flex-1 truncate font-medium"
+                      title={activeSession?.title ?? projectTitle}
+                    >
+                      {activeSession?.title || ''}
+                    </span>
+                    <ChevronDown size={10} className="shrink-0 text-muted-foreground" />
+                  </>
+                )}
+              </button>
+              {sessionsOpen && (
+                <div className="absolute left-0 top-8 z-50 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
+                  {/* "Sesi baru" selalu di atas (pola slash-menu). */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSessionsOpen(false);
+                      onCreateSession();
+                    }}
+                    className={`flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      switching ? 'pointer-events-none text-muted-foreground opacity-50' : 'text-foreground'
+                    }`}
+                  >
+                    <Plus size={12} className="shrink-0 text-accent" />
+                    <span className="min-w-0 flex-1 truncate font-medium">{t('agent.sessionNew')}</span>
+                  </button>
+                  {sessions.length === 0 ? (
+                    <p className="px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+                      {t('agent.sessionsEmpty')}
+                    </p>
+                  ) : (
+                    <div className="border-t border-border pt-0.5">
+                      {sessions.map((session) => {
+                        const active = session.id === activeSessionId;
+                        return (
+                          <button
+                            key={session.id}
+                            type="button"
+                            onClick={() => {
+                              setSessionsOpen(false);
+                              if (!active) onSwitchSession(session.id);
+                            }}
+                            aria-current={active || undefined}
+                            className={`flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              active ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-muted'
+                            }${switching && !active ? ' pointer-events-none opacity-60' : ''}`}
+                          >
+                            <span className="min-w-0 flex-1 truncate">
+                              {session.title || session.id.slice(0, 10)}
+                            </span>
+                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                              {formatSessionTime(session.timeCreated)}
+                            </span>
+                            {active && <Check size={11} className="shrink-0 text-primary" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             {!sessionReady && (
               <Button
                 variant="outline"
@@ -517,6 +632,11 @@ export function AgentPanel({
               uploadError={uploadError}
               onPickFiles={handlePickFiles}
               onRemoveAttachment={removeAttachment}
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              switching={switching}
+              onCreateSession={onCreateSession}
+              onSwitchSession={onSwitchSession}
               models={models}
               currentModel={currentModel}
               onSelectModel={onSelectModel}

@@ -8,6 +8,7 @@ import { TopBar } from '@/components/layout/top-bar';
 import { LeftPanel } from '@/components/panels/left-panel';
 import { CenterPanel } from '@/components/panels/center-panel';
 import { ChatPanel } from '@/components/panels/chat-panel';
+import { IconRail, type LeftTab } from '@/components/workspace/icon-rail';
 
 // ── State tab panel tengah (sumber kebenaran satu-satunya) ───────────────────
 
@@ -128,15 +129,23 @@ export function WorkspaceShell({
   const [treeVersion, setTreeVersion] = useState(0);
   const t = useT();
 
-  // Collapse panel kiri/kanan (fase 8): persist global (bukan per project).
+  // Collapse panel kiri (fase 8+): yang bisa ditutup cuma AREA VIEW kiri —
+  // rail ikon tetap tampil (feedback ss3). Persist global (bukan per project),
+  // key baru research-desk:left-view-collapsed; key lama yang menyembunyikan
+  // seluruh panel kiri (research-desk:left-collapsed) sengaja gak dipakai lagi.
   // Baca di useEffect pas mount — render pertama selalu expanded biar identik
   // dengan SSR (gak ada hydration mismatch), mirip pola restore tab.
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [leftViewCollapsed, setLeftViewCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+
+  // Tab rail kiri di-lift ke shell: rail harus tetap interaktif walau area view
+  // kollapsed, jadi pemilik state pindah ke sini — LeftPanel jadi controlled
+  // penuh lewat props activeTab/onActiveTabChange.
+  const [leftTab, setLeftTab] = useState<LeftTab>('drafts');
 
   useEffect(() => {
     try {
-      setLeftCollapsed(localStorage.getItem('research-desk:left-collapsed') === '1');
+      setLeftViewCollapsed(localStorage.getItem('research-desk:left-view-collapsed') === '1');
       setRightCollapsed(localStorage.getItem('research-desk:right-collapsed') === '1');
     } catch {
       // localStorage gak tersedia (private mode) — biarkan default expanded.
@@ -145,12 +154,12 @@ export function WorkspaceShell({
 
   useEffect(() => {
     try {
-      localStorage.setItem('research-desk:left-collapsed', leftCollapsed ? '1' : '0');
+      localStorage.setItem('research-desk:left-view-collapsed', leftViewCollapsed ? '1' : '0');
       localStorage.setItem('research-desk:right-collapsed', rightCollapsed ? '1' : '0');
     } catch {
       // localStorage penuh/private mode — biarkan state aja.
     }
-  }, [leftCollapsed, rightCollapsed]);
+  }, [leftViewCollapsed, rightCollapsed]);
 
   // Path tab file yang aktif — dipakai LeftPanel (highlight) & ChatPanel (konteks).
   const activeTab = center.tabs.find((tab) => tab.id === center.activeId) ?? null;
@@ -282,23 +291,45 @@ export function WorkspaceShell({
       />
 
       <div className="relative flex min-h-0 flex-1">
-        {/* Buka panel kiri lagi strip: cuma nongol pas kollapsed & gak di focus mode. */}
-        {!focusMode && leftCollapsed && (
-          <button
-            type="button"
-            onClick={() => setLeftCollapsed(false)}
-            aria-label={t('layout.leftOpen')}
-            title={t('layout.leftOpen')}
-            className="absolute left-1.5 top-1/2 z-40 flex h-16 w-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <ChevronRight size={13} />
-          </button>
-        )}
-
         <Group orientation="horizontal" className="h-full">
-          {!focusMode && !leftCollapsed && (
+          {/* Rail ikon: SELALU tampil (kecuali focus mode) — yang bisa collapse
+              cuma area view-nya (feedback ss3). Gak ada Separator setelahnya
+              karena rail gak perlu di-resize terpisah dari view. */}
+          {!focusMode && (
+            <Panel
+              id="left-rail"
+              defaultSize="3"
+              minSize="3"
+              maxSize="3"
+              className="min-w-0"
+              // Strip reopen menonjol setengah keluar batas panel — inner panel
+              // default-nya overflow:auto (nge-clip); ini override yang eksplisit
+              // diizinkan lib (satu-satunya inline style yang boleh di-override).
+              style={{ overflow: 'visible' }}
+            >
+              <div className="relative flex h-full">
+                <IconRail active={leftTab} onChange={setLeftTab} />
+                {/* Buka area view lagi: strip nempel di tepi kanan rail,
+                    setengah nongol ke panel sebelahnya. Cuma tampak saat view
+                    kollapsed & gak di focus mode. */}
+                {leftViewCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => setLeftViewCollapsed(false)}
+                    aria-label={t('layout.leftOpen')}
+                    title={t('layout.leftOpen')}
+                    className="absolute right-0 top-1/2 z-40 flex h-16 w-5 -translate-y-1/2 translate-x-1/2 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary before:absolute before:inset-y-0 before:-left-1 before:content-['']"
+                  >
+                    <ChevronRight size={13} />
+                  </button>
+                )}
+              </div>
+            </Panel>
+          )}
+
+          {!focusMode && !leftViewCollapsed && (
             <>
-              <Panel id="left" defaultSize="20" minSize="13" maxSize="36" className="min-w-0">
+              <Panel id="left-view" defaultSize="17" minSize="10" maxSize="33" className="min-w-0">
                 <div className="relative h-full">
                   <LeftPanel
                     slug={slug}
@@ -306,14 +337,17 @@ export function WorkspaceShell({
                     openFile={openFile}
                     onOpenFile={openDocument}
                     onFileDeleted={handleDeleteFile}
+                    activeTab={leftTab}
+                    onActiveTabChange={setLeftTab}
                   />
-                  {/* Tutup panel kiri: strip di pinggir kanan panel (di atas Separator). */}
+                  {/* Tutup area view kiri: strip di pinggir kanan panel view
+                      (di atas Separator) — rail ikon tetap tampil di kiri. */}
                   <button
                     type="button"
-                    onClick={() => setLeftCollapsed(true)}
+                    onClick={() => setLeftViewCollapsed(true)}
                     aria-label={t('layout.leftClose')}
                     title={t('layout.leftClose')}
-                    className="absolute right-0.5 top-1/2 z-40 flex h-14 w-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="absolute right-0.5 top-1/2 z-40 flex h-14 w-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary before:absolute before:inset-y-0 before:-left-2 before:content-['']"
                   >
                     <ChevronLeft size={12} />
                   </button>

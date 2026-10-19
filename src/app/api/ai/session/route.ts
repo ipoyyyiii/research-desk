@@ -5,16 +5,27 @@ import { projects } from '@/lib/db/schema';
 import { ensureServer } from '@/lib/opencode/service';
 import { applyModelToSession } from '@/lib/opencode/model-pick';
 import { ensureProjectAgentConfig } from '@/lib/opencode/agent-config';
+import { listSessions, pickActiveSessionId } from '@/lib/opencode/session-list';
 import fs from 'node:fs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type EnsureBody = { slug?: string };
+type EnsureBody = { slug?: string; createNew?: boolean };
+
+function bindSession(projectId: number, sessionId: string) {
+  try {
+    void db.update(projects).set({ opencodeSessionId: sessionId }).where(eq(projects.id, projectId));
+  } catch {
+    // binding gagal tulis tidak blokir ensure — sesi tetap ada di server.
+  }
+}
 
 /**
- * Ensure session agent untuk project (session per project).
- * - Session dicari by directory (folder project) lewat session.list.
+ * Ensure session agent untuk project (multi-sesi per project):
+ * - Binding tersimpan (projects.opencode_session_id) dipakai duluan kalau masih
+ *   ada di server → user balik ke sesi yang sama, bukan "paling baru" lawas.
+ * - createNew: true (picker "Sesi baru") → selalu bikin session fresh + bind.
  * - Config persona/izin ditulis idempotent ke <project>/.opencode + AGENTS.md.
  * - Model di-apply sesuai aturan model-pick (override > auto ChatGPT > default).
  */
@@ -38,17 +49,19 @@ export async function POST(request: Request) {
     const client = await ensureServer();
     ensureProjectAgentConfig(project.folderPath);
 
-    // Session per directory — cari yang paling mutakhir (desc order) biar gak dobel.
-    try {
-      const listed = await client.session.list({ directory: project.folderPath, order: 'desc' });
-      const data = Array.isArray(listed?.data) ? listed.data : [];
-      const first = data[0];
-      if (first?.id) {
-        await applyModelToSession(client, first.id).catch(() => undefined);
-        return NextResponse.json({ sessionId: first.id, reused: true });
+    // Pakai sesi existing (binding dulu, lalu terbaru) — kecuali minta sesi baru.
+    if (body.createNew !== true) {
+      try {
+        const sessions = await listSessions(client, project.folderPath);
+        const id = pickActiveSessionId(sessions, project.opencodeSessionId ?? null);
+        if (id) {
+          await applyModelToSession(client, id).catch(() => undefined);
+          bindSession(project.id, id);
+          return NextResponse.json({ sessionId: id, reused: true });
+        }
+      } catch {
+        // list gagal → dianggap belum ada; lanjut buat baru.
       }
-    } catch {
-      // list gagal → dianggap belum ada; lanjut buat baru.
     }
 
     const created = await client.session.create({
@@ -61,6 +74,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Server gak balikin id session' }, { status: 500 });
     }
     await applyModelToSession(client, id).catch(() => undefined);
+    bindSession(project.id, id);
     return NextResponse.json({ sessionId: id, reused: false }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Gagal menyiapkan session agent';

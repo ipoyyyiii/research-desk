@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AgentPanel,
+  type AgentSessionView,
   type ChatMessage,
   type ChatToolEvent,
   type ModelEntryView,
@@ -55,6 +56,10 @@ export function AgentView({
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  // ── multi-sesi ala OpenCode (picker Sessions + slash menu) ───────────────────
+  const [sessions, setSessions] = useState<AgentSessionView[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
   const [waiting, setWaiting] = useState<{
     method: 'device' | 'link';
     url: string | null;
@@ -81,43 +86,52 @@ export function AgentView({
 
   // ── riwayat chat persisten + meter token (fase 2 sisa) ──────────────────────
   // Riwayat di-load sekali saat panel kebuka; live SSE nyusul menimpa state sama.
+  // Mapping juga dipakai pas ganti sesi (picker Sessions) → bentuk identik.
+  /** Payload /api/ai/messages → ChatMessage[]. Multi-step agent = beberapa item
+   * assistant server-side; UI livestream menampilkan SATU bubble, jadi item
+   * assistant berurutan digabung (teks join, toolEvents concat). */
+  const mapHistory = useCallback(
+    (data: {
+      messages?: Array<{
+        id: string;
+        role: 'user' | 'assistant' | 'system';
+        text: string;
+        toolEvents?: Array<{ id: string; title: string; detail?: string; status: string }>;
+        createdAt?: number;
+      }>;
+    }) => {
+      const history: ChatMessage[] = [];
+      for (const item of data.messages ?? []) {
+        const events = (item.toolEvents ?? []).filter(
+          (event): event is { id: string; title: string; detail?: string; status: 'running' | 'done' | 'error' } =>
+            (event.status === 'running' || event.status === 'done' || event.status === 'error') &&
+            Boolean(event.title),
+        );
+        const last = history[history.length - 1];
+        if (item.role === 'assistant' && last?.role === 'assistant') {
+          history[history.length - 1] = {
+            ...last,
+            text: [last.text, item.text].filter(Boolean).join('\n\n'),
+            toolEvents: [...(last.toolEvents ?? []), ...events],
+          };
+          continue;
+        }
+        history.push({ id: item.id, role: item.role, text: item.text, toolEvents: events });
+      }
+      return history;
+    },
+    [],
+  );
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
         const res = await fetch(`/api/ai/messages?slug=${encodeURIComponent(slug)}`);
-        const data = (await res.json()) as {
-          messages?: Array<{
-            id: string;
-            role: 'user' | 'assistant' | 'system';
-            text: string;
-            toolEvents?: Array<{ id: string; title: string; detail?: string; status: string }>;
-            createdAt?: number;
-          }>;
-        };
+        const data = (await res.json()) as Parameters<typeof mapHistory>[0];
         if (cancelled) return;
-        // Multi-step agent = beberapa item assistant server-side; UI livestream
-        // menampilkan SATU bubble. Jadi item assistant berurutan digabung di sini
-        // (teks join, toolEvents concat) biar riwayat = bentuk live.
-        const history: ChatMessage[] = [];
-        for (const m of data.messages ?? []) {
-          const events = (m.toolEvents ?? []).filter(
-            (t): t is { id: string; title: string; detail?: string; status: 'running' | 'done' | 'error' } =>
-              (t.status === 'running' || t.status === 'done' || t.status === 'error') && Boolean(t.title),
-          );
-          const last = history[history.length - 1];
-          if (m.role === 'assistant' && last?.role === 'assistant') {
-            history[history.length - 1] = {
-              ...last,
-              text: [last.text, m.text].filter(Boolean).join('\n\n'),
-              toolEvents: [...(last.toolEvents ?? []), ...events],
-            };
-            continue;
-          }
-          history.push({ id: m.id, role: m.role, text: m.text, toolEvents: events });
-        }
         // Gak nerobos obrolan yang udah jalan — cuma isi kalau masih kosong.
-        setMessages((prev) => (prev.length > 0 ? prev : history));
+        setMessages((prev) => (prev.length > 0 ? prev : mapHistory(data)));
       } catch {
         // riwayat gagal → mulai kosong, bukan error keras.
       }
@@ -126,7 +140,7 @@ export function AgentView({
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, mapHistory]);
 
   const refreshUsage = useCallback(async () => {
     try {
@@ -141,6 +155,25 @@ export function AgentView({
   useEffect(() => {
     void refreshUsage();
   }, [refreshUsage]);
+
+  // ── daftar sesi multi-sesi (picker Sessions strip + slash menu composer) ─────
+  const refreshSessions = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ai/sessions?slug=${encodeURIComponent(slug)}`);
+      const data = (await res.json()) as {
+        sessionId?: string | null;
+        sessions?: AgentSessionView[];
+      };
+      setSessions(data.sessions ?? []);
+      setActiveSessionId(data.sessionId ?? null);
+    } catch {
+      setSessions([]); // list gagal → picker kosong, ambil/chat utama nggak ganggu.
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    void refreshSessions();
+  }, [refreshSessions]);
 
   // ── status awal ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -429,7 +462,9 @@ export function AgentView({
         }
         sessionRef.current = data.sessionId;
         setSessionReady(true);
+        setActiveSessionId(data.sessionId);
         openStream(data.sessionId);
+        void refreshSessions();
       } catch {
         if (!cancelled) pushSystem(t('err.agentServer'));
       }
@@ -441,7 +476,79 @@ export function AgentView({
       esRef.current?.close();
       esRef.current = null;
     };
-  }, [slug, pushSystem, openStream, t]);
+  }, [slug, pushSystem, openStream, t, refreshSessions]);
+
+  // ── aksi multi-sesi: buat sesi baru / ganti sesi (picker + slash menu) ────────
+  /** "Sesi baru" → create fresh + bind + bersihkan obrolan + buka stream baru. */
+  const createSession = useCallback(async () => {
+    if (switching) return;
+    setSwitching(true);
+    try {
+      const res = await fetch('/api/ai/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, createNew: true }),
+      });
+      const data = (await res.json()) as { sessionId?: string; error?: string };
+      if (!res.ok || !data.sessionId) {
+        pushSystem(t('err.sessionPrep', { r: data.error ?? t('err.unknown') }));
+        return;
+      }
+      sessionRef.current = data.sessionId;
+      setActiveSessionId(data.sessionId);
+      assistantRef.current = null;
+      setBusy(false);
+      setMessages([]); // sesi baru = obrolan kosong
+      openStream(data.sessionId);
+      void refreshUsage();
+      void refreshSessions();
+    } catch {
+      pushSystem(t('err.agentServer'));
+    } finally {
+      setSwitching(false);
+    }
+  }, [switching, slug, pushSystem, t, openStream, refreshUsage, refreshSessions]);
+
+  /** Ganti sesi aktif → bind ke project → rebuild history dari sesi itu. */
+  const switchSession = useCallback(
+    async (targetId: string) => {
+      if (switching || targetId === activeSessionId) return;
+      setSwitching(true);
+      try {
+        const res = await fetch('/api/ai/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, sessionId: targetId }),
+        });
+        const data = (await res.json()) as { ok?: boolean; error?: string };
+        if (!res.ok || !data.ok) {
+          pushSystem(t('err.sessionPrep', { r: data.error ?? t('err.unknown') }));
+          return;
+        }
+        // Riwayat sesi target digabung dulu (stream bloh nyusul sesudahnya —
+        // openStream tutup ES lama; event sesi lama juga disaring by sessionID).
+        try {
+          const msgRes = await fetch(`/api/ai/messages?slug=${encodeURIComponent(slug)}`);
+          const payload = (await msgRes.json()) as Parameters<typeof mapHistory>[0];
+          setMessages(mapHistory(payload));
+        } catch {
+          setMessages([]);
+        }
+        sessionRef.current = targetId;
+        setActiveSessionId(targetId);
+        assistantRef.current = null;
+        setBusy(false);
+        openStream(targetId);
+        void refreshUsage();
+        void refreshSessions();
+      } catch {
+        pushSystem(t('err.agentServer'));
+      } finally {
+        setSwitching(false);
+      }
+    },
+    [switching, activeSessionId, slug, pushSystem, t, mapHistory, openStream, refreshUsage, refreshSessions],
+  );
 
   const send = useCallback(
     async (text: string) => {
@@ -645,6 +752,11 @@ export function AgentView({
         providerPicks={providerPicks}
         onProviderConnect={(integrationID, key) => connectProvider(integrationID, key)}
         onProviderDisconnect={(integrationID) => disconnectProvider(integrationID)}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        switching={switching}
+        onCreateSession={() => void createSession()}
+        onSwitchSession={(id) => void switchSession(id)}
       />
 
       {/* Kartu izin (agent minta akses) */}

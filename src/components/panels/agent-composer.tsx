@@ -15,6 +15,20 @@ export type ModelGroupView = { providerID: string; label: string; free: boolean;
 /** Satu integrasi popular di bagian "Login pakai API key" dropdown model. */
 export type ProviderPickView = { integrationID: string; name: string; connected: boolean };
 
+/** Satu sesi agent directory project — dipakai picker Sessions + slash menu. */
+export type AgentSessionView = { id: string; title: string; timeCreated: number };
+
+/** Item slash menu: buat sesi baru atau pindah ke sesi yang sudah ada. */
+type SlashItem = { kind: 'new' } | { kind: 'session'; id: string; title: string; timeCreated: number };
+
+/** Stempel waktu pendek sesi: "mm-dd hh:mm" lokal (kasar cukup utk picker). */
+export function formatSessionTime(timeCreated: number): string {
+  if (!timeCreated) return '';
+  const date = new Date(timeCreated);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /** Satu lampiran yang sudah ter-upload ke project (relatif dari folder project). */
 export type AgentAttachment = { id: string; name: string; path: string; size: number };
 
@@ -44,6 +58,15 @@ export type AgentComposerProps = {
   providerPicks: ProviderPickView[];
   onProviderConnect: (integrationID: string, key: string) => Promise<void>;
   onProviderDisconnect: (integrationID: string) => Promise<void>;
+  /** Multi-sesi ala OpenCode: daftar sesi directory utk menu slash ("/"). */
+  sessions: AgentSessionView[];
+  activeSessionId: string | null;
+  /** Buat sesi baru (slash menu / picker). */
+  onCreateSession: () => void;
+  /** Pindah ke sesi lain (slash menu / picker). */
+  onSwitchSession: (sessionId: string) => void;
+  /** Pindah/buat sesi masih berjalan → slash menu cuma baca. */
+  switching: boolean;
 };
 
 const SUGGESTIONS_SEEN_KEY = 'research-desk:chat-suggestions-seen';
@@ -86,6 +109,11 @@ export function AgentComposer({
   uploadError,
   onPickFiles,
   onRemoveAttachment,
+  sessions,
+  activeSessionId,
+  onCreateSession,
+  onSwitchSession,
+  switching,
   models,
   currentModel,
   onSelectModel,
@@ -107,7 +135,35 @@ export function AgentComposer({
 
   const pickerRef = useRef<HTMLDivElement>(null);
   const effortRef = useRef<HTMLDivElement>(null);
+  const slashRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Slash menu "/" (multi-sesi ala OpenCode): item "Sesi baru" + daftar sesi buat resume. */
+  const [slashClosed, setSlashClosed] = useState(false);
+  const [slashHighlight, setSlashHighlight] = useState(0);
+
+  const trimmedDraft = draft.trim();
+  // Terbuka pas draft (trim) mulai '/' — slashClosed = tutup sementara (Esc/klik-diluar).
+  const slashOpen = !slashClosed && trimmedDraft.startsWith('/') && !switching;
+  const slashItems: SlashItem[] = [
+    { kind: 'new' },
+    ...sessions.map((session): SlashItem => ({
+      kind: 'session',
+      id: session.id,
+      title: session.title,
+      timeCreated: session.timeCreated,
+    })),
+  ];
+  const clampedHighlight = Math.min(slashHighlight, slashItems.length - 1);
+
+  const runSlash = (item: SlashItem) => {
+    setSlashClosed(true);
+    setSlashHighlight(0);
+    onDraftChange('');
+    if (switching) return; // guard ganda — parent juga jaga
+    if (item.kind === 'new') onCreateSession();
+    else onSwitchSession(item.id);
+  };
 
   // Chip saran muncul cuma SEKALI seumur hidup browser (bukan per project):
   // pertama kali mount → tampilkan + tandai '1'; ✕ dismiss juga set '1'.
@@ -141,6 +197,30 @@ export function AgentComposer({
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [effortOpen]);
+
+  // Slash menu ketutup kalau klik di luar-nya — textarea DI DALAM wrapper, jadi
+  // mengetik/bertahan fokus gak menutup menu; klik area lain menutup.
+  useEffect(() => {
+    if (!slashOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (slashRef.current && !slashRef.current.contains(event.target as Node)) setSlashClosed(true);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [slashOpen]);
+
+  // Draft keluar dari area '/' → tutup-sementara/resor di-reset (menu bisa buka lagi).
+  useEffect(() => {
+    if (!trimmedDraft.startsWith('/')) {
+      setSlashClosed(false);
+      setSlashHighlight(0);
+    }
+  }, [trimmedDraft]);
+
+  // Sorotan mulai dari item pertama tiap menu dibuka.
+  useEffect(() => {
+    if (slashOpen) setSlashHighlight(0);
+  }, [slashOpen]);
 
   // Cap effort dari settings.agentModelOverride ("providerID/modelID") → maxModelEffort.
   // Dipegang tiap popover kebuka — model bisa berganti antar pembukaan.
@@ -178,7 +258,31 @@ export function AgentComposer({
   };
 
   // Enter = kirim, Shift+Enter = baris baru; isComposing guard biar IME aman.
+  // Menu slash terbuka → panah navigasi item, Enter jalan item tersorot, Esc tutup.
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (slashOpen) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setSlashHighlight((prev) => Math.min(prev + 1, slashItems.length - 1));
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setSlashHighlight((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setSlashClosed(true);
+        return;
+      }
+      if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        const target = slashItems[Math.min(slashHighlight, slashItems.length - 1)];
+        if (target) runSlash(target);
+        return;
+      }
+    }
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       handleSubmit();
@@ -274,15 +378,58 @@ export function AgentComposer({
           </p>
         </div>
 
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(event) => onDraftChange(event.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={t('ai.placeholder')}
-          rows={2}
-          className="block min-h-0 max-h-28 w-full resize-none bg-transparent px-1 py-1 text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
-        />
+        <div ref={slashRef} className="relative">
+          {/* Menu slash "/": header kecil + "Sesi baru" + daftar sesi buat resume. */}
+          {slashOpen && (
+            <div className="absolute bottom-full left-0 z-50 mb-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
+              <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t('composer.slashTitle')}
+              </p>
+              {slashItems.map((item, index) => {
+                const activeItem = item.kind === 'session' && item.id === activeSessionId;
+                const stateClass = activeItem
+                  ? 'bg-primary/10 text-primary'
+                  : index === clampedHighlight
+                    ? 'bg-muted text-foreground'
+                    : 'text-foreground hover:bg-muted';
+                const className = `flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-[11px] transition-colors ${
+                  stateClass
+                }${switching ? ' pointer-events-none opacity-50' : ''}`;
+                if (item.kind === 'new') {
+                  return (
+                    <button key="new" type="button" onClick={() => runSlash(item)} className={className}>
+                      <Plus size={12} className="shrink-0 text-accent" />
+                      <span className="min-w-0 flex-1 truncate font-medium">{t('agent.sessionNew')}</span>
+                    </button>
+                  );
+                }
+                return (
+                  <button key={item.id} type="button" onClick={() => runSlash(item)} className={className}>
+                    <span className="min-w-0 flex-1 truncate">{item.title || item.id.slice(0, 10)}</span>
+                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                      {formatSessionTime(item.timeCreated)}
+                    </span>
+                    {item.id === activeSessionId && <Check size={11} className="shrink-0 text-primary" />}
+                  </button>
+                );
+              })}
+              {sessions.length === 0 && (
+                <p className="px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+                  {t('agent.sessionsEmpty')}
+                </p>
+              )}
+            </div>
+          )}
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={(event) => onDraftChange(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t('ai.placeholder')}
+            rows={2}
+            className="block min-h-0 max-h-28 w-full resize-none bg-transparent px-1 py-1 text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </div>
 
         {/* Baris bawah ala Codex: [+] · (gap) · pill model ▾ · pill effort ▾ · ↑ */}
         <div className="mt-1 flex items-center gap-1.5">

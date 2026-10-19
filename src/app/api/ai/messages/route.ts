@@ -4,14 +4,16 @@ import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
 import { ensureServer } from '@/lib/opencode/service';
 import { buildHistory } from '@/lib/opencode/history';
+import { listSessions, pickActiveSessionId } from '@/lib/opencode/session-list';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Riwayat chat project (session per project):
+ * Riwayat chat project (multi-sesi per project):
  * GET /api/ai/messages?slug=<slug>
- * Cuma baca — session existing TERAKHIR (order desc), gak bikin session baru.
+ * Cuma baca — sesi AKTIF = binding projects.opencode_session_id kalau masih
+ * ada di server, lalu sesi terbaru. Gak bikin session baru.
  * Selalu 200 dgn session/messages walau gagal, biar UI gak megangang.
  */
 export async function GET(request: Request) {
@@ -29,10 +31,9 @@ export async function GET(request: Request) {
 
     const client = await ensureServer();
 
-    // Pola sama dgn route session: list by directory, ambil yang paling mutakhir.
-    const listed = await client.session.list({ directory: project.folderPath, order: 'desc' });
-    const data = Array.isArray(listed?.data) ? listed.data : [];
-    const sessionId = data[0]?.id ?? null;
+    // Pola sama dgn route session: binding dulu, fallback sesi terbaru.
+    const sessions = await listSessions(client, project.folderPath);
+    const sessionId = pickActiveSessionId(sessions, project.opencodeSessionId ?? null);
     if (!sessionId) {
       // Belum ada session → riwayat kosong, bukan error.
       return NextResponse.json({ sessionId: null, messages: [] });

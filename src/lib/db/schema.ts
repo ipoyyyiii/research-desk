@@ -7,6 +7,9 @@ export const projects = sqliteTable('projects', {
   folderPath: text('folder_path').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   lastOpenedAt: integer('last_opened_at', { mode: 'timestamp' }),
+  // Session agent aktif project ini — dipakai multi-sesi (picker + slash menu).
+  // null = belum ada binding; fall back ke session lokal terbaru.
+  opencodeSessionId: text('opencode_session_id'),
 });
 
 // Baris tunggal (id = 1) — preferensi app-level.

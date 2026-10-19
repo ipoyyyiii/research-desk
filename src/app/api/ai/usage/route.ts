@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
 import { ensureServer } from '@/lib/opencode/service';
 import { buildHistory } from '@/lib/opencode/history';
+import { listSessions, pickActiveSessionId } from '@/lib/opencode/session-list';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,10 +36,9 @@ export async function GET(request: Request) {
 
     const client = await ensureServer();
 
-    // Session existing terakhir (order desc) — ikut pola route session/messages.
-    const listed = await client.session.list({ directory: project.folderPath, order: 'desc' });
-    const data = Array.isArray(listed?.data) ? listed.data : [];
-    const sessionId = data[0]?.id ?? null;
+    // Sesi aktif = binding project dulu, fallback sesi terbaru — ikut route session/messages.
+    const sessions = await listSessions(client, project.folderPath);
+    const sessionId = pickActiveSessionId(sessions, project.opencodeSessionId ?? null);
     if (!sessionId) {
       return NextResponse.json({ sessionId: null, tokens: null, messageCount: 0 });
     }
