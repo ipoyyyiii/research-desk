@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
+import { useT } from '@/lib/preferences';
 import { TopBar } from '@/components/layout/top-bar';
 import { LeftPanel } from '@/components/panels/left-panel';
 import { CenterPanel } from '@/components/panels/center-panel';
@@ -124,6 +126,31 @@ export function WorkspaceShell({
   const [center, setCenter] = useState<CenterState>({ tabs: [], activeId: null });
   const [focusMode, setFocusMode] = useState(false);
   const [treeVersion, setTreeVersion] = useState(0);
+  const t = useT();
+
+  // Collapse panel kiri/kanan (fase 8): persist global (bukan per project).
+  // Baca di useEffect pas mount — render pertama selalu expanded biar identik
+  // dengan SSR (gak ada hydration mismatch), mirip pola restore tab.
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      setLeftCollapsed(localStorage.getItem('research-desk:left-collapsed') === '1');
+      setRightCollapsed(localStorage.getItem('research-desk:right-collapsed') === '1');
+    } catch {
+      // localStorage gak tersedia (private mode) — biarkan default expanded.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('research-desk:left-collapsed', leftCollapsed ? '1' : '0');
+      localStorage.setItem('research-desk:right-collapsed', rightCollapsed ? '1' : '0');
+    } catch {
+      // localStorage penuh/private mode — biarkan state aja.
+    }
+  }, [leftCollapsed, rightCollapsed]);
 
   // Path tab file yang aktif — dipakai LeftPanel (highlight) & ChatPanel (konteks).
   const activeTab = center.tabs.find((tab) => tab.id === center.activeId) ?? null;
@@ -250,20 +277,47 @@ export function WorkspaceShell({
         onDocumentCreated={handleDocumentCreated}
         focusMode={focusMode}
         onToggleFocusMode={() => setFocusMode((v) => !v)}
+        rightOpen={!rightCollapsed}
+        onToggleRight={() => setRightCollapsed((v) => !v)}
       />
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
+        {/* Buka panel kiri lagi strip: cuma nongol pas kollapsed & gak di focus mode. */}
+        {!focusMode && leftCollapsed && (
+          <button
+            type="button"
+            onClick={() => setLeftCollapsed(false)}
+            aria-label={t('layout.leftOpen')}
+            title={t('layout.leftOpen')}
+            className="absolute left-1.5 top-1/2 z-40 flex h-16 w-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <ChevronRight size={13} />
+          </button>
+        )}
+
         <Group orientation="horizontal" className="h-full">
-          {!focusMode && (
+          {!focusMode && !leftCollapsed && (
             <>
               <Panel id="left" defaultSize="20" minSize="13" maxSize="36" className="min-w-0">
-                <LeftPanel
-                  slug={slug}
-                  treeVersion={treeVersion}
-                  openFile={openFile}
-                  onOpenFile={openDocument}
-                  onFileDeleted={handleDeleteFile}
-                />
+                <div className="relative h-full">
+                  <LeftPanel
+                    slug={slug}
+                    treeVersion={treeVersion}
+                    openFile={openFile}
+                    onOpenFile={openDocument}
+                    onFileDeleted={handleDeleteFile}
+                  />
+                  {/* Tutup panel kiri: strip di pinggir kanan panel (di atas Separator). */}
+                  <button
+                    type="button"
+                    onClick={() => setLeftCollapsed(true)}
+                    aria-label={t('layout.leftClose')}
+                    title={t('layout.leftClose')}
+                    className="absolute right-0.5 top-1/2 z-40 flex h-14 w-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <ChevronLeft size={12} />
+                  </button>
+                </div>
               </Panel>
               <Separator className="w-1 bg-neutral-200 transition-colors hover:bg-primary/40 dark:bg-neutral-800" />
             </>
@@ -284,11 +338,16 @@ export function WorkspaceShell({
             />
           </Panel>
 
-          {!focusMode && (
+          {!focusMode && !rightCollapsed && (
             <>
               <Separator className="w-1 bg-neutral-200 transition-colors hover:bg-primary/40 dark:bg-neutral-800" />
               <Panel id="right" defaultSize="27" minSize="18" maxSize="42" className="min-w-0">
-                <ChatPanel slug={slug} projectTitle={projectName} activeFilePath={openFile} />
+                <ChatPanel
+                  slug={slug}
+                  projectTitle={projectName}
+                  activeFilePath={openFile}
+                  onCollapse={() => setRightCollapsed(true)}
+                />
               </Panel>
             </>
           )}

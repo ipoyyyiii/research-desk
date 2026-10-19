@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CloudDownload, Loader2 } from 'lucide-react';
+import { CloudDownload, Loader2, RefreshCw } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Button } from '@/components/ui';
 
@@ -9,15 +9,18 @@ import { Button } from '@/components/ui';
  * Tab Zotero (fase 7): panel penuh di rail kiri. Kredensial disimpen server
  * (data/zotero-<slug>.json, 0600, gitignored); sync menarik seluruh library
  * top-level user dari api.zotero.org lalu merge add-only ke references.bib
- * (key yang sudah ada gak disentuh — entry manual/jurnal kejaga).
+ * (key yang sudah ada gak disentuh — entry manual/jurnal kejaga). Re-sync
+ * (PUT resync) update entri yang pernah di-import — key lama dijaga biar
+ * chip `[@key]` di dokumen gak bouls — plus nambah entri baru.
  */
 export function ZoteroPanel({ slug }: { slug: string }) {
   const t = useT();
   const [userId, setUserId] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [connected, setConnected] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'save' | 'sync' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'sync' | 'resync' | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [detail, setDetail] = useState<string | null>(null);
   const [bibTotal, setBibTotal] = useState<number | null>(null);
 
   const loadStatus = useCallback(async () => {
@@ -48,6 +51,7 @@ export function ZoteroPanel({ slug }: { slug: string }) {
     if (busy) return;
     setBusy('save');
     setMsg(null);
+    setDetail(null);
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/zotero`, {
         method: 'POST',
@@ -74,6 +78,7 @@ export function ZoteroPanel({ slug }: { slug: string }) {
     if (busy) return;
     setBusy('sync');
     setMsg(null);
+    setDetail(null);
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/zotero`, {
         method: 'POST',
@@ -92,6 +97,38 @@ export function ZoteroPanel({ slug }: { slug: string }) {
       }
     } catch {
       setMsg('zotero.errNetwork');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** PUT resync: update entri yang pernah di-import (hash berubah) + tambah
+   *  entri baru. Key bib lama dijaga di server — chip `[@key]` kejaga. */
+  const resyncLibrary = async () => {
+    if (busy) return;
+    setBusy('resync');
+    setMsg(null);
+    setDetail(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/zotero`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'resync' }),
+      });
+      const data = (await res.json()) as { added?: number; updated?: number; error?: string };
+      if (res.ok) {
+        const added = data.added ?? 0;
+        const updated = data.updated ?? 0;
+        setMsg(added + updated > 0 ? `zotero.resyncDone:${added}:${updated}` : 'zotero.resyncZero');
+        const bib = await fetch(`/api/projects/${encodeURIComponent(slug)}/bib`);
+        const bibData = (await bib.json()) as { total?: number };
+        setBibTotal(bib.ok ? (bibData.total ?? 0) : null);
+      } else {
+        setMsg('zotero.errResync');
+        setDetail(data.error && data.error.startsWith('zotero.') ? data.error : null);
+      }
+    } catch {
+      setMsg('zotero.errResync');
     } finally {
       setBusy(null);
     }
@@ -151,13 +188,28 @@ export function ZoteroPanel({ slug }: { slug: string }) {
             {busy === 'sync' ? <Loader2 size={12} className="animate-spin" /> : <CloudDownload size={12} />}
             {busy === 'sync' ? t('zotero.pulling') : t('zotero.pullBtn')}
           </Button>
+          <Button
+            variant="default"
+            className="flex h-7 shrink-0 items-center gap-1 px-2.5 text-[11px]"
+            disabled={busy !== null || connected === null}
+            onClick={() => void resyncLibrary()}
+          >
+            {busy === 'resync' ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            {busy === 'resync' ? t('zotero.resyncing') : t('zotero.forceResync')}
+          </Button>
         </div>
 
         {msg && (
           <p className="mt-2.5 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
             {msg.startsWith('zotero.added:')
               ? t('zotero.added', { n: msg.slice('zotero.added:'.length) })
-              : t(msg)}
+              : msg.startsWith('zotero.resyncDone:')
+                ? t('zotero.resyncDone', {
+                    added: Number(msg.split(':')[1] ?? 0),
+                    updated: Number(msg.split(':')[2] ?? 0),
+                  })
+                : t(msg)}
+            {detail ? ` — ${t(detail)}` : ''}
           </p>
         )}
       </div>

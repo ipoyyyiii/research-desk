@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { Check, ChevronDown, FileText, SendHorizontal, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, FileText, SendHorizontal, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -47,6 +47,8 @@ export type AgentPanelProps = {
   onConnect: () => void;
   /** Agent sedang mengerjakan sesuatu (tampilkan bubble "mengetik…"). */
   busy: boolean;
+  /** Tutup panel kanan — dipanggil dari tombol arrow di header panel. */
+  onCollapse?: () => void;
   /** Model picker (fase 2): daftar model per provider + pilihan aktif. */
   models: ModelGroupView[];
   currentModel: ModelEntryView | null;
@@ -220,6 +222,7 @@ export function AgentPanel({
   connected,
   onConnect,
   busy,
+  onCollapse,
   models,
   currentModel,
   onSelectModel,
@@ -531,6 +534,18 @@ export function AgentPanel({
           tone={connected ? 'green' : 'amber'}
           title={t(connected ? 'ai.connected' : 'ai.disconnected')}
         />
+        {/* Tutup panel kanan — arrow menunjuk keluar (kanan). */}
+        {onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            aria-label={t('layout.rightClose')}
+            title={t('layout.rightClose')}
+            className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <ChevronRight size={12} />
+          </button>
+        )}
       </div>
 
       {activeTab === 'chat' ? (

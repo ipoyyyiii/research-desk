@@ -70,6 +70,26 @@ export function CenterPanel({
             onNewDocument={onNewDocument}
           />
           <div className="flex min-h-0 flex-1 text-foreground">
+            {/* Keep-alive Word (fase 8): SEMUA tab Word tetap mounted — iframe
+              WordCraft gak bouls/bulak-balik booting pas pindah tab. Tab Word
+              non-aktif cuma di-hide via display:none; version tetap jadi prop
+              biar re-throw tetap jalan. */}
+            {tabs
+              .filter((tab) => tab.kind === 'word')
+              .map((tab) => (
+                <div
+                  key={`${tab.id}:${tab.path}`}
+                  className={`h-full min-w-0 flex-1 ${tab.id === activeId ? 'flex' : 'hidden'}`}
+                >
+                  <WordTab
+                    key={`${tab.id}:${tab.path}`}
+                    slug={slug}
+                    path={tab.path}
+                    version={tab.version}
+                    onOpenText={onOpenText}
+                  />
+                </div>
+              ))}
             {active?.kind === 'file' &&
               (isPreviewBinary(active.path) ? (
                 <FileView key={`${active.path}:${active.version}`} slug={slug} path={active.path} />
@@ -88,15 +108,6 @@ export function CenterPanel({
                 key={active.id}
                 url={active.url}
                 onChangeUrl={(url) => onWebUrl(active.id, url)}
-              />
-            )}
-            {active?.kind === 'word' && (
-              <WordTab
-                key={`${active.id}:${active.path}`}
-                slug={slug}
-                path={active.path}
-                version={active.version}
-                onOpenText={onOpenText}
               />
             )}
           </div>

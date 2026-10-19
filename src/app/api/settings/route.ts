@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { settings } from '@/lib/db/schema';
+import { EFFORT_LEVELS } from '@/lib/ai/effort';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,7 @@ export async function GET() {
 const patchSchema = z.object({
   locale: z.enum(['id', 'en']).optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
+  effort: z.enum(EFFORT_LEVELS).nullable().optional(), // null = 'auto'; level lain via EFFORT_LEVELS
   defaultCitationStyle: z.string().min(2).max(40).optional(),
   lastProjectId: z.number().int().optional(),
   agentModelOverride: z.string().min(1).max(200).nullable().optional(),

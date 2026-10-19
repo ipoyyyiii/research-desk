@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { FilePlus2, Settings2, Columns2 } from 'lucide-react';
-import { useT, usePreferences, type Locale, type Theme } from '@/lib/preferences';
-import { Button, IconButton, Modal, SegmentedGroup, TextInput, StatusDot } from '@/components/ui';
+import { FilePlus2, Columns2, MessagesSquare } from 'lucide-react';
+import { useT } from '@/lib/preferences';
+import { Button, IconButton, Modal, TextInput, StatusDot } from '@/components/ui';
+import { SettingsMenu } from '@/components/workspace/settings-menu';
 
 export function TopBar({
   projectName,
@@ -11,17 +12,20 @@ export function TopBar({
   onDocumentCreated,
   focusMode,
   onToggleFocusMode,
+  rightOpen = true,
+  onToggleRight,
 }: {
   projectName: string;
   projectSlug: string;
   onDocumentCreated: (path: string) => void;
   focusMode: boolean;
   onToggleFocusMode: () => void;
+  /** Panel kanan (AI Assistant) lagi kebuka? — buat aria-pressed toggle header. */
+  rightOpen?: boolean;
+  onToggleRight?: () => void;
 }) {
   const t = useT();
-  const { locale, theme, setLocale, setTheme } = usePreferences();
   const [newDocOpen, setNewDocOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,13 +69,23 @@ export function TopBar({
         <IconButton onClick={onToggleFocusMode} title="Focus mode (Esc)" className={focusMode ? 'text-blue-500' : ''}>
           <Columns2 size={15} />
         </IconButton>
+        {!focusMode && (
+          <Button
+            variant="ghost"
+            onClick={onToggleRight}
+            aria-pressed={rightOpen}
+            title={rightOpen ? t('layout.rightClose') : t('layout.aiOpen')}
+          >
+            <MessagesSquare size={15} />
+            {t('layout.aiAssistant')}
+          </Button>
+        )}
         <Button variant="subtle" onClick={() => setNewDocOpen(true)}>
           <FilePlus2 size={15} />
           {t('common.newDocument')}
         </Button>
-        <IconButton onClick={() => setSettingsOpen(true)} title={t('common.settings')}>
-          <Settings2 size={16} />
-        </IconButton>
+        {/* Settings unified ala Claude: Bahasa + Tema + Effort AI (dropdown). */}
+        <SettingsMenu />
         <StatusDot tone="amber" title={`OpenCode: ${t('chat.statusOff')} (fase 2)`} />
       </div>
 
@@ -103,38 +117,6 @@ export function TopBar({
               {creating ? '…' : t('common.create')}
             </Button>
           </div>
-        </div>
-      </Modal>
-
-      {/* Dialog pengaturan */}
-      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title={t('settings.title')}>
-        <div className="space-y-5">
-          <div>
-            <p className="mb-1.5 text-sm font-medium">{t('settings.language')}</p>
-            <SegmentedGroup
-              options={[
-                { value: 'id', label: 'Indonesia' },
-                { value: 'en', label: 'English' },
-              ]}
-              active={locale}
-              onSelect={(value) => setLocale(value as Locale)}
-            />
-          </div>
-          <div>
-            <p className="mb-1.5 text-sm font-medium">{t('settings.theme')}</p>
-            <SegmentedGroup
-              options={[
-                { value: 'light', label: t('settings.themeLight') },
-                { value: 'dark', label: t('settings.themeDark') },
-                { value: 'system', label: t('settings.themeSystem') },
-              ]}
-              active={theme}
-              onSelect={(value) => setTheme(value as Theme)}
-            />
-          </div>
-          <p className="border-t border-neutral-200 pt-3 text-xs text-neutral-500 dark:border-neutral-700">
-            Default citation style & persona agent → fase 2/4.
-          </p>
         </div>
       </Modal>
     </header>

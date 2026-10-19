@@ -42,10 +42,12 @@ export function AgentView({
   slug,
   projectTitle,
   activeFilePath,
+  onCollapse,
 }: {
   slug: string;
   projectTitle: string;
   activeFilePath: string | null;
+  onCollapse?: () => void;
 }) {
   const t = useT();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -624,6 +626,7 @@ export function AgentView({
       <AgentPanel
         slug={slug}
         projectTitle={projectTitle}
+        onCollapse={onCollapse}
         sessionReady={sessionReady}
         onEnsureSession={async () => undefined}
         messages={messages}
