@@ -273,6 +273,7 @@
     "openExternal": "Buka di tab browser",
     "closeTab": "Tutup tab",
     "newWeb": "Tab web",
+    "newSheet": "Spreadsheet baru",
     "workspaceFile": "Berkas workspace",
     "webPage": "Halaman web",
     "blockedHint": "Banyak situs (Google, Scholar, dsb.) larang tampil dalam frame — pakai tombol ↗ kalau blank.",
@@ -341,6 +342,21 @@
     "fontPackFail": "Pack font gak bisa ditanam ke penyimpanan browser (coba hard refresh). Word tetep jalan.",
     "sysFontHint": "Mau font bawaan Windows (Calibri, Segoe UI, dll.) ikut kebaca? Di WordCraft: buka menu Fonts → \"Load system fonts\" (Chrome/Edge), cukup sekali.",
     "sysFontHintNo": "Browser ini belum support \"Load system fonts\" (khusus Chrome/Edge). Font standar Word (Calibri, Times New Roman, Arial, Cambria, Georgia, dll.) udah ada lengkap dari pack — langsung dipakai."
+  },
+  "excel": {
+    "title": "Excel · GridCraft",
+    "loading": "Menyiapkan GridCraft…",
+    "openBtn": "Buka di Excel",
+    "thrown": "File nempel di GridCraft — cek jendelanya, hasil Save balik ke file spreadsheet ini.",
+    "openFailed": "Gagal buka otomatis — drag file .xlsx/.csv ke jendela GridCraft, atau klik tombol ini lagi.",
+    "saveAsk": "Excel nyimpen “{name}” — taro balik ke file spreadsheet?",
+    "saveHint": "Excel nyimpen “{name}” — namanya beda dari file yang lagi dibuka, jadi hasil ini gak bisa balik otomatis ke project. Simpen lagi dengan nama file yang sama.",
+    "saveKeep": "Simpen ke file",
+    "saved": "Kesimpen ✓",
+    "discard": "Buang hasil simpanan",
+    "fullPage": "Buka Excel penuh di tab browser",
+    "stale": "File spreadsheet berubah di luar Excel (agen olah data?) — editan Excel yang belum disimpen bakal ilang, sebaiknya Save dulu di Excel sebelum Tarik.",
+    "pull": "Tarik ke Excel"
   },
   "zotero": {
     "title": "Import Zotero",

@@ -48,3 +48,4 @@ data/
 *.db-wal
 *.db-shm
 public/wordcraft/
+public/gridcraft/

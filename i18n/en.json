@@ -273,6 +273,7 @@
     "openExternal": "Open in browser tab",
     "closeTab": "Close tab",
     "newWeb": "Web tab",
+    "newSheet": "New spreadsheet",
     "workspaceFile": "Workspace file",
     "webPage": "Web page",
     "blockedHint": "Many sites (Google, Scholar, etc.) refuse in-frame display — use the ↗ button if blank.",
@@ -341,6 +342,21 @@
     "fontPackFail": "The font pack couldn't be written to browser storage (try a hard refresh). Word still works.",
     "sysFontHint": "Want your Windows fonts (Calibri, Segoe UI, etc.) too? In WordCraft: open the Fonts menu → \"Load system fonts\" (Chrome/Edge), once is enough.",
     "sysFontHintNo": "This browser doesn't support \"Load system fonts\" (Chrome/Edge only). Standard Word fonts (Calibri, Times New Roman, Arial, Cambria, Georgia, etc.) already come with the pack — ready to use."
+  },
+  "excel": {
+    "title": "Excel · GridCraft",
+    "loading": "Setting up GridCraft…",
+    "openBtn": "Open in Excel",
+    "thrown": "File landed in GridCraft — check the window; Save flows back into this spreadsheet file.",
+    "openFailed": "Auto-open failed — drop the .xlsx/.csv file into the GridCraft window, or click this button again.",
+    "saveAsk": "Excel is saving “{name}” — put it back into the spreadsheet file?",
+    "saveHint": "Excel is saving “{name}” — the name doesn't match the open file, so it can't flow back automatically. Save again under the same file name.",
+    "saveKeep": "Save to file",
+    "saved": "Saved ✓",
+    "discard": "Discard saved result",
+    "fullPage": "Open full Excel in a browser tab",
+    "stale": "The spreadsheet file changed outside Excel (agent crunching data?) — unsaved Excel edits will be lost; Save in Excel before pulling.",
+    "pull": "Pull into Excel"
   },
   "zotero": {
     "title": "Import Zotero",

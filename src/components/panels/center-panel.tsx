@@ -1,12 +1,13 @@
 'use client';
 
-import { ClipboardList, FilePlus2, Globe, Loader2, PencilRuler, PenLine, Plus, Table2, X, type LucideIcon } from 'lucide-react';
+import { ClipboardList, FilePlus2, FileSpreadsheet, Globe, Loader2, PencilRuler, PenLine, Plus, Table2, X, type LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useT } from '@/lib/preferences';
 import { ThesisEditor } from '@/components/editor/thesis-editor';
 import { WebView } from '@/components/center/web-view';
 import { FileView } from '@/components/center/file-view';
 import { WordTab } from '@/components/center/word-tab';
+import { GridTab } from '@/components/center/excel-tab';
 import { isPreviewBinary } from '@/lib/paths';
 import type { CenterTab } from '@/components/workspace/shell';
 
@@ -36,6 +37,7 @@ export function CenterPanel({
   onNewWeb,
   onWebUrl,
   onNewDocument,
+  onNewSpreadsheet,
   onOpenWord,
   onOpenText,
 }: {
@@ -47,6 +49,7 @@ export function CenterPanel({
   onNewWeb: () => void;
   onWebUrl: (id: string, url: string) => void;
   onNewDocument: (title: string) => Promise<boolean>;
+  onNewSpreadsheet: () => Promise<boolean>;
   onOpenWord: (path: string) => void;
   onOpenText: (path: string) => void;
 }) {
@@ -68,6 +71,7 @@ export function CenterPanel({
             onClose={onClose}
             onNewWeb={onNewWeb}
             onNewDocument={onNewDocument}
+            onNewSpreadsheet={onNewSpreadsheet}
           />
           <div className="flex min-h-0 flex-1 text-foreground">
             {/* Keep-alive Word (fase 8): SEMUA tab Word tetap mounted — iframe
@@ -88,6 +92,17 @@ export function CenterPanel({
                     version={tab.version}
                     onOpenText={onOpenText}
                   />
+                </div>
+              ))}
+            {/* Keep-alive Excel: iframe GridCraft juga gak dibuang pas pindah tab. */}
+            {tabs
+              .filter((tab) => tab.kind === 'grid')
+              .map((tab) => (
+                <div
+                  key={`${tab.id}:${tab.path}`}
+                  className={`h-full min-w-0 flex-1 ${tab.id === activeId ? 'flex' : 'hidden'}`}
+                >
+                  <GridTab key={`${tab.id}:${tab.path}`} slug={slug} path={tab.path} version={tab.version} />
                 </div>
               ))}
             {active?.kind === 'file' &&
@@ -126,6 +141,7 @@ function TabBar({
   onClose,
   onNewWeb,
   onNewDocument,
+  onNewSpreadsheet,
 }: {
   tabs: CenterTab[];
   activeId: string | null;
@@ -133,6 +149,7 @@ function TabBar({
   onClose: (id: string) => void;
   onNewWeb: () => void;
   onNewDocument: (title: string) => Promise<boolean>;
+  onNewSpreadsheet: () => Promise<boolean>;
 }) {
   const t = useT();
 
@@ -170,7 +187,7 @@ function TabBar({
         key={tab.id}
         type="button"
         onClick={() => onActivate(tab.id)}
-        title={tab.kind === 'file' || tab.kind === 'word' ? tab.path : tab.url || undefined}
+        title={tab.kind === 'file' || tab.kind === 'word' || tab.kind === 'grid' ? tab.path : tab.url || undefined}
         className={`group flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-t-lg border-b-2 border-b-transparent px-3 transition-colors ${
           active
             ? 'border-b-primary bg-background text-card-foreground'
@@ -199,6 +216,14 @@ function TabBar({
             <span className="max-w-40 truncate text-xs">{splitName(tab.path).name}</span>
             <span className="shrink-0 rounded bg-amber-100 px-1 text-[9px] font-mono uppercase text-amber-700 dark:bg-amber-950 dark:text-amber-300">
               W
+            </span>
+          </>
+        ) : tab.kind === 'grid' ? (
+          <>
+            <Table2 size={12} className="shrink-0 text-emerald-700" />
+            <span className="max-w-40 truncate text-xs">{splitName(tab.path).name}</span>
+            <span className="shrink-0 rounded bg-emerald-100 px-1 text-[9px] font-mono uppercase text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+              X
             </span>
           </>
         ) : null}
@@ -315,6 +340,14 @@ function TabBar({
                       onNewWeb();
                     }}
                   />
+                  <MenuItem
+                    icon={FileSpreadsheet}
+                    label={t('center.newSheet')}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void onNewSpreadsheet();
+                    }}
+                  />
                   <div className="mx-1 my-1 h-px bg-border" />
                   <MenuItem icon={PencilRuler} label={t('center.itemDrawing')} disabled title={t('center.soon')} />
                   <MenuItem icon={ClipboardList} label={t('center.itemSurvey')} disabled title={t('center.soon')} />
@@ -369,8 +402,8 @@ function FooterBar({
 }) {
   const t = useT();
   let left = '';
-  if (active?.kind === 'file' || active?.kind === 'word') left = active.path;
-  else if (active) left = active.url === '' ? t('center.webPage') : safeHostname(active.url);
+  if (active?.kind === 'file' || active?.kind === 'word' || active?.kind === 'grid') left = active.path;
+  else if (active?.kind === 'web') left = active.url === '' ? t('center.webPage') : safeHostname(active.url);
 
   return (
     <footer className="flex h-7 shrink-0 items-center justify-between gap-3 border-t border-border bg-card px-3 text-[11px] text-muted-foreground">

@@ -15,7 +15,8 @@ import { IconRail, type LeftTab } from '@/components/workspace/icon-rail';
 export type CenterTab =
   | { id: string; kind: 'file'; path: string; version: number }
   | { id: string; kind: 'web'; url: string }
-  | { id: string; kind: 'word'; path: string; version: number };
+  | { id: string; kind: 'word'; path: string; version: number }
+  | { id: string; kind: 'grid'; path: string; version: number };
 
 interface CenterState {
   tabs: CenterTab[];
@@ -54,6 +55,24 @@ function openWordTabState(prev: CenterState, path: string): CenterState {
   return { tabs, activeId: id };
 }
 
+/** Buka file di tab Excel (GridCraft) — pola sama; version naik tiap buka. */
+function openGridTabState(prev: CenterState, path: string): CenterState {
+  const id = `grid:${path}`;
+  const exists = prev.tabs.some((tab) => tab.id === id);
+  const tabs = exists
+    ? prev.tabs.map((tab) =>
+        tab.id === id && tab.kind === 'grid' ? { ...tab, version: tab.version + 1 } : tab,
+      )
+    : [...prev.tabs, { id, kind: 'grid' as const, path, version: 0 }];
+  return { tabs, activeId: id };
+}
+
+/** File spreadsheet (.xlsx/.csv/.tsv)? — client-side versi dari files.ts. */
+function isSpreadsheetPath(path: string): boolean {
+  const ext = path.slice(path.lastIndexOf('.')).toLowerCase();
+  return ext === '.xlsx' || ext === '.csv' || ext === '.tsv';
+}
+
 /** Tutup tab; kalau tab aktif yang ditutup → activate tetangganya (kanan, fallback kiri). */
 function closeTabState(prev: CenterState, id: string): CenterState {
   const closedIndex = prev.tabs.findIndex((tab) => tab.id === id);
@@ -73,8 +92,8 @@ function renameTabState(prev: CenterState, from: string, to: string): CenterStat
   let remapped = false;
   const idMap = new Map<string, string>();
   const tabs = prev.tabs.map((tab) => {
-    if ((tab.kind === 'file' || tab.kind === 'word') && tab.path === from) {
-      const nextId = tab.kind === 'file' ? fileTabId(to) : `word:${to}`;
+    if ((tab.kind === 'file' || tab.kind === 'word' || tab.kind === 'grid') && tab.path === from) {
+      const nextId = tab.kind === 'file' ? fileTabId(to) : `${tab.kind}:${to}`;
       const id = nextId !== tab.id && prev.tabs.some((other) => other.id === nextId) ? tab.id : nextId;
       idMap.set(tab.id, id);
       remapped = true;
@@ -127,6 +146,14 @@ function parseStoredCenterState(value: string | null): CenterState | null {
       tabs.push({
         id: t.id,
         kind: 'word',
+        path: t.path,
+        version: typeof t.version === 'number' && Number.isFinite(t.version) ? t.version : 0,
+      });
+    } else if (t.kind === 'grid' && typeof t.path === 'string' && t.path !== '') {
+      seenIds.add(t.id);
+      tabs.push({
+        id: t.id,
+        kind: 'grid',
         path: t.path,
         version: typeof t.version === 'number' && Number.isFinite(t.version) ? t.version : 0,
       });
@@ -265,15 +292,20 @@ export function WorkspaceShell({
 
   const refreshTree = () => setTreeVersion((v) => v + 1);
 
-  const openFileTab = (path: string) => setCenter((prev) => openFileTabState(prev, path));
+  const openFileTab = (path: string) =>
+    setCenter((prev) => (isSpreadsheetPath(path) ? openGridTabState(prev, path) : openFileTabState(prev, path)));
   const openWordTab = (path: string) => setCenter((prev) => openWordTabState(prev, path));
-  /** Klik dokumen: .md langsung ke tab Word; ekstensi lain tetap tab file biasa.
-   * Juga dipakai listener event `workspace:doc-created` di bawah — dibikin
+  /** Klik dokumen: .md → tab Word; xlsx/csv/tsv → tab Excel; selainnya tab file
+   * biasa. Juga dipakai listener event `workspace:doc-created` di bawah — dibikin
    * stabil (deps kosong, setCenter ref-stabil) biar listener gak re-bind tiap render. */
   const openDocument = useCallback(
     (path: string) =>
       setCenter((prev) =>
-        path.toLowerCase().endsWith('.md') ? openWordTabState(prev, path) : openFileTabState(prev, path),
+        path.toLowerCase().endsWith('.md')
+          ? openWordTabState(prev, path)
+          : isSpreadsheetPath(path)
+            ? openGridTabState(prev, path)
+            : openFileTabState(prev, path),
       ),
     [],
   );
@@ -331,6 +363,22 @@ export function WorkspaceShell({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      handleDocumentCreated(data.document.path);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Spreadsheet baru (dokumen/data.xlsx dari template kosong): tanpa modal,
+  // langsung dibuat lalu dibuka di tab Excel (GridCraft).
+  const createNewSpreadsheet = async (): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/spreadsheets`, {
+        method: 'POST',
       });
       if (!res.ok) return false;
       const data = await res.json();
@@ -442,6 +490,7 @@ export function WorkspaceShell({
               onNewWeb={newWebTab}
               onWebUrl={setWebUrl}
               onNewDocument={createDocumentFromTitle}
+              onNewSpreadsheet={createNewSpreadsheet}
               onOpenWord={openWordTab}
               onOpenText={openFileTab}
             />

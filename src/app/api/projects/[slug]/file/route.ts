@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
-import { WorkspaceError, deleteFile, readTextFile, writeTextFile } from '@/lib/workspace/files';
+import { WorkspaceError, deleteFile, readTextFile, writeBinaryFile, writeTextFile } from '@/lib/workspace/files';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +36,9 @@ export async function GET(
 
 const putSchema = z.object({
   path: z.string().min(1).max(500),
-  content: z.string().max(2 * 1024 * 1024),
+  content: z.string().max(14 * 1024 * 1024),
+  // 'base64' = tulis binary (xlsx/csv/tsv dari tab Excel); default = teks.
+  encoding: z.enum(['text', 'base64']).optional(),
 });
 
 export async function PUT(
@@ -57,7 +59,10 @@ export async function PUT(
     }
 
     try {
-      const { mtime } = await writeTextFile(folder, parsed.data.path, parsed.data.content);
+      const mtime =
+        parsed.data.encoding === 'base64'
+          ? (await writeBinaryFile(folder, parsed.data.path, parsed.data.content)).mtime
+          : (await writeTextFile(folder, parsed.data.path, parsed.data.content)).mtime;
       return NextResponse.json({ mtime });
     } catch (error) {
       return workspaceError(error, 'Gagal menulis file');

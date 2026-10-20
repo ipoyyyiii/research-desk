@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { EMPTY_WORKBOOK_BASE64 } from '@/lib/gridcraft/empty-workbook';
 
 // ── Guard & resolusi file dalam folder project ───────────────────────────────
 // Base project FOLDER sudah di-verifikasi realpath saat attach (paths.ts),
@@ -17,10 +18,16 @@ const SKIP_DIRS = new Set(['.opencode', 'node_modules', '.git']);
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB batas file teks editor
 const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.json', '.jsonc', '.csv', '.ris', '.bib', '.tex']);
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+/** Tipe yang buka di GridCraft (tab Excel). */
+export const SPREADSHEET_EXTENSIONS = new Set(['.xlsx', '.csv', '.tsv']);
 export const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
 
 export function isImageFile(name: string): boolean {
   return IMAGE_EXTENSIONS.has(path.extname(name).toLowerCase());
+}
+
+export function isSpreadsheetFile(name: string): boolean {
+  return SPREADSHEET_EXTENSIONS.has(path.extname(name).toLowerCase());
 }
 
 const FILE_MIME: Record<string, string> = {
@@ -35,6 +42,8 @@ const FILE_MIME: Record<string, string> = {
   '.json': 'application/json',
   '.jsonc': 'application/json',
   '.csv': 'text/csv; charset=utf-8',
+  '.tsv': 'text/tab-separated-values; charset=utf-8',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.bib': 'text/plain; charset=utf-8',
   '.ris': 'text/plain; charset=utf-8',
   '.tex': 'text/plain; charset=utf-8',
@@ -163,8 +172,7 @@ export async function readTextFile(baseReal: string, relative: string): Promise<
 }
 
 /** Tulis file teks (autosave dari editor / manual ⌘S). */
-export async function writeTextFile(baseReal: string, relative: string, content: string): Promise<{ mtime: number }> {
-  const abs = safeResolve(baseReal, relative);
+export async function writeTextFile(baseReal: string, relative: string, content: string): Promise<{ mtime: number }> {  const abs = safeResolve(baseReal, relative);
   if (path.extname(abs).toLowerCase() !== '.md') throw new WorkspaceError('UNSUPPORTED_TYPE');
 
   const parent = path.dirname(abs);
@@ -183,6 +191,37 @@ export async function writeTextFile(baseReal: string, relative: string, content:
   }
 
   await fsp.writeFile(abs, content, 'utf8');
+  return { mtime: (await fsp.stat(abs)).mtimeMs };
+}
+
+/** Tulis file binary spreadsheet (xlsx/csv/tsv) dari tab Excel — payload base64. */
+export async function writeBinaryFile(
+  baseReal: string,
+  relative: string,
+  base64: string,
+): Promise<{ mtime: number }> {
+  const abs = safeResolve(baseReal, relative);
+  if (!SPREADSHEET_EXTENSIONS.has(path.extname(abs).toLowerCase())) {
+    throw new WorkspaceError('UNSUPPORTED_TYPE');
+  }
+  const buffer = Buffer.from(base64, 'base64');
+  if (buffer.byteLength > MAX_UPLOAD_SIZE) throw new WorkspaceError('FILE_TOO_BIG');
+
+  const parent = path.dirname(abs);
+  fs.mkdirSync(parent, { recursive: true });
+  const parentReal = fs.realpathSync(parent);
+  if (parentReal !== baseReal && !parentReal.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+
+  try {
+    const targetStat = fs.lstatSync(abs);
+    if (targetStat.isSymbolicLink()) throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+
+  await fsp.writeFile(abs, buffer);
   return { mtime: (await fsp.stat(abs)).mtimeMs };
 }
 
@@ -241,4 +280,26 @@ export async function createDocument(baseReal: string, title: string): Promise<{
   await fsp.writeFile(path.join(baseReal, finalRel), content, 'utf8');
 
   return { path: finalRel, name: fileName };
+}
+
+/** Buat spreadsheet baru di dokumen/ dari template workbook kosong;
+ * file existing gak disentuh — nama bentrok dapat suffix -2/-3 dst. */
+export async function createSpreadsheet(baseReal: string, baseName = 'data'): Promise<{ path: string; name: string }> {
+  const dokumenDir = path.join(baseReal, 'dokumen');
+  fs.mkdirSync(dokumenDir, { recursive: true });
+  const parentReal = fs.realpathSync(dokumenDir);
+  if (parentReal !== baseReal && !parentReal.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+
+  let n = 1;
+  let finalRel = 'dokumen/data.xlsx';
+  while (fs.existsSync(path.join(baseReal, finalRel))) {
+    n += 1;
+    finalRel = `dokumen/${baseName}-${n}.xlsx`;
+  }
+
+  const bytes = Buffer.from(EMPTY_WORKBOOK_BASE64, 'base64');
+  await fsp.writeFile(path.join(baseReal, finalRel), bytes);
+  return { path: finalRel, name: path.basename(finalRel) };
 }
