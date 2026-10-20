@@ -337,6 +337,7 @@
     "pull": "Tarik ke Word",
     "fontPack": "Menyiapkan font lengkap (Word & Google Docs)…",
     "fontPackDone": "Ditambah {n} font ke WordCraft — Word, Google Docs, dan metric Word-nya siap.",
+    "fontPackDoneCleaned": "Ditambah {n} font dan dibersihkan {m} font lama — list WordCraft sekarang rapi seperti Word.",
     "fontPackFail": "Pack font gak bisa ditanam ke penyimpanan browser (coba hard refresh). Word tetep jalan.",
     "sysFontHint": "Mau font bawaan Windows (Calibri, Segoe UI, dll.) ikut kebaca? Di WordCraft: buka menu Fonts → \"Load system fonts\" (Chrome/Edge), cukup sekali.",
     "sysFontHintNo": "Browser ini belum support \"Load system fonts\" (khusus Chrome/Edge). Font standar Word (Calibri, Times New Roman, Arial, Cambria, Georgia, dll.) udah ada lengkap dari pack — langsung dipakai."

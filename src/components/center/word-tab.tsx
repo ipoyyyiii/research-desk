@@ -120,8 +120,15 @@ export function WordTab({
       .then((res) => {
         if (!alive) return;
         if (res?.fail) setSeedNote(tRef.current('word.fontPackFail'));
-        else if (res && res.added > 0) {
-          setSeedNote(tRef.current('word.fontPackDone').replace('{n}', String(res.added)));
+        else if (res && (res.added > 0 || res.pruned > 0)) {
+          const msg =
+            res.pruned > 0
+              ? tRef
+                  .current('word.fontPackDoneCleaned')
+                  .replace('{n}', String(res.added))
+                  .replace('{m}', String(res.pruned))
+              : tRef.current('word.fontPackDone').replace('{n}', String(res.added));
+          setSeedNote(msg);
           window.setTimeout(() => setSeedNote(null), 8000);
         }
       })

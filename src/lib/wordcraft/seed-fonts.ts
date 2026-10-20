@@ -7,15 +7,24 @@
  * WordCraft membaca SEMUA entry di store setiap boot (load_all), jadi font
  * yang ditanam langsung masuk daftar Font di dalam Word. Gagal apa pun
  * di-log lalu dilewati: seeder tidak pernah membuat tab Word macet.
+ *
+ * Migrasi versi: manifest selalu di-fetch (manifestnya kecil) dan dibandingkan
+ * dengan flag versi terakhir yang ditanam → kalau server punya versi lebih
+ * baru, yang kurang ditambah dan yang sudah dihapus dari manifest dibersihkan
+ * dari DB (hanya entry yang TERBUKTI dulu berasal dari pack — yang ada di
+ * cache manifest sebelumnya — supaya font yang di-upload manual user via
+ * "Add Font…" di dalam WordCraft tidak ikut terhapus).
  */
 export type FontPackEntry = { file: string; bytes: number; family: string; group: string };
 export type FontPack = { version: number; generated: string; fonts: FontPackEntry[] };
-export type SeedResult = { added: number; skipped: number; total: number; fail?: boolean };
+export type SeedResult = { added: number; skipped: number; pruned: number; total: number; fail?: boolean };
 
 const DB_NAME = 'wordcraft';
 const STORE = 'fonts';
-const FLAG_PREFIX = 'rd.wordcraft.fontpack.v';
+const FLAG = 'rd.wordcraft.fontpack.seeded';
 const MANIFEST_CACHE = 'rd.wordcraft.manifest';
+// Flag versi lama (per-versi) — dibaca cuma buat fallback siklus first-run lama.
+const LEGACY_FLAG_PREFIX = 'rd.wordcraft.fontpack.v';
 
 /** Buka DB tanpa memaksa versi (DB-nya milik app; store dibuat kalau belum ada). */
 function openDb(): Promise<IDBDatabase> {
@@ -49,102 +58,150 @@ function putFont(db: IDBDatabase, key: string, bytes: Uint8Array): Promise<void>
   });
 }
 
-/** Seeding penuh; null = dilewati (cache terkini, server kosong, atau IDB gagal). */
+function deleteFont(db: IDBDatabase, key: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error('idb delete failed'));
+    tx.onabort = () => reject(tx.error ?? new Error('idb aborted'));
+  });
+}
+
+function readCachedPack(): FontPack | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(MANIFEST_CACHE);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as FontPack;
+    return cached && cached.version && Array.isArray(cached.fonts) ? cached : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Seeding penuh; null = dilewati (cache terkini & tersinkron, server kosong, atau IDB gagal). */
 export async function seedWordcraftFonts(): Promise<SeedResult | null> {
   if (typeof indexedDB === 'undefined') return null;
 
-  // Cepat: pack versi ini sudah ditanam → aman skip (flag dihapus bareng site data,
-  // jadi kalau user bersihin storage, flag juga hilang → seeding jalan lagi).
-  const manifestRaw =
-    typeof localStorage !== 'undefined' ? localStorage.getItem(MANIFEST_CACHE) : null;
-  if (manifestRaw && typeof localStorage !== 'undefined') {
-    try {
-      const cached = JSON.parse(manifestRaw) as FontPack;
-      if (cached.version && localStorage.getItem(FLAG_PREFIX + cached.version) === '1') {
-        // Tetap pastikan DB masih ada font-nya (kalau cache site dibersihkan
-        // sebagian, seeding ulang murah — fetch manifest baru).
-        const db = await openDb();
-        try {
-          const keys = await getKeys(db);
-          if (cached.fonts.every((f: FontPackEntry) => keys.has(f.file))) return null;
-        } finally {
-          db.close();
-        }
-      }
-    } catch {
-      // manifest cache rusak → lanjut fetch ulang
-    }
-  }
-
-  // 1. Manifest dari server
+  // 1. Manifest dari server — selalu, karena biaya kecil dan ini kunci
+  //    migrasi versi (flag lama dulu bikin pack baru gak pernah kecontek).
   let pack: FontPack;
   try {
     const res = await fetch('/api/wordcraft/fonts/pack', { cache: 'no-store' });
-    if (!res.ok) return { added: 0, skipped: 0, total: 0, fail: true };
+    if (!res.ok) return { added: 0, skipped: 0, pruned: 0, total: 0, fail: true };
     pack = (await res.json()) as FontPack;
-    if (!pack || !Array.isArray(pack.fonts) || pack.fonts.length === 0) return { added: 0, skipped: 0, total: 0, fail: true };
+    if (!pack || !Array.isArray(pack.fonts) || pack.fonts.length === 0) {
+      return { added: 0, skipped: 0, pruned: 0, total: 0, fail: true };
+    }
   } catch {
-    return { added: 0, skipped: 0, total: 0, fail: true };
+    return { added: 0, skipped: 0, pruned: 0, total: 0, fail: true };
   }
 
-  // 2. Kunci yang sudah ada di DB
+  const seededVersion =
+    typeof localStorage !== 'undefined'
+      ? (() => {
+          const v = localStorage.getItem(FLAG);
+          if (v) return Number(v);
+          // Fallback siklus lama: flag per-versi. Versi muncul berurutan,
+          // jadi cukup manakah versi tersubut yang pernah ke-tandai — flag
+          // v1/v2 berarti versi pack dulu sudah ditanam ke DB.
+          let seeded = false;
+          try {
+            for (let i = 0; i < pack.version; i++) {
+              if (localStorage.getItem(LEGACY_FLAG_PREFIX + i) === '1') seeded = true;
+            }
+          } catch {
+            /* abaikan */
+          }
+          return seeded ? pack.version - 1 : -1;
+        })()
+      : -1;
+
+  // 2. Kunci DB + hitung yang kurang & yang sudah usang.
   let db: IDBDatabase;
   try {
     db = await openDb();
   } catch (e) {
     console.warn('[wordcraft-fonts] IndexedDB gagal dibuka:', e);
-    return { added: 0, skipped: 0, total: 0, fail: true };
+    return { added: 0, skipped: 0, pruned: 0, total: 0, fail: true };
   }
-  let missing: FontPackEntry[];
+
+  let keys: Set<string>;
   try {
-    const keys = await getKeys(db);
-    missing = pack.fonts.filter((f) => !keys.has(f.file));
+    keys = await getKeys(db);
   } catch (e) {
     console.warn('[wordcraft-fonts] gagal baca keys:', e);
     db.close();
-    return { added: 0, skipped: 0, total: 0, fail: true };
+    return { added: 0, skipped: 0, pruned: 0, total: 0, fail: true };
   }
 
-  // 3. Tanam yang kurang: fetch bytes → put. Batch kecil biar jaringan rapi.
-  let added = 0;
-  let skipped = 0;
-  const BATCH = 8;
-  const okFlag =
-    typeof localStorage !== 'undefined' &&
-    localStorage.getItem(FLAG_PREFIX + pack.version) === '1';
-  if (okFlag && missing.length === 0) {
+  const packFiles = new Set(pack.fonts.map((f: FontPackEntry) => f.file));
+  const missing = pack.fonts.filter((f: FontPackEntry) => !keys.has(f.file));
+
+  // 3. Bersih-bersih usang: hanya key yang TERBUKTI dulu berasal dari pack
+  //    (cepat-cache manifest sebelumnya), supaya upload-manual user gak terhapus.
+  const stale: string[] = [];
+  const cached = readCachedPack();
+  if (cached) {
+    const prevFiles = new Set(cached.fonts.map((f: FontPackEntry) => f.file));
+    for (const k of keys) {
+      if (!packFiles.has(k) && prevFiles.has(k)) stale.push(k);
+    }
+  }
+
+  const fastPathVersionOk = seededVersion === pack.version;
+  if (fastPathVersionOk && missing.length === 0 && stale.length === 0) {
     db.close();
     return null;
   }
-  for (let i = 0; i < missing.length; i += BATCH) {
-    const batch = missing.slice(i, i + BATCH);
-    await Promise.all(
-      batch.map(async (f) => {
-        try {
-          const res = await fetch(`/api/wordcraft/fonts/file/${encodeURIComponent(f.file)}`, {
-            cache: 'force-cache',
-          });
-          if (!res.ok) throw new Error(`fetch ${res.status}`);
-          const bytes = new Uint8Array(await res.arrayBuffer());
-          await putFont(db, f.file, bytes);
-          added++;
-        } catch (e) {
-          skipped++;
-          console.warn(`[wordcraft-fonts] lewati ${f.file}:`, e);
-        }
-      }),
-    );
+
+  // 4. Tanam yang kurang: fetch bytes → put. Batch kecil biar jaringan rapi.
+  let added = 0;
+  let skipped = 0;
+  if (missing.length > 0) {
+    const BATCH = 8;
+    for (let i = 0; i < missing.length; i += BATCH) {
+      const batch = missing.slice(i, i + BATCH);
+      await Promise.all(
+        batch.map(async (f) => {
+          try {
+            const res = await fetch(`/api/wordcraft/fonts/file/${encodeURIComponent(f.file)}`, {
+              cache: 'force-cache',
+            });
+            if (!res.ok) throw new Error(`fetch ${res.status}`);
+            const bytes = new Uint8Array(await res.arrayBuffer());
+            await putFont(db, f.file, bytes);
+            added++;
+          } catch (e) {
+            skipped++;
+            console.warn(`[wordcraft-fonts] lewati ${f.file}:`, e);
+          }
+        }),
+      );
+    }
+  }
+
+  // 5. Hapus paket lama yang sudah digantikan.
+  let pruned = 0;
+  for (const key of stale) {
+    try {
+      await deleteFont(db, key);
+      pruned++;
+    } catch (e) {
+      console.warn(`[wordcraft-fonts] gak bisa hapus ${key}:`, e);
+    }
   }
   db.close();
 
-  // 4. Simpan manifest di cache + tandai versi ditanam.
+  // 6. Simpan manifest baru + tandai versi ter-tanam.
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(MANIFEST_CACHE, JSON.stringify(pack));
-      localStorage.setItem(FLAG_PREFIX + pack.version, '1');
+      localStorage.setItem(FLAG, String(pack.version));
     }
   } catch {
     // quota penuh → tak apa; seeding tetap sudah jalan di DB
   }
-  return { added, skipped, total: pack.fonts.length };
+  return { added, skipped, pruned, total: pack.fonts.length };
 }
