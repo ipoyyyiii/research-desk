@@ -10,7 +10,7 @@
  */
 export type FontPackEntry = { file: string; bytes: number; family: string; group: string };
 export type FontPack = { version: number; generated: string; fonts: FontPackEntry[] };
-export type SeedResult = { added: number; skipped: number; total: number };
+export type SeedResult = { added: number; skipped: number; total: number; fail?: boolean };
 
 const DB_NAME = 'wordcraft';
 const STORE = 'fonts';
@@ -80,11 +80,11 @@ export async function seedWordcraftFonts(): Promise<SeedResult | null> {
   let pack: FontPack;
   try {
     const res = await fetch('/api/wordcraft/fonts/pack', { cache: 'no-store' });
-    if (!res.ok) return null;
+    if (!res.ok) return { added: 0, skipped: 0, total: 0, fail: true };
     pack = (await res.json()) as FontPack;
-    if (!pack || !Array.isArray(pack.fonts) || pack.fonts.length === 0) return null;
+    if (!pack || !Array.isArray(pack.fonts) || pack.fonts.length === 0) return { added: 0, skipped: 0, total: 0, fail: true };
   } catch {
-    return null;
+    return { added: 0, skipped: 0, total: 0, fail: true };
   }
 
   // 2. Kunci yang sudah ada di DB
@@ -93,7 +93,7 @@ export async function seedWordcraftFonts(): Promise<SeedResult | null> {
     db = await openDb();
   } catch (e) {
     console.warn('[wordcraft-fonts] IndexedDB gagal dibuka:', e);
-    return null;
+    return { added: 0, skipped: 0, total: 0, fail: true };
   }
   let missing: FontPackEntry[];
   try {
@@ -102,7 +102,7 @@ export async function seedWordcraftFonts(): Promise<SeedResult | null> {
   } catch (e) {
     console.warn('[wordcraft-fonts] gagal baca keys:', e);
     db.close();
-    return null;
+    return { added: 0, skipped: 0, total: 0, fail: true };
   }
 
   // 3. Tanam yang kurang: fetch bytes → put. Batch kecil biar jaringan rapi.

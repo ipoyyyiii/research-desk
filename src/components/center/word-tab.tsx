@@ -110,12 +110,27 @@ export function WordTab({
   // IndexedDB `wordcraft` SEBELUM iframe Word dibuat - WordCraft membaca
   // seluruh store saat boot, jadi langsum masuk ke daftar Font di Word.
   const [fontsReady, setFontsReady] = useState(false);
+  const [seedNote, setSeedNote] = useState<string | null>(null);
+  const tRef = useRef(t);
+  tRef.current = t;
   useEffect(() => {
     let alive = true;
     const deadline = new Promise<void>((resolve) => window.setTimeout(resolve, 15000));
-    Promise.race([seedWordcraftFonts().catch(() => undefined), deadline]).finally(() => {
-      if (alive) setFontsReady(true);
-    });
+    seedWordcraftFonts()
+      .then((res) => {
+        if (!alive) return;
+        if (res?.fail) setSeedNote(tRef.current('word.fontPackFail'));
+        else if (res && res.added > 0) {
+          setSeedNote(tRef.current('word.fontPackDone').replace('{n}', String(res.added)));
+          window.setTimeout(() => setSeedNote(null), 8000);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (alive) setFontsReady(true);
+      });
+    // Deadline tetap jalan independen: app buka walau seeding nyangkut.
+    void deadline.then(() => alive && setFontsReady(true));
     return () => {
       alive = false;
     };
@@ -335,6 +350,21 @@ export function WordTab({
             type="button"
             aria-label={t('word.discard')}
             onClick={dismissHint}
+            className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
+      {/* Hasil seeding font: ditambah N font / gagal */}
+      {seedNote && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-2 py-1">
+          <span className="min-w-0 flex-1 text-[11px] text-muted-foreground">{seedNote}</span>
+          <button
+            type="button"
+            aria-label={t('word.discard')}
+            onClick={() => setSeedNote(null)}
             className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <X size={12} />

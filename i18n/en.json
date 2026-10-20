@@ -336,6 +336,8 @@
     "stale": "The chapter changed outside Word (agent wrote?) — unsaved Word edits will be lost; save in Word first before pulling.",
     "pull": "Pull into Word",
     "fontPack": "Preparing the full font set (Word & Google Docs)…",
+    "fontPackDone": "Added {n} fonts to WordCraft — Word, Google Docs, and Word metric fonts are ready.",
+    "fontPackFail": "The font pack couldn't be written to browser storage (try a hard refresh). Word still works.",
     "sysFontHint": "Want your Windows fonts (Calibri, Segoe UI, etc.) too? In WordCraft: open the Fonts menu → \"Load system fonts\" (Chrome/Edge), once is enough."
   },
   "zotero": {
