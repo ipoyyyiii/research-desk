@@ -248,10 +248,13 @@ export function WordTab({
   const nameMatches = pending !== null && pending.name === fileName;
 
   // Hint sekali-soal "Load system fonts" (font bawaan Windows) — dismissable.
-  const [sysHint, setSysHint] = useState(false);
+  // 'yes' = browser punya queryLocalFonts (Chrome/Edge), 'no' = tidak punya (Firefox/Safari).
+  const [sysHint, setSysHint] = useState<'yes' | 'no' | false>(false);
   useEffect(() => {
     try {
-      if (localStorage.getItem('rd.wordcraft.sysHint.ack') !== '1') setSysHint(true);
+      if (localStorage.getItem('rd.wordcraft.sysHint.ack') === '1') return;
+      const supportsLocalFonts = typeof (window as { queryLocalFonts?: unknown }).queryLocalFonts === 'function';
+      setSysHint(supportsLocalFonts ? 'yes' : 'no');
     } catch {
       /* storage penuh/tidak tersedia → tampil sekali per visit */
     }
@@ -345,7 +348,9 @@ export function WordTab({
       {/* Hint sekali: font bawaan Windows via "Load system fonts" */}
       {sysHint && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-2 py-1">
-          <span className="min-w-0 flex-1 text-[11px] text-muted-foreground">{t('word.sysFontHint')}</span>
+          <span className="min-w-0 flex-1 text-[11px] text-muted-foreground">
+            {t(sysHint === 'yes' ? 'word.sysFontHint' : 'word.sysFontHintNo')}
+          </span>
           <button
             type="button"
             aria-label={t('word.discard')}

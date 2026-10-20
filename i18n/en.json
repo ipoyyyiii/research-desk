@@ -338,7 +338,8 @@
     "fontPack": "Preparing the full font set (Word & Google Docs)…",
     "fontPackDone": "Added {n} fonts to WordCraft — Word, Google Docs, and Word metric fonts are ready.",
     "fontPackFail": "The font pack couldn't be written to browser storage (try a hard refresh). Word still works.",
-    "sysFontHint": "Want your Windows fonts (Calibri, Segoe UI, etc.) too? In WordCraft: open the Fonts menu → \"Load system fonts\" (Chrome/Edge), once is enough."
+    "sysFontHint": "Want your Windows fonts (Calibri, Segoe UI, etc.) too? In WordCraft: open the Fonts menu → \"Load system fonts\" (Chrome/Edge), once is enough.",
+    "sysFontHintNo": "This browser doesn't support \"Load system fonts\" (Chrome/Edge only). Standard Word fonts (Calibri, Times New Roman, Arial, Cambria, Georgia, etc.) already come with the pack — ready to use."
   },
   "zotero": {
     "title": "Import Zotero",
