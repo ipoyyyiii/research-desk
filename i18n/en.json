@@ -16,7 +16,24 @@
   },
   "tree": {
     "deleteConfirm": "Delete file \"{name}\"?",
-    "fase3Hint": "This file opens later in phase 3 (viewer/PDF)."
+    "fase3Hint": "This file opens later in phase 3 (viewer/PDF).",
+    "newFile": "New file…",
+    "newFolder": "New folder…",
+    "newSheet": "New spreadsheet",
+    "nameFileTitle": "New file",
+    "nameFolderTitle": "New folder",
+    "nameFileLabel": "File name — any format",
+    "nameFolderLabel": "Folder name",
+    "fileNamePh": "e.g. analysis-script.py / notes.txt",
+    "folderNamePh": "e.g. chapter-2",
+    "nameParentHint": "Saved into: {dir}",
+    "rootName": "project root",
+    "createErr": "Couldn't create — try again.",
+    "created": "Created: {name}",
+    "remove": "Delete",
+    "removeFolder": "Delete folder",
+    "deleteFolderConfirm": "Delete folder “{name}” with everything inside ({n} files)?",
+    "deleteErr": "Delete failed — try again."
   },
   "editor": {
     "noFile": "No document open",

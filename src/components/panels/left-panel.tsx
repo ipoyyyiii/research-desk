@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, FilePlus2, FileSpreadsheet, FileText, Folder, FolderOpen, FolderPlus, Plus, Search, X, type LucideIcon } from 'lucide-react';
 import { useT } from '@/lib/preferences';
-import { Modal } from '@/components/ui';
-import { requestNewDocument } from '@/components/panels/new-doc-modal';
+import { Modal, TextInput } from '@/components/ui';
+import { DOC_CREATED_EVENT, requestNewDocument } from '@/components/panels/new-doc-modal';
 import { JournalPanel } from '@/components/panels/journal-panel';
 import { OutlineView } from '@/components/panels/outline-view';
 import { LibraryPanel } from '@/components/panels/library-panel';
@@ -156,6 +156,55 @@ export function LeftPanel({
   const [mutating, setMutating] = useState(false);
   /** Catatan hasil aksi (error move/upload / jumlah file masuk). */
   const [note, setNote] = useState<EmptyStateNote | null>(null);
+  // ── File manager: menu + header, naming modal, menu klik-kanan tree ─────────
+  const [plusOpen, setPlusOpen] = useState(false);
+  /** Modal penamaan node baru: kind + folder induk relatif ('' = root). */
+  const [nodeNaming, setNodeNaming] = useState<{ kind: 'file' | 'folder'; parent: string } | null>(null);
+  const [nodeName, setNodeName] = useState('');
+  const [creatingNode, setCreatingNode] = useState(false);
+  const [createNodeErr, setCreateNodeErr] = useState<string | null>(null);
+  /** Menu klik-kanan: posisi + node sumber (null = area kosong/root). */
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; node: TreeEntry | null } | null>(null);
+
+  // Menu klik-kanan & + tutup saat klik di luar / tekan Escape.
+  useEffect(() => {
+    if (!ctxMenu && !plusOpen) return;
+    const close = () => {
+      setCtxMenu(null);
+      setPlusOpen(false);
+    };
+    window.addEventListener('click', close);
+    window.addEventListener('blur', close);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('blur', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [ctxMenu, plusOpen]);
+
+  /** Spreadsheet baru dari menu + tree: POST → tree refresh + buka tab Excel. */
+  const requestNewSpreadsheet = async () => {
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/spreadsheets`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        setNote({ text: t('tree.createErr'), tone: 'error' });
+        return;
+      }
+      const data = (await res.json()) as { document?: { path?: string } };
+      window.dispatchEvent(new CustomEvent('workspace:tree-refresh'));
+      if (data.document?.path) {
+        window.dispatchEvent(new CustomEvent(DOC_CREATED_EVENT, { detail: { path: data.document.path } }));
+      }
+    } catch {
+      setNote({ text: t('tree.createErr'), tone: 'error' });
+    }
+  };
 
   // Klik chip sitasi di editor (fase 6) → lompat ke tab Jurnal + mode Tersimpan.
   // Dipasang di sini karena journalMode = state internal panel ini; switch tab
@@ -191,6 +240,10 @@ export function LeftPanel({
     : entries;
   const nodes = buildTree(filteredEntries);
 
+  /** Jumlah file langsung di dalam folder (buat teks konfirmasi hapus folder). */
+  const fileCountIn = (folderPath: string) =>
+    entries.filter((entry) => entry.type === 'file' && entry.path.startsWith(`${folderPath}/`)).length;
+
   const chipCount = (count: number) => t('lib.fileCount', { n: count });
 
   /** PDF unduhan jurnal di referensi/ — tampil juga sebagai section di tab Jurnal. */
@@ -209,14 +262,57 @@ export function LeftPanel({
     if (!pendingDelete) return;
     setDeleting(true);
     try {
-      const res = await fetch(
-        `/api/projects/${encodeURIComponent(slug)}/file?path=${encodeURIComponent(pendingDelete.path)}`,
-        { method: 'DELETE' },
-      );
-      if (res.ok) onFileDeleted(openFile === pendingDelete.path);
+      const url =
+        pendingDelete.type === 'dir'
+          ? `/api/projects/${encodeURIComponent(slug)}/folders?path=${encodeURIComponent(pendingDelete.path)}`
+          : `/api/projects/${encodeURIComponent(slug)}/file?path=${encodeURIComponent(pendingDelete.path)}`;
+      const res = await fetch(url, { method: 'DELETE' });
+      if (res.ok) {
+        window.dispatchEvent(new CustomEvent('workspace:tree-refresh'));
+        if (pendingDelete.type === 'file') onFileDeleted(openFile === pendingDelete.path);
+      } else {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setNote({ text: data?.error ?? t('tree.deleteErr'), tone: 'error' });
+      }
     } finally {
       setDeleting(false);
       setPendingDelete(null);
+    }
+  };
+
+  /** File/folder baru via modal naming — endpoint beda per jenis. */
+  const submitNewNode = async () => {
+    if (!nodeNaming || creatingNode) return;
+    const name = nodeName.trim();
+    if (name.length === 0) return;
+    setCreatingNode(true);
+    setCreateNodeErr(null);
+    try {
+      const endpoint = nodeNaming.kind === 'folder' ? 'folders' : 'files';
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent: nodeNaming.parent, name }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setCreateNodeErr(data?.error ?? t('tree.createErr'));
+        return;
+      }
+      const data = (await res.json()) as { folder?: { path: string }; file?: { path: string } };
+      const createdPath = data.folder?.path ?? data.file?.path;
+      if (nodeNaming.parent) {
+        // Auto-expand folder induk biar yang baru kebuat kelihatan.
+        setExpanded((prev) => new Set(prev).add(nodeNaming.parent));
+      }
+      window.dispatchEvent(new CustomEvent('workspace:tree-refresh'));
+      setNodeNaming(null);
+      setNodeName('');
+      if (createdPath) setNote({ text: t('tree.created', { name: createdPath }), tone: 'ok' });
+    } catch {
+      setCreateNodeErr(t('tree.createErr'));
+    } finally {
+      setCreatingNode(false);
     }
   };
 
@@ -316,6 +412,12 @@ export function LeftPanel({
         <li key={node.path}>
           <button
             onClick={() => toggleExpand(node.path)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setPlusOpen(false);
+              setCtxMenu({ x: event.clientX, y: event.clientY, node });
+            }}
             onDragEnter={(event) => {
               const next = event.relatedTarget as Node | null;
               if (next && event.currentTarget.contains(next)) return;
@@ -349,7 +451,7 @@ export function LeftPanel({
               const files = Array.from(event.dataTransfer.files ?? []);
               if (files.length > 0) void uploadToFolderPath(node.path, files);
             }}
-            className={`flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               dropTarget ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted'
             }`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -365,6 +467,22 @@ export function LeftPanel({
               <Folder size={13} className="shrink-0 text-muted-foreground" />
             )}
             <span className="truncate">{node.name}</span>
+            <span className="ml-auto flex shrink-0 items-center gap-1">
+              {/* X hover folder — hapus folder + isinya (modal konfirmasi sama). */}
+              <span
+                role="button"
+                tabIndex={-1}
+                aria-label={t('tree.removeFolder')}
+                title={t('tree.removeFolder')}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setPendingDelete(node);
+                }}
+                className="hidden shrink-0 cursor-pointer text-muted-foreground transition-colors hover:text-destructive group-hover:inline-flex"
+              >
+                <X size={12} />
+              </span>
+            </span>
           </button>
           {isOpen && node.children.map((child) => renderNode(child, depth + 1))}
         </li>
@@ -380,6 +498,12 @@ export function LeftPanel({
       >
         <button
           onClick={() => openable && onOpenFile(node.path)}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setPlusOpen(false);
+            setCtxMenu({ x: event.clientX, y: event.clientY, node });
+          }}
           // Drag sumber: path file dibawa via typed dataTransfer (blok agent
           // & move antar folder pakai tipe yang sama), marker move biar UI drop jelas.
           draggable
@@ -553,15 +677,53 @@ export function LeftPanel({
                   className="h-8 w-full rounded-md border border-border bg-background pl-7 pr-2 text-xs text-foreground transition-colors placeholder:text-muted-foreground"
                 />
               </div>
-              <button
-                type="button"
-                onClick={requestNewDocument}
-                aria-label={t('common.newDocument')}
-                title={t('common.newDocument')}
-                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors [transition-property:color,background-color] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Plus size={16} />
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation(); // jangan langsung ketutup listener click global
+                    setPlusOpen((v) => !v);
+                  }}
+                  aria-label={t('common.create')}
+                  title={t('common.create')}
+                  aria-haspopup="menu"
+                  className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors [transition-property:color,background-color] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Plus size={16} />
+                </button>
+                {plusOpen && (
+                  <div
+                    role="menu"
+                    onClick={(event) => event.stopPropagation()}
+                    className="absolute right-0 top-10 z-50 w-48 rounded-lg border border-border bg-card p-1 shadow-lg"
+                  >
+                    <MenuItem
+                      icon={FilePlus2}
+                      label={t('tree.newFile')}
+                      onClick={() => {
+                        setPlusOpen(false);
+                        setNodeName('');
+                        setCreateNodeErr(null);
+                        setNodeNaming({ kind: 'file', parent: '' });
+                      }}
+                    />
+                    <MenuItem
+                      icon={FolderPlus}
+                      label={t('tree.newFolder')}
+                      onClick={() => {
+                        setPlusOpen(false);
+                        setNodeName('');
+                        setCreateNodeErr(null);
+                        setNodeNaming({ kind: 'folder', parent: '' });
+                      }}
+                    />
+                    <div className="mx-1 my-1 h-px bg-border" />
+                    <MenuItem icon={FileText} label={t('common.newDocument')} onClick={requestNewDocument} />
+                    <MenuItem icon={FileSpreadsheet} label={t('tree.newSheet')} onClick={requestNewSpreadsheet} />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           {note && (
@@ -576,6 +738,11 @@ export function LeftPanel({
           )}
           <div
             className="min-h-0 flex-1 overflow-y-auto px-1 py-2"
+            onContextMenu={(event) => {
+              // Klik kanan area kosong → New file/New folder di root.
+              event.preventDefault();
+              setCtxMenu({ x: event.clientX, y: event.clientY, node: null });
+            }}
             onDragEnter={(event) => {
               // File OS decak pane mana pun → minta user ilepas di sini
               // (target akhirnya tetap baris folder — drop di luar basa-basi doang).
@@ -619,7 +786,11 @@ export function LeftPanel({
       )}
 
       <Modal open={!!pendingDelete} onClose={() => setPendingDelete(null)} title={t('common.delete')}>
-        <p className="text-sm text-foreground">{t('tree.deleteConfirm', { name: pendingDelete?.name ?? '' })}</p>
+        <p className="text-sm text-foreground">
+          {pendingDelete?.type === 'dir'
+            ? t('tree.deleteFolderConfirm', { name: pendingDelete.name, n: fileCountIn(pendingDelete.path) })
+            : t('tree.deleteConfirm', { name: pendingDelete?.name ?? '' })}
+        </p>
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
@@ -638,6 +809,152 @@ export function LeftPanel({
           </button>
         </div>
       </Modal>
+      {/* Modal naming: file baru / folder baru (dari menu + atau klik kanan). */}
+      <Modal
+        open={!!nodeNaming}
+        onClose={() => {
+          setNodeNaming(null);
+          setCreateNodeErr(null);
+        }}
+        title={nodeNaming?.kind === 'folder' ? t('tree.nameFolderTitle') : t('tree.nameFileTitle')}
+      >
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="new-node-name" className="mb-1 block text-sm font-medium">
+              {nodeNaming?.kind === 'folder' ? t('tree.nameFolderLabel') : t('tree.nameFileLabel')}
+            </label>
+            <TextInput
+              id="new-node-name"
+              value={nodeName}
+              onChange={(event) => setNodeName(event.target.value)}
+              placeholder={nodeNaming?.kind === 'folder' ? t('tree.folderNamePh') : t('tree.fileNamePh')}
+              autoFocus
+              disabled={creatingNode}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && nodeName.trim()) void submitNewNode();
+              }}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('tree.nameParentHint', { dir: nodeNaming?.parent || t('tree.rootName') })}
+            </p>
+          </div>
+          {createNodeErr && <p className="text-xs text-destructive">{createNodeErr}</p>}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setNodeNaming(null);
+                setCreateNodeErr(null);
+              }}
+              className="cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              disabled={creatingNode || nodeName.trim().length === 0}
+              onClick={() => void submitNewNode()}
+              className="cursor-pointer rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {creatingNode ? '…' : t('common.create')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Menu klik-kanan tree: kontekstual per node (folder/file) atau area kosong. */}
+      {ctxMenu && (
+        <div
+          role="menu"
+          onClick={(event) => event.stopPropagation()}
+          style={{ left: Math.min(ctxMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 500) - 200), top: ctxMenu.y }}
+          className="fixed z-50 w-48 rounded-lg border border-border bg-card p-1 shadow-lg"
+        >
+          {(ctxMenu.node?.type === 'file' || ctxMenu.node?.type === 'dir') && (
+            <>
+              {ctxMenu.node.type === 'dir' && (
+                <>
+                  <MenuItem
+                    icon={FilePlus2}
+                    label={t('tree.newFile')}
+                    onClick={() => {
+                      setNodeName('');
+                      setCreateNodeErr(null);
+                      setNodeNaming({ kind: 'file', parent: ctxMenu.node!.path });
+                      setCtxMenu(null);
+                    }}
+                  />
+                  <MenuItem
+                    icon={FolderPlus}
+                    label={t('tree.newFolder')}
+                    onClick={() => {
+                      setNodeName('');
+                      setCreateNodeErr(null);
+                      setNodeNaming({ kind: 'folder', parent: ctxMenu.node!.path });
+                      setCtxMenu(null);
+                    }}
+                  />
+                  <div className="mx-1 my-1 h-px bg-border" />
+                </>
+              )}
+              <MenuItem icon={X} label={t('tree.remove')} onClick={() => { const node = ctxMenu.node!; setCtxMenu(null); setPlusOpen(false); setPendingDelete(node); }} />
+            </>
+          )}
+          {ctxMenu.node === null && (
+            <>
+              <MenuItem
+                icon={FilePlus2}
+                label={t('tree.newFile')}
+                onClick={() => {
+                  setNodeName('');
+                  setCreateNodeErr(null);
+                  setNodeNaming({ kind: 'file', parent: '' });
+                  setCtxMenu(null);
+                }}
+              />
+              <MenuItem
+                icon={FolderPlus}
+                label={t('tree.newFolder')}
+                onClick={() => {
+                  setNodeName('');
+                  setCreateNodeErr(null);
+                  setNodeNaming({ kind: 'folder', parent: '' });
+                  setCtxMenu(null);
+                }}
+              />
+            </>
+          )}
+        </div>
+      )}
     </aside>
+  );
+}
+
+/** Baris item menu file manager (mirip menu + tab-bar: ikon + label). */
+function MenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  title,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+      className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <Icon size={13} className="shrink-0 text-muted-foreground" />
+      <span className="truncate">{label}</span>
+    </button>
   );
 }

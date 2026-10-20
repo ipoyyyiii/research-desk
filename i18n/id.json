@@ -16,7 +16,24 @@
   },
   "tree": {
     "deleteConfirm": "Hapus file \"{name}\"?",
-    "fase3Hint": "Buka file ini nanti di fase 3 (viewer/PDF)."
+    "fase3Hint": "Buka file ini nanti di fase 3 (viewer/PDF).",
+    "newFile": "File baru…",
+    "newFolder": "Folder baru…",
+    "newSheet": "Spreadsheet baru",
+    "nameFileTitle": "File baru",
+    "nameFolderTitle": "Folder baru",
+    "nameFileLabel": "Nama file — format bebas",
+    "nameFolderLabel": "Nama folder",
+    "fileNamePh": "mis. skrip-analisis.py / catatan.txt",
+    "folderNamePh": "mis. bab-2",
+    "nameParentHint": "Kesimpen di: {dir}",
+    "rootName": "root project",
+    "createErr": "Gak kebuat — coba lagi.",
+    "created": "Kebuat: {name}",
+    "remove": "Hapus",
+    "removeFolder": "Hapus folder",
+    "deleteFolderConfirm": "Hapus folder “{name}” beserta isinya ({n} file)?",
+    "deleteErr": "Gagal hapus — coba lagi."
   },
   "editor": {
     "noFile": "Belum ada dokumen terbuka",

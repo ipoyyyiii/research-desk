@@ -303,3 +303,85 @@ export async function createSpreadsheet(baseReal: string, baseName = 'data'): Pr
   await fsp.writeFile(path.join(baseReal, finalRel), bytes);
   return { path: finalRel, name: path.basename(finalRel) };
 }
+
+/** Nama node aman: tanpa direktori (anti traversal), karakter liar jadi '_'. */
+export function sanitizeNodeName(raw: string): string {
+  const base = path
+    .basename(raw ?? '')
+    .replace(/[^\w.\- ]/g, '_')
+    .replace(/^[. _]+/, '')
+    .trim();
+  return base || 'file';
+}
+
+/** Bentrok di disk → suffix `-2`,`-3` sebelum ekstensi. */
+export function uniqueNodeName(dir: string, name: string): string {
+  const ext = path.extname(name);
+  const stem = ext ? name.slice(0, -ext.length) : name;
+  let candidate = name;
+  for (let index = 2; fs.existsSync(path.join(dir, candidate)); index += 1) {
+    candidate = `${stem}-${index}${ext}`;
+  }
+  return candidate;
+}
+
+/** Parent folder projekt valid (realpath di dalam base) → abs path. */
+function resolveParentDir(baseReal: string, parentRelative: string): string {
+  const rel = parentRelative === '' ? '.' : parentRelative;
+  const parent = safeResolve(baseReal, rel);
+  fs.mkdirSync(parent, { recursive: true });
+  const parentReal = fs.realpathSync(parent);
+  if (parentReal !== baseReal && !parentReal.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+  return parent;
+}
+
+/** Folder baru di dalam parent (nesting bebas); bentrok → suffix -2/-3. */
+export async function createFolder(
+  baseReal: string,
+  parentRelative: string,
+  rawName: string,
+): Promise<{ path: string; name: string }> {
+  const parent = resolveParentDir(baseReal, parentRelative);
+  const name = sanitizeNodeName(rawName);
+  const finalName = uniqueNodeName(parent, name);
+  fs.mkdirSync(path.join(parent, finalName), { recursive: true });
+  const parentRel = parentRelative === '' ? '' : toRel(baseReal, parent);
+  return { path: parentRel ? `${parentRel}/${finalName}` : finalName, name: finalName };
+}
+
+/** File baru format bebas: kosong (0B); .xlsx otomatis pakai template workbook,
+ * biar gak jadi xlsx rusak yang gak bisa dibuka GridCraft. */
+export async function createPlaceholderFile(
+  baseReal: string,
+  parentRelative: string,
+  rawName: string,
+): Promise<{ path: string; name: string }> {
+  const parent = resolveParentDir(baseReal, parentRelative);
+  const name = sanitizeNodeName(rawName);
+  const finalName = uniqueNodeName(parent, name);
+  const abs = path.join(parent, finalName);
+  const data =
+    path.extname(finalName).toLowerCase() === '.xlsx'
+      ? Buffer.from(EMPTY_WORKBOOK_BASE64, 'base64')
+      : Buffer.alloc(0);
+  await fsp.writeFile(abs, data);
+  const parentRel = parentRelative === '' ? '' : toRel(baseReal, parent);
+  return { path: parentRel ? `${parentRel}/${finalName}` : finalName, name: finalName };
+}
+
+/** Hapus folder + seluruh isinya (rekursif). Root project ditolak —
+ * safeResolve gak nerima '' (INVALID_PATH), symlink juga ditolak. */
+export async function deleteFolder(baseReal: string, relative: string): Promise<void> {
+  const abs = safeResolve(baseReal, relative);
+  const stat = fs.lstatSync(abs);
+  if (stat.isSymbolicLink() || !stat.isDirectory()) {
+    throw new WorkspaceError('UNSUPPORTED_TYPE');
+  }
+  const real = fs.realpathSync(abs);
+  if (real !== baseReal && !real.startsWith(baseReal + path.sep)) {
+    throw new WorkspaceError('PATH_OUT_OF_PROJECT');
+  }
+  await fsp.rm(real, { recursive: true });
+}
