@@ -5,7 +5,6 @@ import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
 import { settings as settingsTable } from '@/lib/db/schema';
 import {
-  createProjectSubfolders,
   ensureProjectDirectory,
   normalizeAndGuardFolder,
   slugify,
@@ -96,7 +95,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Folder tidak bisa dibuat' }, { status: 400 });
     }
 
-    createProjectSubfolders(guard.folderPath);
+    // Clean start: TANPA folder standar (dokumen/gambar/referensi/export).
+    // Tiap fitur bikin foldernya sendiri saat butuh (lazy mkdir) — folder yang
+    // user lihat di tree = folder yang user/fitur beneran bikin.
 
     // Slug unik: research-desk, research-desk-2, ...
     const baseSlug = slugify(parsed.data.name);

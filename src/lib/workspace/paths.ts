@@ -56,12 +56,6 @@ export function ensureProjectDirectory(resolvedPath: string): string {
 }
 
 /** Struktur subfolder baku project (sesuai planning.md §3.3). */
-export function createProjectSubfolders(folderPath: string): void {
-  for (const sub of ['dokumen', 'gambar', 'referensi/papers', 'export']) {
-    fs.mkdirSync(path.join(folderPath, sub), { recursive: true });
-  }
-}
-
 export function slugify(name: string): string {
   return (
     name
