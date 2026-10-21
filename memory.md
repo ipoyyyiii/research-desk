@@ -1,7 +1,8 @@
 # MEMORY — Riwayat & Keputusan Sesi (private context)
 
 > File memori sesi. Kalau context hilang/session baru, BACA DULU file ini + `planning.md` sebelum kerja apapun di repo ini.
-> Last updated: agentmemory lokal terpasang & semua pembahasan sesi ini sudah tersimpan DI DUA tempat (file ini + agentmemory, 9 entri baseline). Fase 0 belum dimulai.
+> Last updated: 2026-10-21 (sesi lanjutan). Fase 0–5 + Tier 1 selesai; sesi ini nutup 2 "utang" tes Tier 1 dan nyiapin Tier 2 (matriks literatur).
+> Kode app = repo `/home/ubuntu/research-desk` (branch `main`, commit terakhir `d4c58d6` sebelum sesi ini).
 
 ---
 
@@ -27,6 +28,12 @@
 - **Gotcha fase 1**: shadcn CLI v5/v4 semua kena prompt interaktif via shell → pivot ke UI primitives mini sendiri (`src/components/ui.tsx`); `pkill -f "next dev"` nembak shell sendiri (pattern match cmdline) → pakai `pkill -f 'next[ ]dev'`; jangan pipa server ke `head` (SIGPIPE); StarterKit v3 TIDAK include Table/TaskList → registrasi eksplisit.
 - Langkah berikutnya: **fase 2** — chat ↔ OpenCode: session per project, streaming chat, tool timeline, auto-reload editor saat agent ngedit, persona "thesis" + izin, auto start service OpenCode
 - ❗ `socautomation` (repo lama, `/home/ubuntu/socautomation`) = project <> lain, **JANGAN disentuh**
+- **STATUS PER 2026-10-21 (akhir sesi OpenCode "research-desk: setup repo + planning + memory")**: Fase 0–5 + Tier 1 selesai, `main` = `origin/main` di commit `d4c58d6` "Sitasi langsung di WordCraft, konfirmasi key hilang, pustaka ikut ke DOCX".
+  - Fase 2 (chat ↔ OpenCode) ✅ `d3005b5` · model picker `c1c79c2` · provider login `119f7cd` · sisa fase 2 (riwayat + token meter + aktivitas) `6e211be` · fase 2.5 ✅
+  - Fase 3 (jurnal/library/PDF/gambar) ✅ · **WordCraft** (tab Word, `public/wordcraft/`) ✅ `3d3688f` + bridge simpan `f920a57` + font pack v3 `f8e9b52` · **GridCraft** (tab Excel, `public/gridcraft/`) ✅ `cebc6af` · file manager penuh `c03adeb`
+  - Tier 1 ✅: sitasi di tab Word (`d4c58d6`), preflight key hilang + `b:Sources` ke DOCX (`606f073`), alur AI↔data + skrip `uji-statistik.py` (`032f825`)
+  - **Tier 2 belum mulai** (matriks literatur = item 1, sedang dikerjakan sesi ini)
+  - ⚠️ Repo lokal `socautomation` JANGAN disentuh · `public/wordcraft` & `public/gridcraft` **gitignored** (binary lokal, script pasang ada di `scripts/`)
 
 ## 3. Topik yang dibahas dalam sesi (kronologi)
 
@@ -139,3 +146,66 @@ Yang dibuat di polish:
 - Styling: `.paper img { max-width:100% }`, kertas apply `fontFamily/fontSize(pt)/lineHeight` dari prefs.
 
 Gotcha build: `unsetAllFormatting` gak ada di StarterKit-only (pakai `clearNodes().unsetAllMarks()`); `TextAlign` perlu `@tiptap/extension-text-align` (terpasang). Smoke test: upload→serve `200 image/png`, guard `..%2F..%2Fetc/passwd` ditolak, roundtrip md path relatif utuh ✓. Root `bab1.md` sempat ketimpa smoke test → pulih ke stub (file asli user di `dokumen/bab1-pendahuluan.md` aman).
+
+## 11. Sesi lanjutan 2026-10-21 — nutup 2 utang Tier 1 + Tier 2 (matriks)
+
+**Konteks:** sesi OpenCode sebelumnya berhenti tepat di "gue lakuin 2 tes ini sendiri" (save round-trip WordCraft + AI chat ↔ spreadsheet). Sesi ini continuation dari situ.
+
+### 11.1 BUG BESAR: file `.md` TIDAK PERNAH kebuka di tab Word (ketemu & dibenerin)
+
+AppOpened `.md` → tab Word → lempar file ke WordCraft. **Hasil: dokumen gak pernah tampil** (user cuma lihat "Good afternoon" + file masuk section "Recent"). App sendiri nulis "Not showing? click again or drag it in manually" — jadi app TAHU ini bisa gagal.
+
+**Akar masalah = 2 hal terpisah:**
+
+1. **Timing**: app lempar file ~1,2 detik setelah hook terpasang, padahal wasm WordCraft (42 MB) butuh ~6,2 detik boot. egui belum daftar handler drop → event drop hilang.
+   - Sinyal readiness yang terbukti jalan: kirim `dragover` sintetis ke canvas → kalau egui sudah listen, `event.defaultPrevented === true`. (Sinyal lain: `window.wasmBindings` ada, canvas bukan 300x150, `#wordcraft_loading` hilang.)
+2. **Cross-realm**: `DragEvent`/`DataTransfer`/`File` dibuat di realm PARENT lalu didispatch ke canvas iframe. WordCraft cuma mendaftarkan file-nya (muncul di "Recent"), tidak pernah membuka.
+   - **Bukti**: WordCraft terisolasi (`/wordcraft/index.html` langsung, tanpa app) → drop dari realm sendiri → dokumen langsung kebuka.
+
+**Fix (di `src/components/center/word-tab.tsx`):**
+- Hook suntik ke iframe nambah `window.__wcProbeReady()` (probe `dragover`) + `window.__rwDropFile(name, base64)` (drop **di dalam realm iframe**, File/DataTransfer lahir di sana).
+- State baru `wcReady` → gerbang lempar file (ganti `booted`).
+- Parent panggil `win.__rwDropFile(fileName, base64)` (base64 supaya aman lintas realm).
+
+**Belum terbukti (utang):** round-trip lengkap edit→Save→"Simpan ke bab"→file berubah di disk (lihat 11.3).
+
+### 11.2 BUG: dossier ctx bocor file `.venv`
+
+`buildDossier()` di `src/lib/opencode/agent-config.ts` cuma filter ekstensi (`.md|.bib|.ris|.txt`) → 245 file paket Python (`.venv/...`) masuk daftar → context terbuang 4.2 KB + agent bingung.
+**Fix:** `SKIP_DIRS` di `src/lib/workspace/files.ts` diperluas (`.venv`, `venv`, `site-packages`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `.ipynb_checkpoints`, `.next`, `.turbo`, `.cache`) → file tree **dan** dossier bersih.
+
+### 11.3 Status 2 "utang" Tier 1
+
+- **Save round-trip WordCraft: ✅ TUTUP (bukti lengkap)**. Alur yang TERBUKTI jalan: **WordCraft `File → Export → Markdown`** → WordCraft download `uji-save.md` → hook anchor-download app nangkep → banner *"Word saved 'uji-save.md' — put it back into the chapter?"* → klik **"Save to chapter"** → file `.md` di disk berubah. Bukti konkret: `"# Uji Save\n\nHalo"` → `"# Uji Save\n\nHalo TES-SAVE"` (sha `12cda885…` → `8a54ec54…`).
+  - **Temuan penting: WordCraft SELALU nyimpen .docx** (magic byte `PK\x03\x04`), walau file sumbernya `.md` — nama yang dipaksa di picker gak ngaruh. Jadi tombol **Save** biasa TIDAK bisa balik ke `.md`; cuma **Export → Markdown** (ekspor markdown NATIVE WordCraft) yang hasilnya markdown.
+  - Karena itu sesi ini nambah jalur konversi: `POST /api/projects/[slug]/word-save` (docx→markdown via `pandoc -f docx -t gfm --wrap=none`, marker sitasi `\[@key]` di-unescape balik ke `[@key]`), dan tombol "Save to chapter" sekarang muncul juga buat hasil simpan `.docx` (file bab `.md`). Jalur Export → Markdown tetap ada (fidelitas lebih baik, tanpa lewat pandoc).
+  - Catatan fidelity: `pandoc` escape `[@key]` → `\[@key]` (diperbaiki manual) dan tabel `.md` → GFM pipe table (bagus). Tapi konversi docx→md tetap lossy untuk fitur Word (gaya, nomor halaman, field).
+- **Kecepatan buka dokumen di tab Word: LAMBAT (~40-120 detik)** — akar masalahnya bukan drop, tapi **font seeding**: `seedWordcraftFonts()` nulis ~315 file font ke IndexedDB di main thread, memblokir probe & drop. Di browser user seeding cuma sekali (flag `localStorage`), jadi reopen berikutnya jauh lebih cepat. Di Playwright (profil baru tiap run) selalu bayar biaya penuh.
+- **AI chat ↔ spreadsheet: TERBLOKIR DI LUAR APP** (bukan bug app):
+  - Free tier provider `opencode` habis: `provider.free-limit` / `FreeUsageLimitError`, `retryAfterMs` ≈ 8,8 jam. Tried: deepseek-v4.1-flash-free, glm-5.3-flash-free, minimax-m3.1-flash-free, big-pickle, beam-free, longcat, nemotron → semua limit.
+  - Semua 19 model provider `openai` (ChatGPT OAuth) ditolak: *"The 'gpt-5.x' model is not supported when using Codex with a ChatGPT account"*. Kredensial valid (`chatgpt-headless`, ada refresh token, belum expired 28 Okt 2026) — jadi masalahnya **entitlement akun**, bukan token kadaluarsa.
+  - Model di luar katalog (mis. `gpt-5.1-codex`) → *"Model unavailable"*.
+  - **Sisi app yang TERBUKA**: `getAuthState().connected` = true selama provider `openai` ADA, padahal nol model yang bisa dipakai → UI ngaku "terhubung" padahal agent bakal error. **Perbaikan yang perlu: deteksi konektivitas nyata (cek minimal 1 model bisa dipakai), bukan cuma provider Terdaftar.**
+  - Yang SUDAH terbukti dari sisi app: route `POST /api/projects/[slug]/stats-template` ✅, skrip `uji-statistik.py` jalan ✅ (angka cocok hitungan independen: mean_x 34,5250 · mean_y 61,0663 · Pearson r 0,992636 · grup A 64,9227 · grup B 57,2100), data mentah utuh ✅ (sha256 sama sebelum/sesudah).
+
+### 11.4 Tier 2 item 1 — Matriks literatur (selesai)
+
+Tab baru di rail kiri (`matrix`, ikon `TableProperties` — jangan `Table2`, itu dipakai placeholder "Matriks" di menu `+` panel tengah).
+- Table DB baru `matrix_rows` (slug, paper_id, title, authors JSON, year, tema, metode, temuan, kutipan, position, created_at) + unique `(slug, paper_id)`; duplikasi `paper_id` dicek di app level (SQLite anggap NULL distinct).
+- API: `GET/POST/PATCH/DELETE /api/projects/[slug]/matrix` + `POST /api/projects/[slug]/matrix/export` (GFM table, heading & label ikut locale).
+- Panel `src/components/panels/matrix-panel.tsx`: search + tombol "+", empty state, tabel 5 kolom editable (auto-save saat blur), picker dari Library (judul/penulis/tahun terisi otomatis) atau baris manual, delete + konfirmasi, Export Markdown.
+- i18n: `matrix.*` 50 key, id/en parity 503 → **553/553**.
+- **BUG lama yang ditemukan (belum dibenerin)**: `library-panel.tsx` + `journal-panel.tsx` fetch `/api/journals/saved` → **404**, route yang benar `/api/journals/save`. Jadi tab "Tersimpan" error. (Panel matriks sengaja fetch yang benar.)
+
+### 11.5 Gotcha operasional sesi ini
+
+- **Mesin mepet**: RAM 1,9 GB total (available ~180-340 MB, swap 4 GB dipakai 2,9 GB). Build Next + Chromium + agentmemory + opencode semuanya nanggung bareng. **Jangan paralel**: build dulu → restart server → baru jalankan browser test. Playwright harus install Chromium headless **dengan `--no-sandbox --disable-dev-shm-usage`**.
+- Server prod: `node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000`. `pnpm start` pakai `-H 0.0.0.0` (bukan loopback!) — untuk mesin ini pake `-H 127.0.0.1`.
+- `source ~/.bashrc && ...` di shell non-interaktif → **exit 127** (bashrc bail). Pake path absolut: `~/.nvm/versions/node/v24.22.0/bin/node`.
+- `npx drizzle-kit push` aman (CREATE TABLE baru, data lama utuh) tapi **HINDARI jalan bareng** dengan `npx eslint`/build → ESLint sempat gagal load `eslint-plugin-react-hooks` (race di node_modules pnpm), build lanjut setelah error itu.
+- `drizzle-kit push` TIDAK bikin folder `drizzle/` (belum ada migrations sama sekali) — `drizzle.config.ts` cuma nunjuk `out`.
+- Skema kolom DB = **snake_case**, properti Drizzle = camelCase (`folderPath: text('folder_path')`). Raw SQL query harus pakai nama kolom snake_case (`folder_path`), bukan nama properti.
+- `session.remove({sessionID})` BUKAN `{id}`; `client.session.create` → `session.list({directory})` → `session.prompt({sessionID,text})`.
+- Loop playback: stream SSE `/api/ai/stream?sessionId=…`; event `permission` (data.id = requestId) → balas `POST /api/ai/permission` `{sessionId, requestId, decision:'once'}` (meniru user klik "Allow once").
+- Symlink `~/.agentmemory/secret` = Bearer token REST agentmemory. **REST-nya sempat mati total** (semua route 404) karena engine `iii` jalan tanpa worker agentmemory →修复: `CI=1 EMBEDDING_PROVIDER=local npx -y @agentmemory/agentmemory@latest` (start ulang). Data mentah tetap ada di `~/.local/share/agentmemory/state_store.db/mem%3Amemories.bin` (JSON polos + trailer biner — parse sampai `lastIndexOf('}')`).
+- Repo `~/.tier1-test` + `~/.local/share/agentmemory` = artefak tes; project test leftover di DB (`probe-wc`, `tier1-test`) **belum dibersih** dari tabel `projects`.

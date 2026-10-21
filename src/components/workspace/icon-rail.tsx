@@ -8,12 +8,21 @@ import {
   Images,
   ListTree,
   ScrollText,
+  TableProperties,
   type LucideIcon,
 } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { SettingsDialog } from '@/components/workspace/settings-dialog';
 
-export type LeftTab = 'drafts' | 'outline' | 'journals' | 'zotero' | 'figures' | 'data' | 'files';
+export type LeftTab =
+  | 'drafts'
+  | 'outline'
+  | 'journals'
+  | 'zotero'
+  | 'matrix'
+  | 'figures'
+  | 'data'
+  | 'files';
 
 // Views berbasis tujuan dulu (kiri atas), view file-manager mentah paling bawah.
 // MCP & Skills pindah ke dialog Settings — tab 'extensions' gak ada lagi.
@@ -22,6 +31,7 @@ const TABS: Array<{ id: LeftTab; icon: LucideIcon; labelKey: string }> = [
   { id: 'outline', icon: ListTree, labelKey: 'left.tabOutline' },
   { id: 'journals', icon: BookOpenText, labelKey: 'tabs.journal' },
   { id: 'zotero', icon: BookMarked, labelKey: 'left.tabZotero' },
+  { id: 'matrix', icon: TableProperties, labelKey: 'matrix.title' },
   { id: 'figures', icon: Images, labelKey: 'views.figures' },
   { id: 'data', icon: Database, labelKey: 'views.data' },
   { id: 'files', icon: FolderClosed, labelKey: 'tabs.file' },

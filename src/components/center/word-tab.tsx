@@ -28,6 +28,36 @@ const HOOK_SOURCE = `
 (() => {
   if (window.__rwHooked) return;
   window.__rwHooked = true;
+  // Sinyal "WordCraft siap menerima file": egui baru mendaftarkan handler drop
+  // setelah wasm 42MB selesai boot. Selama belum, event drop dilempar sia-sia.
+  // Cara cek: kirim dragover sintetis - kalau egui sudah listen, defaultPrevented.
+  window.__wcProbeReady = function () {
+    try {
+      const canvas = document.querySelector('#wordcraft_canvas');
+      if (!canvas) return false;
+      const ev = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() });
+      canvas.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    } catch (e) { return false; }
+  };
+  // Lempar file ke canvas WordCraft.
+  // WAJIB jalan di realm iframe: DataTransfer/File harus lahir di dokumen yang
+  // sama dengan canvas. Dibuat di parent lalu didispatch ke iframe, egui cuma
+  // mendaftarkan file-nya (muncul di "Recent") tapi tidak pernah membukanya.
+  window.__rwDropFile = function (name, base64) {
+    try {
+      const raw = atob(base64);
+      const u8 = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+      const dt = new DataTransfer();
+      dt.items.add(new File([u8], name, { type: 'text/markdown' }));
+      const canvas = document.querySelector('#wordcraft_canvas') || document.body;
+      for (const type of ['dragenter', 'dragover', 'drop']) {
+        canvas.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
+      }
+      return true;
+    } catch (e) { return false; }
+  };
   // Panel Sitasi app: paste sintetis ke canvas (satu-satunya cara yang terbukti
   // masuk ke editor egui; keydown sintetis tidak dibaca).
   window.__rwInsertText = function (text) {
@@ -400,11 +430,16 @@ export function WordTab({
   const t = useT();
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const [booted, setBooted] = useState(false);
+  // WordCraft baru bisa menerima file ~6-8 detik setelah iframe muncul (wasm 42MB).
+  // Tanpa gerbang ini, event drop dilempar sebelum egui daftar handler -> dokumen
+  // tidak pernah tampil di kanvas.
+  const [wcReady, setWcReady] = useState(false);
   const [thrown, setThrown] = useState(false);
   const [throwFailed, setThrowFailed] = useState(false);
   const [pending, setPending] = useState<SaveCandidate | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Deteksi file berubah di luar Word (agen nulis): versi terakhir dijembatan vs disk.
   const inWordRef = useRef<string | null>(null);
   const seenRef = useRef<string | null>(null);
@@ -477,6 +512,31 @@ export function WordTab({
     };
   }, []);
 
+  // Gerbang siap: poll probe drop-handler egui di dalam iframe.
+  useEffect(() => {
+    let alive = true;
+    const probe = () => {
+      const win = frameRef.current?.contentWindow as
+        | (Window & { __wcProbeReady?: () => boolean })
+        | null
+        | undefined;
+      return win?.__wcProbeReady?.() ?? false;
+    };
+    const timer = window.setInterval(() => {
+      if (!alive) return;
+      if (probe()) {
+        window.clearInterval(timer);
+        setWcReady(true);
+      }
+    }, 250);
+    const stop = window.setTimeout(() => window.clearInterval(timer), 90000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
+  }, []);
+
   // Pesan dari bridge iframe: simpan file + panel Sitasi.
   useEffect(() => {
     let alive = true;
@@ -495,6 +555,7 @@ export function WordTab({
       if (data.kind === 'save' && data.bytes instanceof ArrayBuffer) {
         setPending({ name: data.name ?? 'dokumen.md', bytes: data.bytes });
         setSavedMsg(false);
+        setSaveError(null);
         return;
       }
 
@@ -573,21 +634,23 @@ export function WordTab({
     const frame = frameRef.current;
     const win = frame?.contentWindow;
     const doc = frame?.contentDocument;
-    if (!win || !doc || !booted) {
-      setThrowFailed(true);
+    if (!win || !doc || !wcReady) {
+      if (wcReady) setThrowFailed(true);
       return;
     }
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/raw?path=${encodeURIComponent(path)}`);
       if (!res.ok) throw new Error(`raw ${res.status}`);
       const bytes = await res.arrayBuffer();
-      const dt = new DataTransfer();
-      dt.items.add(new File([bytes], fileName, { type: 'text/markdown' }));
-      const target = doc.querySelector('canvas') ?? (doc.body as HTMLElement | null);
-      if (!target) throw new Error('canvas belum ada');
-      for (const type of ['dragenter', 'dragover', 'drop'] as const) {
-        target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
+      const u8 = new Uint8Array(bytes);
+      let bin = '';
+      for (let i = 0; i < u8.length; i += 0x8000) {
+        bin += String.fromCharCode.apply(null, Array.from(u8.subarray(i, i + 0x8000)));
       }
+      const base64 = btoa(bin);
+      const drop = (win as Window & { __rwDropFile?: (n: string, b: string) => boolean }).__rwDropFile;
+      const ok = drop ? drop(fileName, base64) : false;
+      if (!ok) throw new Error('drop gagal');
       // Tandai versi yang saat ini di Word + versi disk yang sudah dikonfirmasi.
       const text = new TextDecoder().decode(bytes);
       inWordRef.current = text;
@@ -598,25 +661,45 @@ export function WordTab({
     } catch {
       setThrowFailed(true);
     }
-  }, [slug, path, fileName, booted]);
+  }, [slug, path, fileName, wcReady]);
 
   // Auto-lempar: tab dibuka / file diklik lagi → begitu Word siap, file langsung dilempar.
   // version naik tiap klik file (shell) → lempar ulang; manual-throw user tetap bisa via tombol.
   const queuedThrow = useRef(true);
   useEffect(() => {
     queuedThrow.current = true;
-    if (booted) {
+    if (booted && wcReady) {
       queuedThrow.current = false;
       void throwFile();
     }
-  }, [version, booted, throwFile]);
+  }, [version, booted, wcReady, throwFile]);
 
-  // Simpan balik bytes hasil Word ke file bab (khusus .md — format lain via menu Ekspor).
+  // Simpan balik bytes hasil Word ke file bab.
+  // WordCraft nyimpen .docx (format aslinya) walau file babnya .md → route
+  // word-save mengubahnya ke markdown dulu sebelum ditulis balik.
   const keepSave = useCallback(async () => {
     if (!pending || saving) return;
     setSaving(true);
     try {
-      const content = new TextDecoder().decode(pending.bytes);
+      const u8 = new Uint8Array(pending.bytes);
+      let bin = '';
+      for (let i = 0; i < u8.length; i += 0x8000) {
+        bin += String.fromCharCode.apply(null, Array.from(u8.subarray(i, i + 0x8000)));
+      }
+      const base64 = btoa(bin);
+      const conv = await fetch(`/api/projects/${encodeURIComponent(slug)}/word-save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: pending.name, base64 }),
+      });
+      const converted = (await conv.json().catch(() => null)) as
+        | { content?: string; error?: string }
+        | null;
+      if (!conv.ok || typeof converted?.content !== 'string') {
+        setSaveError(converted?.error ?? 'Gagal menyimpan hasil Word');
+        return;
+      }
+      const content = converted.content;
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/file`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -627,6 +710,7 @@ export function WordTab({
         seenRef.current = content;
         setStale(null);
         setSavedMsg(true);
+        setSaveError(null);
         setPending(null);
       }
     } catch {
@@ -636,7 +720,11 @@ export function WordTab({
     }
   }, [pending, saving, slug, path]);
 
-  const nameMatches = pending !== null && pending.name === fileName;
+  // Cocok kalau nama hasil simpan sama dengan file bab, ATAU WordCraft nyimpen
+  // .docx sementara file babnya .md (dikonversi ke markdown dulu).
+  const nameMatches =
+    pending !== null &&
+    (pending.name === fileName || (/\.docx$/i.test(pending.name) && /\.md$/i.test(fileName)));
 
   // Hint sekali-soal "Load system fonts" (font bawaan Windows) — dismissable.
   // 'yes' = browser punya queryLocalFonts (Chrome/Edge), 'no' = tidak punya (Firefox/Safari).
@@ -718,7 +806,7 @@ export function WordTab({
         <Button
           variant="default"
           className="h-7 shrink-0 px-2.5 text-[11px]"
-          disabled={!booted}
+          disabled={!wcReady}
           onClick={() => void throwFile()}
         >
           <Upload size={12} className="mr-1" />
@@ -809,9 +897,13 @@ export function WordTab({
       {pending && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-700/30 bg-amber-50 px-2 py-1.5 dark:bg-amber-950/40">
           <span className="min-w-0 flex-1 text-[11px] text-amber-800 dark:text-amber-200">
-            {nameMatches
-              ? t('word.saveAsk').replace('{name}', pending.name)
-              : t('word.saveHint').replace('{name}', pending.name)}
+            {saveError
+              ? saveError
+              : nameMatches
+                ? /\.docx$/i.test(pending.name)
+                  ? t('word.saveConvert').replace('{name}', fileName)
+                  : t('word.saveAsk').replace('{name}', pending.name)
+                : t('word.saveHint').replace('{name}', pending.name)}
           </span>
           {nameMatches && (
             <>

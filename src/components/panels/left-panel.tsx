@@ -9,6 +9,7 @@ import { JournalPanel } from '@/components/panels/journal-panel';
 import { OutlineView } from '@/components/panels/outline-view';
 import { LibraryPanel } from '@/components/panels/library-panel';
 import { ZoteroPanel } from '@/components/panels/zotero-panel';
+import { MatrixPanel } from '@/components/panels/matrix-panel';
 import { type LeftTab } from '@/components/workspace/icon-rail';
 import {
   DropOverlay,
@@ -605,6 +606,13 @@ export function LeftPanel({
         <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
           {tabHeader(t('left.tabZotero'))}
           <ZoteroPanel slug={slug} />
+        </div>
+      )}
+
+      {activeTab === 'matrix' && (
+        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+          {tabHeader(t('matrix.title'))}
+          <MatrixPanel slug={slug} />
         </div>
       )}
 

@@ -40,3 +40,28 @@ export const savedPapers = sqliteTable('saved_papers', {
 
 export type SavedPaper = typeof savedPapers.$inferSelect;
 export type NewSavedPaper = typeof savedPapers.$inferInsert;
+
+// Baris matriks literatur (Bab 2) per project. Satu baris = satu paper yang
+// dianalisis; kolom tema/metode/temuan/kutipan diisi user manual.
+// paperId = paperId library (saved_papers); null = baris manual (judul diketik).
+// Unik (slug, paperId) — paperId NULL gak bisa diAndai unik di SQLite, jadi
+// duplikasi paperId dicek di level aplikasi (route POST /matrix).
+export const matrixRows = sqliteTable('matrix_rows', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  slug: text('slug').notNull(),
+  paperId: text('paper_id'),
+  title: text('title').notNull(),
+  authors: text('authors').notNull().default('[]'), // JSON string array
+  year: integer('year'),
+  tema: text('tema').notNull().default(''),
+  metode: text('metode').notNull().default(''),
+  temuan: text('temuan').notNull().default(''),
+  kutipan: text('kutipan').notNull().default(''),
+  position: integer('position').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+}, (table) => ({
+  slugPaperUniq: unique('matrix_rows_slug_paper_uniq').on(table.slug, table.paperId),
+}));
+
+export type MatrixRowRecord = typeof matrixRows.$inferSelect;
+export type NewMatrixRow = typeof matrixRows.$inferInsert;

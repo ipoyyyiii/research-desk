@@ -14,7 +14,22 @@ export type TreeEntry = {
   size: number;
 };
 
-const SKIP_DIRS = new Set(['.opencode', 'node_modules', '.git']);
+const SKIP_DIRS = new Set([
+  '.opencode',
+  'node_modules',
+  '.git',
+  '.venv',
+  'venv',
+  'site-packages',
+  '__pycache__',
+  '.pytest_cache',
+  '.mypy_cache',
+  '.ruff_cache',
+  '.ipynb_checkpoints',
+  '.next',
+  '.turbo',
+  '.cache',
+]);
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB batas file teks editor
 const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.json', '.jsonc', '.csv', '.ris', '.bib', '.tex']);
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
