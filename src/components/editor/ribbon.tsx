@@ -233,10 +233,18 @@ export function Ribbon({
   const [exportOpen, setExportOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportResult, setExportResult] = useState<string | null>(null);
+  const [exportSources, setExportSources] = useState<number | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportWarnings, setExportWarnings] = useState<{
     missingCitations: string[];
     unusedEntries: number;
+  } | null>(null);
+  const [exportConfirm, setExportConfirm] = useState<{
+    style: 'apa' | 'ieee';
+    out: 'docx' | 'pdf';
+    missing: string[];
+    unused: number;
+    hasBib: boolean;
   } | null>(null);
   const [sourcesBusy, setSourcesBusy] = useState(false);
 
@@ -253,11 +261,11 @@ export function Ribbon({
     unused: string[];
   } | null>(null);
 
-  const doExport = async (style: 'apa' | 'ieee', out: 'docx' | 'pdf' = 'docx') => {
-    setExportOpen(false);
+  const runExport = async (style: 'apa' | 'ieee', out: 'docx' | 'pdf' = 'docx') => {
     setExportBusy(true);
     setExportError(null);
     setExportResult(null);
+    setExportSources(null);
     setExportWarnings(null);
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/export`, {
@@ -268,6 +276,7 @@ export function Ribbon({
       const data = await res.json();
       if (res.ok && data?.out) {
         setExportResult(data.out);
+        setExportSources(Number.isFinite(Number(data?.sources)) ? Number(data.sources) : 0);
         if (data?.warnings) {
           setExportWarnings({
             missingCitations: Array.isArray(data.warnings.missingCitations)
@@ -284,6 +293,54 @@ export function Ribbon({
     } finally {
       setExportBusy(false);
     }
+  };
+
+  // Preflight dulu: key sitasi yang tidak ada di references.bib bikin pandoc
+  // menulis "(key?)" diam-diam. Kalau ada yang hilang, minta konfirmasi.
+  const doExport = async (style: 'apa' | 'ieee', out: 'docx' | 'pdf' = 'docx') => {
+    setExportOpen(false);
+    setExportBusy(true);
+    setExportError(null);
+    setExportResult(null);
+    setExportSources(null);
+    setExportWarnings(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePath, style, out, dryRun: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setExportError(t('err.export'));
+        return;
+      }
+      const missing = Array.isArray(data?.warnings?.missingCitations)
+        ? (data.warnings.missingCitations as string[])
+        : [];
+      if (missing.length > 0) {
+        setExportConfirm({
+          style,
+          out,
+          missing,
+          unused: Number(data?.warnings?.unusedEntries ?? 0),
+          hasBib: Boolean(data?.hasBib),
+        });
+        return;
+      }
+      await runExport(style, out);
+    } catch {
+      setExportError(t('err.server'));
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const confirmExport = () => {
+    if (!exportConfirm) return;
+    const job = exportConfirm;
+    setExportConfirm(null);
+    void runExport(job.style, job.out);
   };
 
   /** Unduh sources.xml (impor ke Word: References > Manage Sources > Browse). */
@@ -683,6 +740,7 @@ export function Ribbon({
             {exportResult}
           </a>{' '}
           — {t('toolbar.exportDone')}
+          {exportSources ? ` · ${t('toolbar.exportSourcesInDoc', { n: exportSources })}` : ''}
         </p>
       )}
       {exportWarnings && exportWarnings.missingCitations.length > 0 && (
@@ -699,6 +757,39 @@ export function Ribbon({
         </p>
       )}
       {exportError && <p className="px-1 pb-1 text-[11px] text-red-600">{exportError}</p>}
+
+      {/* Konfirmasi sebelum ekspor kalau ada key sitasi yang tidak ada di pustaka. */}
+      <Modal
+        open={exportConfirm !== null}
+        onClose={() => setExportConfirm(null)}
+        title={t('toolbar.exportConfirmTitle')}
+      >
+        {exportConfirm && (
+          <div className="space-y-3 text-xs">
+            {!exportConfirm.hasBib && (
+              <p className="text-red-600">{t('toolbar.exportConfirmNoBib')}</p>
+            )}
+            <p className="text-muted-foreground">
+              {t('toolbar.exportConfirmBody', {
+                n: exportConfirm.missing.length,
+                keys: exportConfirm.missing.slice(0, 6).join(', '),
+              })}
+              {exportConfirm.missing.length > 6 ? '…' : ''}
+            </p>
+            {exportConfirm.unused > 0 && (
+              <p className="text-muted-foreground">
+                {t('toolbar.exportConfirmUnused', { n: exportConfirm.unused })}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setExportConfirm(null)}>
+                {t('toolbar.exportConfirmCancel')}
+              </Button>
+              <Button onClick={confirmExport}>{t('toolbar.exportConfirmGo')}</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Cek konsistensi sitasi ↔ pustaka (semua file .md project). */}
       <Modal open={checkOpen} onClose={() => setCheckOpen(false)} title={t('citeCheck.title')}>

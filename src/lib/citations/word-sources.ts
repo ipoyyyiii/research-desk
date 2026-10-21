@@ -83,7 +83,10 @@ ${people.join('\n')}
  * Bangun file sources.xml dari entry BibTeX. Tag = citation key apa adanya
  * (Word mensyaratkan unik; duplikat dilewati).
  */
-export function buildWordSourcesXml(entries: BibEntry[]): string {
+export function buildWordSourcesXml(
+  entries: BibEntry[],
+  style: 'apa' | 'ieee' = 'apa',
+): string {
   const seen = new Set<string>();
   const sources: string[] = [];
 
@@ -106,11 +109,18 @@ export function buildWordSourcesXml(entries: BibEntry[]): string {
     sources.push(`  <b:Source>\n${fields.join('\n')}\n  </b:Source>`);
   }
 
+  // Word memakai SelectedStyle untuk pilihan gaya di Manage Sources; WordCraft
+  // membaca StyleName. Dua-duanya disamakan dengan gaya ekspor.
+  const meta =
+    style === 'ieee'
+      ? { selected: '\\IEEE2006OfficeOnline.xsl', name: 'IEEE' }
+      : { selected: '\\APASixthEditionOfficeOnline.xsl', name: 'APA' };
+
   return (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
     '<b:Sources xmlns:b="http://schemas.openxmlformats.org/officeDocument/2006/bibliography" ' +
     'xmlns="http://schemas.openxmlformats.org/officeDocument/2006/bibliography" ' +
-    'SelectedStyle="\\APASixthEditionOfficeOnline.xsl" StyleName="APA" Version="6">\n' +
+    `SelectedStyle="${meta.selected}" StyleName="${meta.name}" Version="6">\n` +
     `${sources.join('\n')}\n` +
     '</b:Sources>\n'
   );

@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
 import { parseBib } from '@/lib/journals/bib';
 import { checkCitations } from '@/lib/citations/check';
+import { injectDocxSources } from '@/lib/citations/docx-sources';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -53,7 +54,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   try {
     const { slug } = await params;
     const body = (await request.json().catch(() => null)) as
-      | { path?: string; style?: string; out?: 'docx' | 'pdf'; bibliographyTitle?: string }
+      | {
+          path?: string;
+          style?: string;
+          out?: 'docx' | 'pdf';
+          bibliographyTitle?: string;
+          dryRun?: boolean;
+        }
       | null;
     const rel = (body?.path ?? '').trim();
     const style = body?.style ?? 'apa';
@@ -88,14 +95,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     // Cek sitasi SEBELUM ekspor: key `[@x]` tanpa entri bikin pandoc menulis
     // "(x?)" diam-diam (exit 0), jadi peringatannya kita hitung sendiri.
     const markdown = await fs.readFile(src, 'utf8').catch(() => '');
-    const bibKeys = bib
-      ? parseBib(await fs.readFile(bibAbs, 'utf8').catch(() => '')).map((entry) => entry.key)
+    const bibEntries = bib
+      ? parseBib(await fs.readFile(bibAbs, 'utf8').catch(() => ''))
       : [];
-    const citationCheck = checkCitations(markdown, bibKeys);
+    const citationCheck = checkCitations(
+      markdown,
+      bibEntries.map((entry) => entry.key),
+    );
     const warnings = {
       missingCitations: citationCheck.missing,
       unusedEntries: citationCheck.unused.length,
     };
+
+    // Preflight: UI minta daftar key yang hilang SEBELUM pandoc jalan, biar
+    // user bisa batal / tetap ekspor dengan sadar.
+    if (body?.dryRun) {
+      return NextResponse.json({
+        ok: true,
+        dryRun: true,
+        hasBib: bib,
+        bibTotal: bibEntries.length,
+        warnings,
+      });
+    }
 
     const base = path.basename(src, path.extname(src));
     const outDir = path.dirname(rel.replace(/^\/+/, ''));
@@ -167,7 +189,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
     await exec('pandoc', [...args, '-o', outAbs], { timeout: 90_000, maxBuffer: 24 * 1024 * 1024 });
 
-    return NextResponse.json({ ok: true, out: outRel, citeproc: bib, warnings });
+    // Bawa pustaka ke dalam DOCX: Word/WordCraft bisa buka Manage Sources dan
+    // menemukan entri yang sama dengan yang dipakai citeproc.
+    let sources = 0;
+    if (bib && bibEntries.length > 0) {
+      try {
+        const original = await fs.readFile(outAbs);
+        const patched = await injectDocxSources(
+          original,
+          bibEntries,
+          style === 'ieee' ? 'ieee' : 'apa',
+        );
+        await fs.writeFile(outAbs, patched.bytes);
+        sources = patched.count;
+      } catch (error) {
+        // Jangan gagalkan ekspor cuma karena data pustaka gagal ditempel —
+        // dokumen tetap valid, cuma Manage Sources-nya kosong.
+        console.error('[api/projects/export] gagal tempel b:Sources:', error);
+      }
+    }
+
+    return NextResponse.json({ ok: true, out: outRel, citeproc: bib, sources, warnings });
   } catch (error) {
     console.error('[api/projects/export] POST gagal:', error);
     return NextResponse.json({ error: 'Ekspor gagal' }, { status: 500 });
