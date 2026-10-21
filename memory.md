@@ -207,11 +207,20 @@ Tab baru di rail kiri (`matrix`, ikon `TableProperties` — jangan `Table2`, itu
 - Skema kolom DB = **snake_case**, properti Drizzle = camelCase (`folderPath: text('folder_path')`). Raw SQL query harus pakai nama kolom snake_case (`folder_path`), bukan nama properti.
 - `session.remove({sessionID})` BUKAN `{id}`; `client.session.create` → `session.list({directory})` → `session.prompt({sessionID,text})`.
 - Loop playback: stream SSE `/api/ai/stream?sessionId=…`; event `permission` (data.id = requestId) → balas `POST /api/ai/permission` `{sessionId, requestId, decision:'once'}` (meniru user klik "Allow once").
-- Symlink `~/.agentmemory/secret` = Bearer token REST agentmemory. **REST-nya sempat mati total** (semua route 404) karena engine `iii` jalan tanpa worker agentmemory →修复: `CI=1 EMBEDDING_PROVIDER=local npx -y @agentmemory/agentmemory@latest` (start ulang). Data mentah tetap ada di `~/.local/share/agentmemory/state_store.db/mem%3Amemories.bin` (JSON polos + trailer biner — parse sampai `lastIndexOf('}')`).
+- Symlink `~/.agentmemory/secret` = Bearer token REST agentmemory. **REST-nya sempat mati total** (semua route 404) karena engine `iii` jalan tanpa worker agentmemory → fix: `CI=1 EMBEDDING_PROVIDER=local npx -y @agentmemory/agentmemory@latest` (start ulang). Data mentah tetap ada di `~/.local/share/agentmemory/state_store.db/mem%3Amemories.bin` (JSON polos + trailer biner — parse sampai `lastIndexOf('}')`).
 - Repo `~/.tier1-test` + `~/.local/share/agentmemory` = artefak tes; project test `probe-wc` (foldernya udah dihapus) **sudah dibersih** dari tabel `projects`, `tier1-test` sengaja dibiarin buat tes statistik lanjutan.
 - **`.commandcode/`** = folder tooling sesi CommandCode → sudah masuk `.gitignore` (jangan ikut commit).
 
-### 11.6 Tier 2 item 2 — Anotasi PDF ringan (selesai)
+### 11.7 Tier 3 — template ekspor + skrip pasang (selesai)
+
+- **`templates/skripsi-reference.docx`** (10 KB, hasil commit) = reference doc pandoc: Times New Roman 12pt, spasi baris 1.5 (`w:line="360"`), A4, margin atas 4 cm / sisi 3 cm (twips: 2268 / 1701). Dibuat reproducible oleh **`scripts/make-reference-docx.mjs`** (ambil `pandoc --print-default-data-file reference.docx`, patch `word/styles.xml` + `word/document.xml` pakai jszip).
+  - Route export sekarang pakai `--reference-doc` (kalau file-nya ada → kalau hilang ekspor tetap jalan, default pandoc).
+  - PDF (jalur weasyprint) gonna disetel di `assets/pdf.css`: `@page margin` 2,5cm → **4cm 3cm 3cm 3cm**.
+  - Catatan: **`templates/` Commit** (kecil), sementara `public/wordcraft/` + `public/gridcraft/` + `data/wordcraft-fonts/` **gitignored** (besar).
+- **Skrip pasang**: `scripts/setup-semua.sh` (orkestrator) → `fetch-wordcraft.sh` + `fetch-gridcraft.sh` (versi diambil dari GitHub release terbaru, bisa dikunci `GRIDCRAFT_VER=…`) + pack font (`wordcraft-fontpack-v3.py`, butuh `fontTools` + `ttf-mscorefonts-installer`). Docs ada di `scripts/README.md`.
+  - Catatan: `fetch-wordcraft.sh` versi lama masih hardcode `v0.8.0` → `fetch-gridcraft.sh` yg baru lebih rapi (API release + flatten zip).
+
+### 11.8 Tier 2 item 2 — Anotasi PDF ringan (selesai)
 
 Catatan/kutipan dari paper, menempel ke baris matriks (atau ke paper doang), lalu bisa didorong ke kolom `kutipan` dalam satu klik.
 - Table DB baru `paper_notes` (id, slug, paper_id, matrix_row_id FK→`matrix_rows.id` ON DELETE SET NULL, note, quote, source, created_at). Diterapkan `npx drizzle-kit push --force` (prompt-nya butuh TTY) → hanya CREATE TABLE baru, data lama utuh.

@@ -84,3 +84,22 @@ export const paperNotes = sqliteTable('paper_notes', {
 
 export type PaperNoteRecord = typeof paperNotes.$inferSelect;
 export type NewPaperNote = typeof paperNotes.$inferInsert;
+
+// Komentar dosen per ronde revisi — satu baris = satu komentar yang harus
+// ditindaklanjuti. status: 'todo' | 'doing' | 'done'. chapterPath = file bab
+// yang dikomentari (mis. 'dokumen/bab1-pendahuluan.md'); null = belum ditautkan.
+// resolvedAt = kapan item ditutup (isi saat status jadi 'done').
+export const revisionItems = sqliteTable('revision_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  slug: text('slug').notNull(),
+  text: text('text').notNull(),
+  status: text('status').notNull().default('todo'),
+  chapterPath: text('chapter_path'),
+  note: text('note'),
+  resolvedAt: integer('resolved_at', { mode: 'timestamp' }),
+  position: integer('position').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+export type RevisionItemRecord = typeof revisionItems.$inferSelect;
+export type NewRevisionItem = typeof revisionItems.$inferInsert;

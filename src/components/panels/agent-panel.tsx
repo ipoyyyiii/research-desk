@@ -1,11 +1,20 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, Loader2, Plus, SlidersHorizontal, Sparkles } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Plus,
+  SlidersHorizontal,
+  Sparkles,
+  Stethoscope,
+} from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Button, SegmentedGroup, StatusDot } from '@/components/ui';
+import { Button, Modal, SegmentedGroup, StatusDot } from '@/components/ui';
 import {
   AgentComposer,
   formatSessionTime,
@@ -19,6 +28,20 @@ import {
 // Tipe model picker disimpan di agent-composer (milik komposer ala-Codex),
 // diekspor ulang di sini biar import agent-view gak berubah.
 export type { ModelEntryView, ModelGroupView, ProviderPickView, AgentSessionView };
+
+/** Hasil diagnosa koneksi AI (cermin src/lib/opencode/doctor.ts). */
+type DoctorFinding = {
+  providerID: string;
+  label: string;
+  modelID: string;
+  status: 'ok' | 'free-limit' | 'not-supported' | 'no-model' | 'auth' | 'error';
+  message: string;
+};
+type DoctorReport = {
+  findings: DoctorFinding[];
+  checkedAt: string;
+  error?: string;
+};
 
 // Panel kanan fase 2 (pratinjau UI — belum nyambung API; wiring nyata menyusul).
 
@@ -273,9 +296,28 @@ export function AgentPanel({
   const [sessionsOpen, setSessionsOpen] = useState(false);
   /** Filter chip di tab Aktivitas (dipertahankan saat pindah-pindah tab). */
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
+  /** Diagnosa koneksi AI (probe 1 model per provider). */
+  const [doctorBusy, setDoctorBusy] = useState(false);
+  const [doctorOpen, setDoctorOpen] = useState(false);
+  const [doctor, setDoctor] = useState<DoctorReport | null>(null);
   const capsRef = useRef<HTMLDivElement>(null);
   const sessionsRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const runDoctor = async () => {
+    setDoctorOpen(true);
+    setDoctorBusy(true);
+    try {
+      const res = await fetch('/api/ai/doctor');
+      const data = (await res.json().catch(() => null)) as DoctorReport | null;
+      if (res.ok && data) setDoctor(data);
+      else setDoctor({ findings: [], checkedAt: new Date().toISOString(), error: 'Gagal menjalankan diagnosa' });
+    } catch {
+      setDoctor({ findings: [], checkedAt: new Date().toISOString(), error: 'Gagal menjalankan diagnosa' });
+    } finally {
+      setDoctorBusy(false);
+    }
+  };
 
   // Popover kemampuan ikut ketutup pas klik di luar-nya.
   useEffect(() => {
@@ -461,6 +503,16 @@ export function AgentPanel({
           tone={connected ? 'green' : 'amber'}
           title={t(connected ? 'ai.connected' : 'ai.disconnected')}
         />
+        {/* Diagnosa koneksi: provider terdaftar ≠ model bisa dipakai. */}
+        <button
+          type="button"
+          onClick={() => void runDoctor()}
+          aria-label={t('ai.doctor')}
+          title={t('ai.doctor')}
+          className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          {doctorBusy ? <Loader2 size={12} className="animate-spin" /> : <Stethoscope size={12} />}
+        </button>
         {/* Tutup panel kanan — arrow menunjuk keluar (kanan). */}
         {onCollapse && (
           <button
@@ -697,6 +749,54 @@ export function AgentPanel({
           </div>
         </div>
       )}
+
+      {/* Diagnosa koneksi AI — provider terdaftar ≠ model bisa dipakai. */}
+      <Modal open={doctorOpen} onClose={() => setDoctorOpen(false)} title={t('ai.doctorTitle')}>
+        <div className="space-y-3 text-xs">
+          {doctorBusy && (
+            <p className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 size={13} className="animate-spin" />
+              {t('ai.doctorRunning')}
+            </p>
+          )}
+          {!doctorBusy && doctor?.error && (
+            <p className="text-destructive">{doctor.error}</p>
+          )}
+          {!doctorBusy && doctor && doctor.findings.length === 0 && !doctor.error && (
+            <p className="text-muted-foreground">{t('ai.doctorEmpty')}</p>
+          )}
+          {!doctorBusy &&
+            doctor?.findings.map((finding) => (
+              <div key={`${finding.providerID}-${finding.modelID}`} className="rounded-md border border-border p-2">
+                <div className="flex items-center gap-2">
+                  <StatusDot
+                    tone={
+                      finding.status === 'ok'
+                        ? 'green'
+                        : finding.status === 'error' || finding.status === 'auth'
+                          ? 'red'
+                          : 'amber'
+                    }
+                    title={finding.status}
+                  />
+                  <span className="font-medium">{finding.label}</span>
+                  <span className="truncate font-mono text-[10px] text-muted-foreground">
+                    {finding.modelID}
+                  </span>
+                </div>
+                <p className="mt-1 text-muted-foreground">
+                  {t(`ai.doctorStatus.${finding.status}`)}
+                </p>
+                <p className="mt-1 break-words text-[10px] text-muted-foreground/80">{finding.message}</p>
+                {finding.status !== 'ok' && (
+                  <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">
+                    {t(`ai.doctorFix.${finding.status}`)}
+                  </p>
+                )}
+              </div>
+            ))}
+        </div>
+      </Modal>
     </aside>
   );
 }

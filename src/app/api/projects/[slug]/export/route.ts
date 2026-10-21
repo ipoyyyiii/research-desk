@@ -172,6 +172,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     }
 
     const args = [src, '-f', 'markdown', '-t', 'docx', '--resource-path', folder];
+    // Template skripsi: Times New Roman 12pt, spasi 1.5, A4, margin 4-3-3-3 cm.
+    // Kalau templatenya hilang, ekspor tetap jalan (default pandoc).
+    const referenceDoc = path.join(process.cwd(), 'templates', 'skripsi-reference.docx');
+    const hasReference = await fs.stat(referenceDoc).then(() => true).catch(() => false);
+    if (hasReference) args.push('--reference-doc', referenceDoc);
     if (bib) {
       args.push(
         '--citeproc',

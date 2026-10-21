@@ -7,6 +7,7 @@ import {
   FolderClosed,
   Images,
   ListTree,
+  MessageSquareQuote,
   ScrollText,
   TableProperties,
   type LucideIcon,
@@ -20,6 +21,7 @@ export type LeftTab =
   | 'journals'
   | 'zotero'
   | 'matrix'
+  | 'revision'
   | 'figures'
   | 'data'
   | 'files';
@@ -32,6 +34,7 @@ const TABS: Array<{ id: LeftTab; icon: LucideIcon; labelKey: string }> = [
   { id: 'journals', icon: BookOpenText, labelKey: 'tabs.journal' },
   { id: 'zotero', icon: BookMarked, labelKey: 'left.tabZotero' },
   { id: 'matrix', icon: TableProperties, labelKey: 'matrix.title' },
+  { id: 'revision', icon: MessageSquareQuote, labelKey: 'revision.title' },
   { id: 'figures', icon: Images, labelKey: 'views.figures' },
   { id: 'data', icon: Database, labelKey: 'views.data' },
   { id: 'files', icon: FolderClosed, labelKey: 'tabs.file' },
