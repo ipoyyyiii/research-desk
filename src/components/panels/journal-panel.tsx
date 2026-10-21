@@ -38,7 +38,7 @@ export type JournalCard = {
 
 export type SortKey = 'relevance' | 'citations' | 'year';
 
-/** Entri di GET /api-journals/saved — data paper + bibKey hasil konversi backend. */
+/** Entri di GET /api/journals/save — data paper + bibKey hasil konversi backend. */
 export type SavedJournalEntry = {
   id: number;
   paperId: string;
@@ -414,7 +414,7 @@ export function JournalPanel({
   /** Daftar paper tersimpan project — buat tandai hasil ✓ & cegah dobel. */
   const fetchSaved = useCallback(async () => {
     try {
-      const res = await fetch(`/api/journals/saved?slug=${encodeURIComponent(slug)}`);
+      const res = await fetch(`/api/journals/save?slug=${encodeURIComponent(slug)}`);
       const data: unknown = await res.json();
       if (!res.ok || !hasResults('results', data)) return;
       const next: Record<string, string> = {};

@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, Download, Loader2, Plus, X } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { BookOpen, Download, Loader2, Plus, Quote, StickyNote, Trash2, X } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { Modal, SegmentedGroup, StatusDot, TextInput } from '@/components/ui';
 import { EmptyState, NoResultsNote, ViewSearchRow } from '@/components/panels/views-left';
 import type { MatrixField, MatrixRow } from '@/lib/matrix/types';
+import { parsePaperNoteJson, type PaperNote } from '@/lib/notes/types';
 import type { JournalCard } from '@/lib/journals/types';
 
 // Tab "Matriks Literatur" (Bab 2): paper dari Perpustakaan ditarik ke tabel,
@@ -95,6 +96,10 @@ export function MatrixPanel({ slug }: { slug: string }) {
   const [exporting, setExporting] = useState(false);
   /** Markdown hasil export — dibuka manual kalau clipboard browser gak bisa dipakai. */
   const [exportText, setExportText] = useState<string | null>(null);
+  /** Catatan per baris matriks (anotasi ringan dari PDF). */
+  const [notes, setNotes] = useState<PaperNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -119,11 +124,37 @@ export function MatrixPanel({ slug }: { slug: string }) {
     }
   }, [slug]);
 
+  const fetchNotes = useCallback(async () => {
+    setNotesLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/notes`);
+      const data: unknown = await res.json();
+      const raw =
+        res.ok &&
+        data &&
+        typeof data === 'object' &&
+        Array.isArray((data as { notes?: unknown }).notes)
+          ? ((data as { notes: unknown[] }).notes)
+          : null;
+      setNotes(
+        raw ? raw.map(parsePaperNoteJson).filter((item): item is PaperNote => item !== null) : [],
+      );
+    } catch {
+      setNotes([]);
+      setNote({ text: t('notes.loadFail'), tone: 'error' });
+    } finally {
+      setNotesLoading(false);
+    }
+  }, [slug, t]);
+
   useEffect(() => {
     setRows([]);
+    setNotes([]);
+    setExpandedRowId(null);
     setNote(null);
     void fetchRows();
-  }, [slug, fetchRows]);
+    void fetchNotes();
+  }, [slug, fetchRows, fetchNotes]);
 
   const saveCell = useCallback(
     async (id: number, field: EditableField, value: string): Promise<boolean> => {
@@ -197,6 +228,117 @@ export function MatrixPanel({ slug }: { slug: string }) {
     }
   }, [pendingDelete, slug, t]);
 
+  const createNote = useCallback(
+    async (row: MatrixRow, noteText: string, quoteText: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            matrixRowId: row.id,
+            paperId: row.paperId,
+            note: noteText,
+            quote: quoteText === '' ? null : quoteText,
+            source: 'matrix',
+          }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as {
+            error?: string;
+            code?: string;
+          } | null;
+          setNote({ text: errorText(t, data, t('notes.saveFail')), tone: 'error' });
+          return false;
+        }
+        const data = (await res.json().catch(() => null)) as { note?: unknown } | null;
+        const created = data?.note ? parsePaperNoteJson(data.note) : null;
+        if (created) setNotes((prev) => [...prev, created]);
+        setNote({ text: t('notes.added'), tone: 'ok' });
+        return true;
+      } catch {
+        setNote({ text: t('notes.saveFail'), tone: 'error' });
+        return false;
+      }
+    },
+    [slug, t],
+  );
+
+  const updateNote = useCallback(
+    async (id: number, patch: { note?: string; quote?: string | null }): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/notes`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, ...patch }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as {
+            error?: string;
+            code?: string;
+          } | null;
+          setNote({ text: errorText(t, data, t('notes.saveFail')), tone: 'error' });
+          return false;
+        }
+        const data = (await res.json().catch(() => null)) as { note?: unknown } | null;
+        const updated = data?.note ? parsePaperNoteJson(data.note) : null;
+        if (updated) setNotes((prev) => prev.map((item) => (item.id === id ? updated : item)));
+        return true;
+      } catch {
+        setNote({ text: t('notes.saveFail'), tone: 'error' });
+        return false;
+      }
+    },
+    [slug, t],
+  );
+
+  const deleteNote = useCallback(
+    async (id: number): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/notes`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as {
+            error?: string;
+            code?: string;
+          } | null;
+          setNote({ text: errorText(t, data, t('notes.saveFail')), tone: 'error' });
+          return false;
+        }
+        setNotes((prev) => prev.filter((item) => item.id !== id));
+        setNote({ text: t('notes.deleted'), tone: 'ok' });
+        return true;
+      } catch {
+        setNote({ text: t('notes.saveFail'), tone: 'error' });
+        return false;
+      }
+    },
+    [slug, t],
+  );
+
+  /** Satu klik: kutipan dari catatan → kolom Kutipan baris (PATCH matrix). */
+  const pushQuote = useCallback(
+    async (row: MatrixRow, item: PaperNote) => {
+      const quote = item.quote?.trim() ?? '';
+      if (quote === '') return;
+      const current = row.kutipan.trim();
+      if (current.includes(quote)) {
+        setNote({ text: t('notes.pushedAlready'), tone: 'ok' });
+        return;
+      }
+      const next = current === '' ? quote : `${current}\n${quote}`;
+      const ok = await saveCell(row.id, 'kutipan', next);
+      if (ok) {
+        setNote({ text: t('notes.pushed'), tone: 'ok' });
+      } else {
+        setNote({ text: t('notes.saveFail'), tone: 'error' });
+      }
+    },
+    [saveCell, t],
+  );
+
   const exportMarkdown = useCallback(async () => {
     if (rows.length === 0) {
       setNote({ text: t('matrix.exportEmpty'), tone: 'error' });
@@ -243,6 +385,18 @@ export function MatrixPanel({ slug }: { slug: string }) {
           ),
     [rows, q],
   );
+
+  /** Catatan dikelompokkan per baris matriks (catatan tanpa baris = catatan paper). */
+  const notesByRow = useMemo(() => {
+    const map = new Map<number, PaperNote[]>();
+    for (const item of notes) {
+      if (item.matrixRowId === null) continue;
+      const list = map.get(item.matrixRowId);
+      if (list) list.push(item);
+      else map.set(item.matrixRowId, [item]);
+    }
+    return map;
+  }, [notes]);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -312,55 +466,87 @@ export function MatrixPanel({ slug }: { slug: string }) {
               </tr>
             </thead>
             <tbody>
-              {visible.map((row) => (
-                <tr key={row.id} className="border-b border-border align-top">
-                  <td className="px-2 py-1.5">
-                    <p className="text-[11px] font-medium leading-snug text-foreground">
-                      {row.title}
-                    </p>
-                    <p className="text-[10px] leading-snug text-muted-foreground">
-                      {[row.authors.join(', '), row.year !== null ? String(row.year) : '']
-                        .filter((part) => part !== '')
-                        .join(' — ')}
-                    </p>
-                  </td>
-                  <EditableCell
-                    value={row.tema}
-                    label={t('matrix.tema')}
-                    placeholder={t('matrix.temaPh')}
-                    onCommit={(value) => saveCell(row.id, 'tema', value)}
-                  />
-                  <EditableCell
-                    value={row.metode}
-                    label={t('matrix.metode')}
-                    placeholder={t('matrix.metodePh')}
-                    onCommit={(value) => saveCell(row.id, 'metode', value)}
-                  />
-                  <EditableCell
-                    value={row.temuan}
-                    label={t('matrix.temuan')}
-                    placeholder={t('matrix.temuanPh')}
-                    onCommit={(value) => saveCell(row.id, 'temuan', value)}
-                  />
-                  <EditableCell
-                    value={row.kutipan}
-                    label={t('matrix.kutipan')}
-                    placeholder={t('matrix.kutipanPh')}
-                    onCommit={(value) => saveCell(row.id, 'kutipan', value)}
-                  />
-                  <td className="px-1 py-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setPendingDelete(row)}
-                      title={t('matrix.removeRow')}
-                      aria-label={t('matrix.removeRow')}
-                      className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <X size={12} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {visible.map((row) => {
+                const rowNotes = notesByRow.get(row.id) ?? [];
+                const expanded = expandedRowId === row.id;
+                return (
+                  <Fragment key={row.id}>
+                    <tr className="border-b border-border align-top">
+                      <td className="px-2 py-1.5">
+                        <p className="text-[11px] font-medium leading-snug text-foreground">
+                          {row.title}
+                        </p>
+                        <p className="text-[10px] leading-snug text-muted-foreground">
+                          {[row.authors.join(', '), row.year !== null ? String(row.year) : '']
+                            .filter((part) => part !== '')
+                            .join(' — ')}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedRowId(expanded ? null : row.id)}
+                          title={expanded ? t('notes.collapse') : t('notes.expand')}
+                          aria-expanded={expanded}
+                          className="mt-1 inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                          <StickyNote size={10} />
+                          {t('notes.count', { n: rowNotes.length })}
+                        </button>
+                      </td>
+                      <EditableCell
+                        value={row.tema}
+                        label={t('matrix.tema')}
+                        placeholder={t('matrix.temaPh')}
+                        onCommit={(value) => saveCell(row.id, 'tema', value)}
+                      />
+                      <EditableCell
+                        value={row.metode}
+                        label={t('matrix.metode')}
+                        placeholder={t('matrix.metodePh')}
+                        onCommit={(value) => saveCell(row.id, 'metode', value)}
+                      />
+                      <EditableCell
+                        value={row.temuan}
+                        label={t('matrix.temuan')}
+                        placeholder={t('matrix.temuanPh')}
+                        onCommit={(value) => saveCell(row.id, 'temuan', value)}
+                      />
+                      <EditableCell
+                        value={row.kutipan}
+                        label={t('matrix.kutipan')}
+                        placeholder={t('matrix.kutipanPh')}
+                        onCommit={(value) => saveCell(row.id, 'kutipan', value)}
+                      />
+                      <td className="px-1 py-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(row)}
+                          title={t('matrix.removeRow')}
+                          aria-label={t('matrix.removeRow')}
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <X size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                    {expanded && (
+                      <tr className="border-b border-border bg-muted/40">
+                        <td colSpan={6} className="px-2 py-2">
+                          <RowNotes
+                            notes={rowNotes}
+                            loading={notesLoading}
+                            onCreate={(noteText, quoteText) =>
+                              createNote(row, noteText, quoteText)
+                            }
+                            onUpdate={updateNote}
+                            onDelete={deleteNote}
+                            onPushQuote={(item) => void pushQuote(row, item)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -500,6 +686,211 @@ function EditableCell({
         )}
       </div>
     </td>
+  );
+}
+
+/**
+ * Catatan satu baris matriks: daftar catatan (isi + kutipan) plus form
+ * tambah catatan baru. Kutipan bisa didorong ke kolom Kutipan baris dengan
+ * satu klik.
+ */
+function RowNotes({
+  notes,
+  loading,
+  onCreate,
+  onUpdate,
+  onDelete,
+  onPushQuote,
+}: {
+  notes: PaperNote[];
+  loading: boolean;
+  onCreate: (noteText: string, quoteText: string) => Promise<boolean>;
+  onUpdate: (id: number, patch: { note?: string; quote?: string | null }) => Promise<boolean>;
+  onDelete: (id: number) => Promise<boolean>;
+  onPushQuote: (item: PaperNote) => void;
+}) {
+  const t = useT();
+  const [noteText, setNoteText] = useState('');
+  const [quoteText, setQuoteText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    const clean = noteText.trim();
+    if (clean === '' || busy) return;
+    setBusy(true);
+    try {
+      const ok = await onCreate(clean, quoteText.trim());
+      if (ok) {
+        setNoteText('');
+        setQuoteText('');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {loading ? (
+        <p className="text-[11px] text-muted-foreground">…</p>
+      ) : notes.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground">{t('notes.emptyRow')}</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {notes.map((item) => (
+            <li key={item.id} className="rounded-md border border-border bg-card p-2">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <NoteField
+                    value={item.note}
+                    label={t('notes.noteLabel')}
+                    placeholder={t('notes.notePh')}
+                    onCommit={(value) => onUpdate(item.id, { note: value })}
+                  />
+                  <NoteField
+                    value={item.quote ?? ''}
+                    label={t('notes.quoteLabel')}
+                    placeholder={t('notes.quotePh')}
+                    rows={1}
+                    onCommit={(value) => onUpdate(item.id, { quote: value === '' ? null : value })}
+                  />
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onPushQuote(item)}
+                    disabled={!item.quote?.trim()}
+                    title={t('notes.pushQuote')}
+                    aria-label={t('notes.pushQuote')}
+                    className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-accent disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Quote size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onDelete(item.id)}
+                    title={t('notes.delete')}
+                    aria-label={t('notes.delete')}
+                    className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {item.source === 'matrix' ? t('notes.sourceMatrix') : t('notes.sourceManual')}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="rounded-md border border-dashed border-border p-2">
+        <textarea
+          value={noteText}
+          onChange={(event) => setNoteText(event.target.value)}
+          placeholder={t('notes.addPlaceholder')}
+          aria-label={t('notes.noteLabel')}
+          rows={2}
+          className="w-full resize-y rounded border border-border bg-background px-1.5 py-1 text-[11px] leading-snug text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary"
+        />
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <TextInput
+            value={quoteText}
+            onChange={(event) => setQuoteText(event.target.value)}
+            placeholder={t('notes.quotePlaceholder')}
+            aria-label={t('notes.quoteLabel')}
+            className="h-8 text-xs"
+          />
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={busy || noteText.trim() === ''}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+            {t('notes.add')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Isi catatan/kutipan — disimpan saat blur (atau Ctrl/Cmd+Enter). */
+function NoteField({
+  value,
+  label,
+  placeholder,
+  rows = 2,
+  onCommit,
+}: {
+  value: string;
+  label: string;
+  placeholder: string;
+  rows?: number;
+  onCommit: (value: string) => Promise<boolean>;
+}) {
+  const t = useT();
+  const [draft, setDraft] = useState(value);
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const commit = async () => {
+    if (draft === value) {
+      setStatus('idle');
+      return;
+    }
+    setStatus('saving');
+    const ok = await onCommit(draft);
+    if (ok) {
+      setStatus('saved');
+    } else {
+      setDraft(value);
+      setStatus('error');
+    }
+  };
+
+  const tone = status === 'saving' ? 'amber' : status === 'saved' ? 'green' : 'red';
+  const title =
+    status === 'saving'
+      ? t('notes.saving')
+      : status === 'saved'
+        ? t('notes.saved')
+        : status === 'error'
+          ? t('notes.saveFail')
+          : '';
+
+  return (
+    <div className="relative">
+      <textarea
+        value={draft}
+        aria-label={label}
+        placeholder={placeholder}
+        rows={rows}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          setStatus('idle');
+        }}
+        onBlur={() => {
+          void commit();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' || (event.key === 'Enter' && (event.metaKey || event.ctrlKey))) {
+            event.currentTarget.blur();
+          }
+        }}
+        className="w-full resize-y rounded border border-border bg-background px-1.5 py-1 text-[11px] leading-snug text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary"
+      />
+      {status !== 'idle' && (
+        <span className="absolute bottom-1 right-1">
+          <StatusDot tone={tone} title={title} />
+        </span>
+      )}
+    </div>
   );
 }
 

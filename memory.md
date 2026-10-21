@@ -208,4 +208,16 @@ Tab baru di rail kiri (`matrix`, ikon `TableProperties` — jangan `Table2`, itu
 - `session.remove({sessionID})` BUKAN `{id}`; `client.session.create` → `session.list({directory})` → `session.prompt({sessionID,text})`.
 - Loop playback: stream SSE `/api/ai/stream?sessionId=…`; event `permission` (data.id = requestId) → balas `POST /api/ai/permission` `{sessionId, requestId, decision:'once'}` (meniru user klik "Allow once").
 - Symlink `~/.agentmemory/secret` = Bearer token REST agentmemory. **REST-nya sempat mati total** (semua route 404) karena engine `iii` jalan tanpa worker agentmemory →修复: `CI=1 EMBEDDING_PROVIDER=local npx -y @agentmemory/agentmemory@latest` (start ulang). Data mentah tetap ada di `~/.local/share/agentmemory/state_store.db/mem%3Amemories.bin` (JSON polos + trailer biner — parse sampai `lastIndexOf('}')`).
-- Repo `~/.tier1-test` + `~/.local/share/agentmemory` = artefak tes; project test leftover di DB (`probe-wc`, `tier1-test`) **belum dibersih** dari tabel `projects`.
+- Repo `~/.tier1-test` + `~/.local/share/agentmemory` = artefak tes; project test `probe-wc` (foldernya udah dihapus) **sudah dibersih** dari tabel `projects`, `tier1-test` sengaja dibiarin buat tes statistik lanjutan.
+- **`.commandcode/`** = folder tooling sesi CommandCode → sudah masuk `.gitignore` (jangan ikut commit).
+
+### 11.6 Tier 2 item 2 — Anotasi PDF ringan (selesai)
+
+Catatan/kutipan dari paper, menempel ke baris matriks (atau ke paper doang), lalu bisa didorong ke kolom `kutipan` dalam satu klik.
+- Table DB baru `paper_notes` (id, slug, paper_id, matrix_row_id FK→`matrix_rows.id` ON DELETE SET NULL, note, quote, source, created_at). Diterapkan `npx drizzle-kit push --force` (prompt-nya butuh TTY) → hanya CREATE TABLE baru, data lama utuh.
+- API: `GET/POST/PATCH/DELETE /api/projects/[slug]/notes`; `GET` bisa disaring `?paperId=` / `?matrixRowId=`. Error pakai `{ error, code }` dengan code `notes.noteMissing` / `notes.rowMissing` / `notes.notFound` (bisa diterjemahkan client via `errorText`).
+- Panel matriks: chip "N catatan" di sel Paper → expand jadi baris tambahan (`<tr>` colspan 6) berisi daftar catatan (isi + kutipan, auto-save saat blur), tombol hapus, dan form tambah. Tombol "kutip" (ikon `Quote`) PATCH `/matrix` kolom `kutipan` — kalau sel sudah ada isi, kutipan di-append (dilewati kalau sudah ada).
+- Baris matriks dihapus → `matrix_row_id` catatannya di-null-kan (catatan tetap nempel ke paper). FK-nya juga `ON DELETE SET NULL`, tapi `PRAGMA foreign_keys` di `src/lib/db/index.ts` gak di-set ON, jadi cleanup dilakukan di app level.
+- Preview PDF di tab tengah (`src/components/center/file-view.tsx`): PDF di `referensi/` yang namanya cocok dengan paper di Perpustakaan nampilin chip "N catatan" + panel catatan (read-only). Cocok dari nama berkas ↔ paperId / judul / turunan DOI (`src/lib/notes/match.ts`, `pdfFileStem` meniru route `/api/journals/pdf`).
+- i18n: `notes.*` 28 key, id/en parity 554 → **582/582**.
+- Yang SENGAJA gak dibangun: canvas overlay / PDF.js text-layer annotator / alat gambar (editor PDF visual = lift besar sendiri), dan tombol push-kutipan di preview PDF (cukup di panel matriks).

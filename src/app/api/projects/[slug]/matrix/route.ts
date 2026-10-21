@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { matrixRows, projects, savedPapers } from '@/lib/db/schema';
+import { matrixRows, paperNotes, projects, savedPapers } from '@/lib/db/schema';
 import { stringifyAuthors, toMatrixRow } from '@/lib/matrix/types';
 import type { JournalCard } from '@/lib/journals/types';
 
@@ -245,6 +245,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ s
       .where(and(eq(matrixRows.id, parsed.data.id), eq(matrixRows.slug, slug)))
       .returning({ id: matrixRows.id });
     if (deleted.length === 0) return fail('Baris matriks tidak ditemukan', 404);
+
+    // Catatan baris ini dilepas dari matriks (tetap nempel ke paper).
+    await db
+      .update(paperNotes)
+      .set({ matrixRowId: null })
+      .where(and(eq(paperNotes.matrixRowId, parsed.data.id), eq(paperNotes.slug, slug)));
 
     return NextResponse.json({ ok: true, deleted: deleted.length });
   } catch (error) {

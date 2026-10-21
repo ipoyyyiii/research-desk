@@ -49,3 +49,6 @@ data/
 *.db-shm
 public/wordcraft/
 public/gridcraft/
+
+# CommandCode session tooling
+.commandcode/

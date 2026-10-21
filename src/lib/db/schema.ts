@@ -65,3 +65,22 @@ export const matrixRows = sqliteTable('matrix_rows', {
 
 export type MatrixRowRecord = typeof matrixRows.$inferSelect;
 export type NewMatrixRow = typeof matrixRows.$inferInsert;
+
+// Catatan ringan dari paper (anotasi PDF versi txt). Satu catatan bisa
+// nempel ke paper library (paperId), ke baris matriks (matrixRowId), atau
+// keduanya. paperId NULL = catatan bebas (mis. file PDF lepas).
+// matrixRowId NULL = catatan Attached ke paper doang (dibaca di preview PDF).
+// source = cara penangkapan: 'manual' | 'matrix'.
+export const paperNotes = sqliteTable('paper_notes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  slug: text('slug').notNull(),
+  paperId: text('paper_id'),
+  matrixRowId: integer('matrix_row_id').references(() => matrixRows.id, { onDelete: 'set null' }),
+  note: text('note').notNull(),
+  quote: text('quote'),
+  source: text('source').notNull().default('manual'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+export type PaperNoteRecord = typeof paperNotes.$inferSelect;
+export type NewPaperNote = typeof paperNotes.$inferInsert;

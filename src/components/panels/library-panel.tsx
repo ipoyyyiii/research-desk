@@ -40,7 +40,7 @@ export function LibraryPanel({
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch(`/api/journals/saved?slug=${encodeURIComponent(slug)}`);
+      const res = await fetch(`/api/journals/save?slug=${encodeURIComponent(slug)}`);
       const data: unknown = await res.json();
       const raw = res.ok && data && typeof data === 'object' && Array.isArray((data as { results?: unknown }).results)
         ? ((data as { results: unknown[] }).results)
