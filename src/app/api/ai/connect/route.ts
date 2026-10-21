@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { NextResponse } from 'next/server';
-import { getAuthState } from '@/lib/opencode/service';
+import { ensureServer, getAuthState } from '@/lib/opencode/service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -98,28 +98,56 @@ function killEntry(entry: ConnectEntry | undefined): void {
   entry.done = true;
 }
 
+/**
+ * Putuskan kredensial lama, biar login ulang bisa ganti akun.
+ * Pakai API service (CLI `auth logout` butuh credential id + terminal
+ * interaktif, dan di server ga ada TTY).
+ */
+async function logoutExisting(): Promise<void> {
+  try {
+    const client = await ensureServer();
+    const credentials = await client.credential.list();
+    for (const credential of credentials) {
+      if (credential.integrationID !== 'openai') continue;
+      await client.credential.remove({ credentialID: credential.id }).catch(() => undefined);
+    }
+  } catch (error) {
+    console.error('[api/ai/connect] gagal lepas kredensial lama:', error);
+  }
+}
+
 export async function POST(request: Request) {
   const params = new URL(request.url).searchParams;
   const method = (params.get('method') === 'link' ? 'link' : 'device') as 'device' | 'link';
   const restart = params.get('restart') === '1';
+  // force=1 → login ulang: kredensial lama dilepas dulu. Dipakai waktu provider
+  // terdaftar tapi semua modelnya ditolak server (mis. akun ChatGPT tanpa
+  // akses Codex) — tanpa ini app tak bisa ngeluarin form login baru.
+  const force = params.get('force') === '1';
 
-  // Sudah tersambung? tak perlu apa-apa.
-  try {
-    const status = await getAuthState();
-    if (status.connected) {
-      return NextResponse.json({ ...snapshot(undefined), connected: true });
+  if (force) {
+    killEntry(g.__rdOcConnect);
+    g.__rdOcConnect = undefined;
+    await logoutExisting();
+  } else {
+    // Sudah tersambung? tak perlu apa-apa.
+    try {
+      const status = await getAuthState();
+      if (status.connected) {
+        return NextResponse.json({ ...snapshot(undefined), connected: true });
+      }
+    } catch {
+      // lanjut — status mungkin gagal; flow auth jalan terus
     }
-  } catch {
-    // lanjut — status mungkin gagal; flow auth jalan terus
-  }
 
-  const current = g.__rdOcConnect;
-  if (current && !current.done) {
-    const sameMethod = current.method === method;
-    if (sameMethod && !restart) {
-      return NextResponse.json({ ...snapshot(current), connected: false });
+    const current = g.__rdOcConnect;
+    if (current && !current.done) {
+      const sameMethod = current.method === method;
+      if (sameMethod && !restart) {
+        return NextResponse.json({ ...snapshot(current), connected: false });
+      }
+      killEntry(current);
     }
-    killEntry(current);
   }
 
   const entry = startEntry(method);

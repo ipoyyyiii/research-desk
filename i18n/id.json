@@ -181,6 +181,7 @@
     "capLiteratureDesc": "Agent boleh manggil API OpenAlex/Crossref/Semantic Scholar — tampil judul, penulis, tahun, DOI, sitasi.",
     "capabilitiesNote": "Dipakai agent mulai chat berikutnya. Disimpan di config project (.opencode), bukan cloud.",
     "doctor": "Cek koneksi AI",
+    "doctorReconnect": "Masuk ulang / ganti akun",
     "doctorTitle": "Diagnosa koneksi AI",
     "doctorRunning": "Mencoba satu model per provider…",
     "doctorEmpty": "Gak ada provider buat dicek.",

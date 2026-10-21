@@ -833,10 +833,10 @@ export function AgentView({
   }, []);
 
   const connect = useCallback(
-    async (mode: 'device' | 'link' = 'device', restart = false) => {
+    async (mode: 'device' | 'link' = 'device', restart = false, force = false) => {
       try {
         const res = await fetch(
-          `/api/ai/connect?method=${mode}${restart ? '&restart=1' : ''}`,
+          `/api/ai/connect?method=${mode}${restart ? '&restart=1' : ''}${force ? '&force=1' : ''}`,
           { method: 'POST' },
         );
         const data = (await res.json()) as {
@@ -944,7 +944,12 @@ export function AgentView({
         onSend={(text) => void send(text)}
         activeFilePath={activeFilePath}
         connected={connected ?? false}
-        onConnect={() => void connect()}
+        onConnect={() => void connect('device', false, true)}
+        onReconnect={() => void connect('device', false, true)}
+        onDoctorResult={(usable) => {
+          // Gak ada satu pun model yang bisa dipakai -> jangan ngaku "terhubung".
+          if (!usable) setConnected(false);
+        }}
         busy={busy}
         models={models}
         currentModel={currentModel}

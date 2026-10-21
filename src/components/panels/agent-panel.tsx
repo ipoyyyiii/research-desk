@@ -76,6 +76,10 @@ export type AgentPanelProps = {
   /** Auth OpenCode (mis. provider ChatGPT) sudah tersambung? */
   connected: boolean;
   onConnect: () => void;
+  /** Login ulang / ganti akun ChatGPT (kredensial lama dilepas dulu). */
+  onReconnect?: () => void;
+  /** Hasil diagnosa: ada model yang bisa dipakai atau tidak. */
+  onDoctorResult?: (usable: boolean) => void;
   /** Agent sedang mengerjakan sesuatu (tampilkan bubble "mengetik…"). */
   busy: boolean;
   /** Tutup panel kanan — dipanggil dari tombol arrow di header panel. */
@@ -265,6 +269,8 @@ export function AgentPanel({
   activeFilePath,
   connected,
   onConnect,
+  onReconnect,
+  onDoctorResult,
   busy,
   onCollapse,
   models,
@@ -310,8 +316,12 @@ export function AgentPanel({
     try {
       const res = await fetch('/api/ai/doctor');
       const data = (await res.json().catch(() => null)) as DoctorReport | null;
-      if (res.ok && data) setDoctor(data);
-      else setDoctor({ findings: [], checkedAt: new Date().toISOString(), error: 'Gagal menjalankan diagnosa' });
+      if (res.ok && data) {
+        setDoctor(data);
+        onDoctorResult?.(data.findings.some((finding) => finding.status === 'ok'));
+      } else {
+        setDoctor({ findings: [], checkedAt: new Date().toISOString(), error: 'Gagal menjalankan diagnosa' });
+      }
     } catch {
       setDoctor({ findings: [], checkedAt: new Date().toISOString(), error: 'Gagal menjalankan diagnosa' });
     } finally {
@@ -795,6 +805,25 @@ export function AgentPanel({
                 )}
               </div>
             ))}
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            {doctor?.findings.some(
+              (finding) => finding.status === 'not-supported' || finding.status === 'auth',
+            ) && (
+              <Button
+                variant="outline"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => {
+                  setDoctorOpen(false);
+                  onReconnect?.();
+                }}
+              >
+                {t('ai.doctorReconnect')}
+              </Button>
+            )}
+            <Button variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setDoctorOpen(false)}>
+              {t('common.close')}
+            </Button>
+          </div>
         </div>
       </Modal>
     </aside>
