@@ -99,7 +99,11 @@
     "exportApa": "APA",
     "exportIeee": "IEEE",
     "exportBusy": "Mengekspor…",
-    "exportDone": "Siap — klik untuk unduh"
+    "exportDone": "Siap — klik untuk unduh",
+    "exportSources": "impor ke Word",
+    "exportCheck": "Cek sitasi ↔ pustaka",
+    "exportMissing": "Sitasi tanpa entri pustaka: {keys}",
+    "exportUnused": "{n} entri pustaka belum dipakai"
   },
   "chat": {
     "title": "Chat",
@@ -267,7 +271,9 @@
     "permission": "Gagal memproses izin.",
     "loadFocus": "Gagal memuat — coba lagi saat window fokus",
     "export": "Ekspor .docx gagal (cek log server)",
-    "citeSave": "Simpan jurnal gagal"
+    "citeSave": "Simpan jurnal gagal",
+    "sourcesNoBib": "references.bib belum ada atau kosong",
+    "citeCheck": "Gagal cek konsistensi sitasi"
   },
   "w": {
     "tagline": "Satu tempat untuk nulis skripsi + baca jurnal + tanya AI.",
@@ -529,5 +535,15 @@
   "brand": {
     "name": "research-desk",
     "home": "Ke halaman awal"
+  },
+  "citeCheck": {
+    "title": "Konsistensi Sitasi",
+    "busy": "Memeriksa…",
+    "summary": "{docs} file dicek · {bib} entri pustaka · {files} file pakai sitasi",
+    "noBib": "references.bib belum ada. Simpan jurnal dulu buat bikin pustaka.",
+    "noMissing": "Aman — semua sitasi punya entri.",
+    "missingTitle": "Sitasi tanpa entri",
+    "unusedTitle": "Entri belum dipakai",
+    "noUnused": "Semua entri kepakai."
   }
 }

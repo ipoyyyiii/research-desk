@@ -6,6 +6,8 @@ import { promisify } from 'node:util';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
+import { parseBib } from '@/lib/journals/bib';
+import { checkCitations } from '@/lib/citations/check';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -51,11 +53,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   try {
     const { slug } = await params;
     const body = (await request.json().catch(() => null)) as
-      | { path?: string; style?: string; out?: 'docx' | 'pdf' }
+      | { path?: string; style?: string; out?: 'docx' | 'pdf'; bibliographyTitle?: string }
       | null;
     const rel = (body?.path ?? '').trim();
     const style = body?.style ?? 'apa';
     const outFmt = body?.out === 'pdf' ? 'pdf' : 'docx';
+    const bibliographyTitle =
+      (body?.bibliographyTitle ?? '').trim().slice(0, 120) || 'Daftar Pustaka';
 
     if (rel.length === 0) {
       return NextResponse.json({ error: 'Path file wajib diisi' }, { status: 400 });
@@ -81,6 +85,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const bibAbs = path.join(folder, 'references.bib');
     const bib = await fs.stat(bibAbs).then(() => true).catch(() => false);
 
+    // Cek sitasi SEBELUM ekspor: key `[@x]` tanpa entri bikin pandoc menulis
+    // "(x?)" diam-diam (exit 0), jadi peringatannya kita hitung sendiri.
+    const markdown = await fs.readFile(src, 'utf8').catch(() => '');
+    const bibKeys = bib
+      ? parseBib(await fs.readFile(bibAbs, 'utf8').catch(() => '')).map((entry) => entry.key)
+      : [];
+    const citationCheck = checkCitations(markdown, bibKeys);
+    const warnings = {
+      missingCitations: citationCheck.missing,
+      unusedEntries: citationCheck.unused.length,
+    };
+
     const base = path.basename(src, path.extname(src));
     const outDir = path.dirname(rel.replace(/^\/+/, ''));
 
@@ -104,7 +120,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
           '-o', tmpHtml,
         ];
         if (bib) {
-          args.push('--citeproc', '--bibliography', bibAbs, '--csl', cslAbs);
+          args.push(
+            '--citeproc',
+            '--bibliography',
+            bibAbs,
+            '--csl',
+            cslAbs,
+            '--metadata',
+            `reference-section-title=${bibliographyTitle}`,
+          );
         }
 
         await exec('pandoc', args, { timeout: 90_000, maxBuffer: 24 * 1024 * 1024 });
@@ -119,7 +143,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
           maxBuffer: 8 * 1024 * 1024,
         });
 
-        return NextResponse.json({ ok: true, out: outRel, citeproc: bib });
+        return NextResponse.json({ ok: true, out: outRel, citeproc: bib, warnings });
       } finally {
         await fs.rm(tmpHtml, { force: true }).catch(() => undefined);
       }
@@ -127,7 +151,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
     const args = [src, '-f', 'markdown', '-t', 'docx', '--resource-path', folder];
     if (bib) {
-      args.push('--citeproc', '--bibliography', bibAbs, '--csl', cslAbs);
+      args.push(
+        '--citeproc',
+        '--bibliography',
+        bibAbs,
+        '--csl',
+        cslAbs,
+        '--metadata',
+        `reference-section-title=${bibliographyTitle}`,
+      );
     }
 
     const outRel = path.join(outDir, `${base}-export.docx`);
@@ -135,7 +167,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
     await exec('pandoc', [...args, '-o', outAbs], { timeout: 90_000, maxBuffer: 24 * 1024 * 1024 });
 
-    return NextResponse.json({ ok: true, out: outRel, citeproc: bib });
+    return NextResponse.json({ ok: true, out: outRel, citeproc: bib, warnings });
   } catch (error) {
     console.error('[api/projects/export] POST gagal:', error);
     return NextResponse.json({ error: 'Ekspor gagal' }, { status: 500 });

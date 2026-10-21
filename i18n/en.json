@@ -99,7 +99,11 @@
     "exportApa": "APA",
     "exportIeee": "IEEE",
     "exportBusy": "Exporting…",
-    "exportDone": "Ready — click to download"
+    "exportDone": "Ready — click to download",
+    "exportSources": "import into Word",
+    "exportCheck": "Check citations ↔ library",
+    "exportMissing": "Citations missing from library: {keys}",
+    "exportUnused": "{n} library entries unused"
   },
   "chat": {
     "title": "Chat",
@@ -267,7 +271,9 @@
     "permission": "Failed to process the permission.",
     "loadFocus": "Failed to load — retry when the window regains focus",
     "export": "DOCX export failed (see server logs)",
-    "citeSave": "Failed to save the paper"
+    "citeSave": "Failed to save the paper",
+    "sourcesNoBib": "references.bib is missing or empty",
+    "citeCheck": "Citation consistency check failed"
   },
   "w": {
     "tagline": "One place to write your thesis + read journals + ask the AI.",
@@ -529,5 +535,15 @@
   "brand": {
     "name": "research-desk",
     "home": "Go to homepage"
+  },
+  "citeCheck": {
+    "title": "Citation Consistency",
+    "busy": "Checking…",
+    "summary": "{docs} files checked · {bib} library entries · {files} files with citations",
+    "noBib": "references.bib is empty. Save a journal first to build the library.",
+    "noMissing": "Clean — every citation has an entry.",
+    "missingTitle": "Citations without entries",
+    "unusedTitle": "Unused entries",
+    "noUnused": "Every entry is used."
   }
 }

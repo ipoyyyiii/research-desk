@@ -78,6 +78,10 @@ export const CitationMark = Mark.create({
  * Dipanggil setiap: onCreate + konten di-set ulang (loader file / agent edit).
  * Return: true kalau ada perubahan (dipakai autosave menyusul).
  */
+/** Satu bracket sitasi: `[@a]`, `[@a, p. 5]`, `[@a; @b]`, `[-@a]`. */
+const CITATION_RANGE = /\[[^[\]]*@[^[\]]*\]/g;
+const FIRST_KEY = /-?@([A-Za-z0-9_][A-Za-z0-9_:.-]*)/;
+
 export function applyCitationMarks(editor: Editor, editorInitialScan?: true): boolean {
   if (editor.isDestroyed) return false;
 
@@ -85,41 +89,54 @@ export function applyCitationMarks(editor: Editor, editorInitialScan?: true): bo
   if (!citationType) return false;
 
   const { doc, schema, tr } = editor.state;
-  let changed = false;
+  type Edit = { from: number; to: number; parts: ReturnType<typeof schema.text>[] };
+  const edits: Edit[] = [];
 
   doc.descendants((node, pos) => {
     if (!node.isText || node.marks.some((m) => m.type === citationType)) return;
 
     const text = node.text ?? '';
-    const re = /\[@([A-Za-z0-9_-]+)\]/g;
-    let match: RegExpExecArray | null;
+    // Bersihkan backslash sisa serializer sekaligus (chip di bawah gak di-escape).
+    const cleaned = normalizeCitationEscapes(text);
+    const ranges = [...cleaned.matchAll(CITATION_RANGE)];
+    if (cleaned === text && ranges.length === 0) return;
 
-    while ((match = re.exec(text)) !== null) {
-      const from = pos + match.index;
-      const to = from + match[0].length;
-      const chipNode = schema.text(match[0], [citationType.create({ key: match[1] })]);
-      tr.replaceWith(from, to, chipNode);
-      changed = true;
+    const parts: ReturnType<typeof schema.text>[] = [];
+    let cursor = 0;
+    for (const range of ranges) {
+      const index = range.index ?? 0;
+      if (index > cursor) {
+        parts.push(schema.text(cleaned.slice(cursor, index), node.marks));
+      }
+      const key = FIRST_KEY.exec(range[0])?.[1] ?? null;
+      parts.push(schema.text(range[0], [...node.marks, citationType.create({ key })]));
+      cursor = index + range[0].length;
     }
+    if (cursor < cleaned.length) {
+      parts.push(schema.text(cleaned.slice(cursor), node.marks));
+    }
+    edits.push({ from: pos, to: pos + text.length, parts });
   });
 
-  if (changed) {
-    tr.setMeta('addToHistory', false);
-    editor.view.dispatch(tr);
+  if (edits.length === 0) return false;
+
+  // Dari belakang biar posisi edit sebelumnya gak geser.
+  for (const edit of edits.sort((a, b) => b.from - a.from)) {
+    tr.replaceWith(edit.from, edit.to, edit.parts);
   }
+  tr.setMeta('addToHistory', false);
+  editor.view.dispatch(tr);
 
   void editorInitialScan;
-  return changed;
+  return true;
 }
 
 /**
- * Satu-satunya keunikan file: TEKS yang moto `[@key]` di file serialize Tiptap
- * jadi `\[@key\]` (escaping kecil) → pandoc gak kenal. Normalizer menyelametkannya:
- * khusus pattern `\[@key\]` menjadi `[@key]` lagi sebelum ditulis ke file
- * (pattern lain gak disentuh — aman buat teks escape lain).
+ * Tiptap markdown menulis bracket sitasi sebagai `\[@key\]`. Normalizer
+ * mengembalikannya jadi `[@key]` — termasuk locator (`[@key, p. 5]`),
+ * multi-cite (`[@a; @b]`), dan backslash yang sempat menumpuk dari save lama.
+ * Hanya bracket yang mengandung `@` yang disentuh; teks/link lain aman.
  */
 export function normalizeCitationEscapes(markdown: string): string {
-  return markdown.replace(/\\?\[@([A-Za-z0-9_-]+)\\?\]/g, (match, key: string) =>
-    match.includes('\\') ? `[@${key}]` : match,
-  );
+  return markdown.replace(/\\*\[([^[\]]*@[^[\]]*?)\\*\]/g, (_match, inner: string) => `[${inner}]`);
 }

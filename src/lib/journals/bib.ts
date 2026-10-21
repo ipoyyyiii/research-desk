@@ -65,6 +65,8 @@ export function extractBibKeys(content: string): string[] {
 /** Entry ter-parse dari references.bib — buat list sitasi + chip tooltip. */
 export type BibEntry = {
   key: string;
+  /** Jenis entry BibTeX (article/book/…, lowercase) — buat sources.xml Word. */
+  type: string | null;
   title: string;
   authors: string[];
   year: string | null;
@@ -119,6 +121,7 @@ export function parseBib(content: string): BibEntry[] {
     const keyStart = content.indexOf(',', brace);
     if (keyStart < 0) break;
     const key = content.slice(brace + 1, keyStart).trim();
+    const type = content.slice(at + 1, brace).trim().toLowerCase() || null;
 
     let depth = 1;
     let end = keyStart + 1;
@@ -133,6 +136,7 @@ export function parseBib(content: string): BibEntry[] {
     if (key.length > 0) {
       entries.push({
         key,
+        type,
         title: field(block, 'title') ?? '',
         authors: (field(block, 'author') ?? '')
           .split(/ and /i)

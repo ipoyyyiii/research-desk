@@ -234,12 +234,31 @@ export function Ribbon({
   const [exportBusy, setExportBusy] = useState(false);
   const [exportResult, setExportResult] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportWarnings, setExportWarnings] = useState<{
+    missingCitations: string[];
+    unusedEntries: number;
+  } | null>(null);
+  const [sourcesBusy, setSourcesBusy] = useState(false);
+
+  // Cek konsistensi sitasi ↔ pustaka (semua file .md project).
+  const [checkOpen, setCheckOpen] = useState(false);
+  const [checkBusy, setCheckBusy] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const [checkData, setCheckData] = useState<{
+    hasBib: boolean;
+    bibTotal: number;
+    docsScanned: number;
+    files: Array<{ path: string; citations: number; missing: string[] }>;
+    missing: string[];
+    unused: string[];
+  } | null>(null);
 
   const doExport = async (style: 'apa' | 'ieee', out: 'docx' | 'pdf' = 'docx') => {
     setExportOpen(false);
     setExportBusy(true);
     setExportError(null);
     setExportResult(null);
+    setExportWarnings(null);
     try {
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/export`, {
         method: 'POST',
@@ -247,12 +266,69 @@ export function Ribbon({
         body: JSON.stringify({ path: filePath, style, out }),
       });
       const data = await res.json();
-      if (res.ok && data?.out) setExportResult(data.out);
-      else setExportError(t('err.export'));
+      if (res.ok && data?.out) {
+        setExportResult(data.out);
+        if (data?.warnings) {
+          setExportWarnings({
+            missingCitations: Array.isArray(data.warnings.missingCitations)
+              ? data.warnings.missingCitations
+              : [],
+            unusedEntries: Number(data.warnings.unusedEntries ?? 0),
+          });
+        }
+      } else {
+        setExportError(t('err.export'));
+      }
     } catch {
       setExportError(t('err.server'));
     } finally {
       setExportBusy(false);
+    }
+  };
+
+  /** Unduh sources.xml (impor ke Word: References > Manage Sources > Browse). */
+  const downloadSources = async () => {
+    setExportOpen(false);
+    setSourcesBusy(true);
+    setExportError(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/bib/sources`);
+      if (!res.ok) {
+        setExportError(t('err.sourcesNoBib'));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'sources.xml';
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch {
+      setExportError(t('err.server'));
+    } finally {
+      setSourcesBusy(false);
+    }
+  };
+
+  const openCitationCheck = async () => {
+    setExportOpen(false);
+    setCheckOpen(true);
+    setCheckBusy(true);
+    setCheckError(null);
+    setCheckData(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/citations/check`);
+      const data = await res.json();
+      if (!res.ok) {
+        setCheckError(t('err.citeCheck'));
+        return;
+      }
+      setCheckData(data);
+    } catch {
+      setCheckError(t('err.server'));
+    } finally {
+      setCheckBusy(false);
     }
   };
 
@@ -574,6 +650,22 @@ export function Ribbon({
               >
                 .pdf — {t('toolbar.exportIeee')}
               </button>
+              <div className="my-1 h-px bg-border" />
+              <button
+                type="button"
+                disabled={sourcesBusy}
+                className="w-full cursor-pointer rounded px-2 py-1 text-left transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => void downloadSources()}
+              >
+                sources.xml — {t('toolbar.exportSources')}
+              </button>
+              <button
+                type="button"
+                className="w-full cursor-pointer rounded px-2 py-1 text-left transition-colors hover:bg-muted"
+                onClick={() => void openCitationCheck()}
+              >
+                {t('toolbar.exportCheck')}
+              </button>
             </div>
           )}
         </div>
@@ -593,7 +685,84 @@ export function Ribbon({
           — {t('toolbar.exportDone')}
         </p>
       )}
+      {exportWarnings && exportWarnings.missingCitations.length > 0 && (
+        <p className="px-1 pb-1 text-[11px] text-red-600">
+          {t('toolbar.exportMissing', {
+            keys: exportWarnings.missingCitations.slice(0, 6).join(', '),
+          })}
+          {exportWarnings.missingCitations.length > 6 ? '…' : ''}
+        </p>
+      )}
+      {exportWarnings && exportWarnings.unusedEntries > 0 && (
+        <p className="px-1 pb-1 text-[11px] text-muted-foreground">
+          {t('toolbar.exportUnused', { n: exportWarnings.unusedEntries })}
+        </p>
+      )}
       {exportError && <p className="px-1 pb-1 text-[11px] text-red-600">{exportError}</p>}
+
+      {/* Cek konsistensi sitasi ↔ pustaka (semua file .md project). */}
+      <Modal open={checkOpen} onClose={() => setCheckOpen(false)} title={t('citeCheck.title')}>
+        <div className="space-y-3 text-xs">
+          {checkBusy && <p className="text-muted-foreground">{t('citeCheck.busy')}</p>}
+          {checkError && <p className="text-red-600">{checkError}</p>}
+          {!checkBusy && !checkError && checkData && (
+            <>
+              <p className="text-muted-foreground">
+                {t('citeCheck.summary', {
+                  docs: checkData.docsScanned,
+                  bib: checkData.bibTotal,
+                  files: checkData.files.length,
+                })}
+              </p>
+              {!checkData.hasBib && (
+                <p className="text-muted-foreground">{t('citeCheck.noBib')}</p>
+              )}
+              {checkData.hasBib && checkData.missing.length === 0 && (
+                <p className="font-medium text-green-700">{t('citeCheck.noMissing')}</p>
+              )}
+              {checkData.missing.length > 0 && (
+                <div>
+                  <p className="mb-1 font-medium text-red-600">
+                    {t('citeCheck.missingTitle')} ({checkData.missing.length})
+                  </p>
+                  <ul className="max-h-32 overflow-y-auto rounded border border-border bg-muted/40 p-2 font-mono text-[11px]">
+                    {checkData.missing.map((key) => (
+                      <li key={key}>{key}</li>
+                    ))}
+                  </ul>
+                  {checkData.files.filter((file) => file.missing.length > 0).length > 0 && (
+                    <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                      {checkData.files
+                        .filter((file) => file.missing.length > 0)
+                        .map((file) => (
+                          <li key={file.path}>
+                            {file.path}: {file.missing.join(', ')}
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {checkData.hasBib && (
+                <div>
+                  <p className="mb-1 font-medium">
+                    {t('citeCheck.unusedTitle')} ({checkData.unused.length})
+                  </p>
+                  {checkData.unused.length === 0 ? (
+                    <p className="text-muted-foreground">{t('citeCheck.noUnused')}</p>
+                  ) : (
+                    <ul className="max-h-32 overflow-y-auto rounded border border-border bg-muted/40 p-2 font-mono text-[11px]">
+                      {checkData.unused.map((key) => (
+                        <li key={key}>{key}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </Modal>
 
       {uploadError && <p className="px-1 pb-1 text-[11px] text-red-600">{t('toolbar.uploadFailed')}: {uploadError}</p>}
 
