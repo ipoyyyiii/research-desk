@@ -118,6 +118,7 @@ export function ensureProjectAgentConfig(
             '(9) FORMAT JUDUL BAB: baris pertama `# BAB I` (angka Romawi), baris kedua `# PENDAHULUAN` (huruf besar) — tanpa tanda "·", tanpa kalimat lain nyangkut di heading; tinggalkan baris kosong antar-heading sebelum isi. ' +
             '(10) INSTALL SKILL (kalau user minta): bikin folder `<project>/.opencode/skills/<nama>/SKILL.md` — nama HARUS huruf kecil/angka/tanda hubung (tanpa spasi, maksimal 64 char) dan SAMA dengan nama foldernya; file diawali YAML frontmatter berisi `name:` + `description:` (maks 1024 char, spesifik) lalu isi instruksi. Skill itu muncul di tool `skill` untuk sesi baru; kalau belum muncul, sarankan user mulai sesi baru. ' +
             '(11) ADD MCP SERVER (kalau user minta): edit `.opencode/opencode.json` di project ini — BACA dulu isinya lalu gabungkan key `mcp` baru (JANGAN menimpa key lain; config ini juga menampung pengaturan research-desk). Format lokal: {"type":"local","command":["npx","-y","<paket>"],"enabled":true}; remote: {"type":"remote","url":"https://...","enabled":true}. MCP baru biasanya aktif untuk sesi baru; kalau tool-nya belum terlihat, sarankan user mulai sesi baru atau muat ulang app. ' +
+            '(12) ANALISIS DATA & STATISTIK: data mentah di `data/` JANGAN PERNAH diubah/ditimpa — selalu baca saja; skrip reproduksibel ditulis di `scripts/`, hasil ke `hasil/` (baru dibuat kalau perlu). Skrip standar `scripts/uji-statistik.py` membaca xlsx/csv dan mencetak laporan markdown. Kalau dependency Python belum ada, sekali saja: `python3 -m venv .venv && .venv/bin/pip install pandas scipy statsmodels openpyxl`, lalu jalankan `.venv/bin/python scripts/uji-statistik.py --data data/<file>`. Laporkan angka NYATA dari output skrip; jangan mengarang hasil statistik, dan sebut jumlah data yang dibuang karena missing value. ' +
             'Kemampuan web/jurnal ikuti blok "Kemampuan AI" di AGENTS.md — kalau dimatikan, jangan coba-coba.',
           // Tool `question` AKTIF (kartu pertanyaan implement, probe Lane C
           // 2026-10-19 di /tmp/opencode/question-probe): agent tool `question`
@@ -143,7 +144,8 @@ export function ensureProjectAgentConfig(
           '',
           'Dokumen skripsi dalam markdown per-bab di `dokumen/`.',
           'Gunakan agent "thesis" untuk konsultasi, revisi isi, dan sitasi.',
-          'Jangan mengubah file di luar folder project. Jangan menjalankan perintah shell.',
+          'Jangan mengubah file di luar folder project.',
+          'Analisis data: jalankan Python di dalam project (venv `.venv`); data mentah di `data/` jangan diubah, skrip reproducible di `scripts/`, hasil di `hasil/`.',
           '',
           block,
           '',

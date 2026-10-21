@@ -530,7 +530,12 @@
     "searchOutline": "Cari bab…",
     "searchFiles": "Cari file…",
     "removeFile": "Hapus file",
-    "moveErr": "Gagal mindahin file."
+    "moveErr": "Gagal mindahin file.",
+    "statsAction": "Skrip uji statistik",
+    "statsHint": "Buat scripts/uji-statistik.py — data mentah tetap aman",
+    "statsCreated": "Skrip dibuat: {path}",
+    "statsFail": "Gagal membuat skrip statistik",
+    "statsInstalled": "Terpasang: {path}"
   },
   "brand": {
     "name": "research-desk",

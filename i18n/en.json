@@ -530,7 +530,12 @@
     "searchOutline": "Search chapters…",
     "searchFiles": "Search files…",
     "removeFile": "Delete file",
-    "moveErr": "Failed to move file."
+    "moveErr": "Failed to move file.",
+    "statsAction": "Stats test script",
+    "statsHint": "Create scripts/uji-statistik.py — raw data stays untouched",
+    "statsCreated": "Script created: {path}",
+    "statsFail": "Failed to create the stats script",
+    "statsInstalled": "Installed: {path}"
   },
   "brand": {
     "name": "research-desk",

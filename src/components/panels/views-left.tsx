@@ -15,6 +15,7 @@ import {
   Loader2,
   Plus,
   Search,
+  Sigma,
   Table2,
   X,
   type LucideIcon,
@@ -661,7 +662,16 @@ export function DataView({ slug, entries }: ViewProps) {
   const up = useFolderUpload(slug, 'data', '.csv,.xlsx,.xls,.json');
   const del = useFileDelete(slug);
   const [query, setQuery] = useState('');
+  const [statsBusy, setStatsBusy] = useState(false);
+  const [statsMsg, setStatsMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
   const data = dataFiles(entries);
+  const installedStats = useMemo(
+    () =>
+      entries.find(
+        (entry) => entry.type === 'file' && /^scripts\/uji-statistik(?:-\d+)?\.py$/.test(entry.path),
+      ),
+    [entries],
+  );
   const q = textFilter(query);
   const visible = useMemo(
     () => (q ? data.filter((f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q)) : data),
@@ -672,6 +682,28 @@ export function DataView({ slug, entries }: ViewProps) {
     : up.savedCount > 0 && data.length === 0
       ? { text: t('es.uploaded', { n: up.savedCount }), tone: 'ok' }
       : null;
+
+  /** Pasang scripts/uji-statistik.py (lazy — file dibuat hanya saat diklik). */
+  const installStats = async () => {
+    setStatsBusy(true);
+    setStatsMsg(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/stats-template`, {
+        method: 'POST',
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.file?.path) {
+        setStatsMsg({ text: t('es.statsFail'), tone: 'error' });
+        return;
+      }
+      setStatsMsg({ text: t('es.statsCreated', { path: payload.file.path }), tone: 'ok' });
+      window.dispatchEvent(new CustomEvent('workspace:tree-refresh'));
+    } catch {
+      setStatsMsg({ text: t('es.statsFail'), tone: 'error' });
+    } finally {
+      setStatsBusy(false);
+    }
+  };
 
   return (
     <section
@@ -690,6 +722,31 @@ export function DataView({ slug, entries }: ViewProps) {
           plusTitle={t('es.dataAction')}
           plusBusy={up.busy}
         />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 px-3 pb-2">
+        <button
+          type="button"
+          onClick={() => void installStats()}
+          disabled={statsBusy}
+          title={t('es.statsHint')}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {statsBusy ? <Loader2 size={12} className="animate-spin" /> : <Sigma size={12} />}
+          {t('es.statsAction')}
+        </button>
+        {statsMsg ? (
+          <span
+            className={`text-[11px] ${
+              statsMsg.tone === 'error' ? 'text-red-600' : 'text-muted-foreground'
+            }`}
+          >
+            {statsMsg.text}
+          </span>
+        ) : installedStats ? (
+          <span className="text-[11px] text-muted-foreground">
+            {t('es.statsInstalled', { path: installedStats.path })}
+          </span>
+        ) : null}
       </div>
       <div className="min-h-0 flex-1">
         {data.length === 0 ? (
