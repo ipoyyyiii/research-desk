@@ -28,7 +28,7 @@
 - **Gotcha fase 1**: shadcn CLI v5/v4 semua kena prompt interaktif via shell → pivot ke UI primitives mini sendiri (`src/components/ui.tsx`); `pkill -f "next dev"` nembak shell sendiri (pattern match cmdline) → pakai `pkill -f 'next[ ]dev'`; jangan pipa server ke `head` (SIGPIPE); StarterKit v3 TIDAK include Table/TaskList → registrasi eksplisit.
 - Langkah berikutnya: **fase 2** — chat ↔ OpenCode: session per project, streaming chat, tool timeline, auto-reload editor saat agent ngedit, persona "thesis" + izin, auto start service OpenCode
 - ❗ `socautomation` (repo lama, `/home/ubuntu/socautomation`) = project <> lain, **JANGAN disentuh**
-- **STATUS PER 2026-10-21 (akhir sesi OpenCode "research-desk: setup repo + planning + memory")**: Fase 0–5 + Tier 1 selesai, `main` = `origin/main` di commit `d4c58d6` "Sitasi langsung di WordCraft, konfirmasi key hilang, pustaka ikut ke DOCX".
+- **STATUS PER 2026-10-21 (sesi lanjutan)**: `main` = `origin/main` di commit `43e4744`. Fase 0–5 + Tier 1 + Tier 2 (3 item) + Tier 3 (3 item) selesai — lihat §11.
   - Fase 2 (chat ↔ OpenCode) ✅ `d3005b5` · model picker `c1c79c2` · provider login `119f7cd` · sisa fase 2 (riwayat + token meter + aktivitas) `6e211be` · fase 2.5 ✅
   - Fase 3 (jurnal/library/PDF/gambar) ✅ · **WordCraft** (tab Word, `public/wordcraft/`) ✅ `3d3688f` + bridge simpan `f920a57` + font pack v3 `f8e9b52` · **GridCraft** (tab Excel, `public/gridcraft/`) ✅ `cebc6af` · file manager penuh `c03adeb`
   - Tier 1 ✅: sitasi di tab Word (`d4c58d6`), preflight key hilang + `b:Sources` ke DOCX (`606f073`), alur AI↔data + skrip `uji-statistik.py` (`032f825`)
@@ -219,6 +219,12 @@ Tab baru di rail kiri (`matrix`, ikon `TableProperties` — jangan `Table2`, itu
   - Catatan: **`templates/` Commit** (kecil), sementara `public/wordcraft/` + `public/gridcraft/` + `data/wordcraft-fonts/` **gitignored** (besar).
 - **Skrip pasang**: `scripts/setup-semua.sh` (orkestrator) → `fetch-wordcraft.sh` + `fetch-gridcraft.sh` (versi diambil dari GitHub release terbaru, bisa dikunci `GRIDCRAFT_VER=…`) + pack font (`wordcraft-fontpack-v3.py`, butuh `fontTools` + `ttf-mscorefonts-installer`). Docs ada di `scripts/README.md`.
   - Catatan: `fetch-wordcraft.sh` versi lama masih hardcode `v0.8.0` → `fetch-gridcraft.sh` yg baru lebih rapi (API release + flatten zip).
+
+### 11.9 Tier 2 item 7 + Tier 3 item 10 — Riwayat versi per bab & sisip hasil analisis (selesai)
+
+- **Riwayat versi** (`src/lib/versions/store.ts` + `src/components/panels/versions-panel.tsx` + route `/api/projects/[slug]/versions` + `/versions/restore`): snapshot isi bab disimpan **sebagai FILE** di `<project>/.riwayat/<bab-path-safe>/<timestamp>-<hash>.md` (+ sidecar `.json` berisi path/savedAt/reason/bytes/hash) — jadi riwayatnya ikut sama folder skripsi & bisa dibuka di luar app. Snapshot diambil **otomatis** sebelum isi bab ditimpa (route `file` PUT + jalur revisi agen) dengan `reason` (`edit`/`agent`/`analysis`/`restore`/`reject`/`manual`). Restore = tulis balik versi lama, **dan** versi sekarang disimpan dulu sebelum restore (jadi restore sendiri bisa dibalik). Panel: daftar versi per bab + badge jumlah, diff vs versi sekarang (pakai `computeLineDiff` yg sudah ada), restore + hapus (dengan konfirmasi). Folder `.riwayat` masuk `SKIP_DIRS` (gak muncul di tree & dossier).
+- **Sisip hasil analisis** (`src/lib/insert/markdown-tables.ts` + `src/components/panels/insert-result-modal.tsx` + route `/api/projects/[slug]/insert-result`): Panel Data nampilin laporan di folder `hasil/` → tombol "Sisip ke bab" → modal pilih tabel (di-parse dari GFM) + pilih bab + edit judul → tabel disisipin ke akhir bab dengan nomor **"Tabel 3.1"** (nomor bab dari nama file `babN`/heading `# BAB N`, angka tabel = jumlah tabel existing + 1). Judul tabel dibersihin dari nomor bagian laporan ("4. Korelasi Pearson" → "Korelasi Pearson"). Versi bab SEBELUM sisip disimpan sebagai snapshot (`reason: 'analysis'`).
+- **Helper bersama** `src/lib/workspace/api-error.ts` (`workspaceError`) — route `file` sekarang pake itu, route baru ikut pake yang sama.
 
 ### 11.8 Tier 2 item 2 — Anotasi PDF ringan (selesai)
 
