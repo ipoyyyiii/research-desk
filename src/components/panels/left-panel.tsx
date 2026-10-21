@@ -11,6 +11,7 @@ import { LibraryPanel } from '@/components/panels/library-panel';
 import { ZoteroPanel } from '@/components/panels/zotero-panel';
 import { MatrixPanel } from '@/components/panels/matrix-panel';
 import { RevisionPanel } from '@/components/panels/revision-panel';
+import { VersionsPanel } from '@/components/panels/versions-panel';
 import { type LeftTab } from '@/components/workspace/icon-rail';
 import {
   DropOverlay,
@@ -621,6 +622,13 @@ export function LeftPanel({
         <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
           {tabHeader(t('revision.title'))}
           <RevisionPanel slug={slug} />
+        </div>
+      )}
+
+      {activeTab === 'versions' && (
+        <div className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+          {tabHeader(t('versions.title'))}
+          <VersionsPanel slug={slug} />
         </div>
       )}
 

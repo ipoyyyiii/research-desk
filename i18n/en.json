@@ -580,6 +580,41 @@
     "chapterInvalid": "Invalid chapter path.",
     "notFound": "Comment not found."
   },
+  "versions": {
+    "title": "Version History",
+    "searchPlaceholder": "Search chapter…",
+    "addAction": "Save a version now",
+    "addTitle": "Save chapter version",
+    "pickerSearch": "Search chapter…",
+    "pickerEmpty": "No .md file in the dokumen/ folder yet.",
+    "emptyTitle": "No version history yet",
+    "emptyDesc": "Each chapter in dokumen/ is snapshotted automatically before it is rewritten.",
+    "noHistory": "No versions yet — history starts from the next write.",
+    "chapterCount": "{n} versions",
+    "reasonEdit": "before edit",
+    "reasonAgent": "before agent revision",
+    "reasonAnalysis": "before inserting analysis result",
+    "reasonRestore": "before restore",
+    "reasonReject": "before rejecting revision",
+    "reasonManual": "manual version",
+    "viewDiff": "View diff",
+    "preview": "Preview",
+    "restore": "Restore",
+    "restoreTitle": "Restore this version?",
+    "restoreConfirm": "Replace the chapter with the version from {date}? The current content is saved as a new version first, so this restore can be undone.",
+    "restored": "Version restored — the previous content was saved as a new version.",
+    "deleteSnapshot": "Delete version",
+    "deleteTitle": "Delete this version?",
+    "deleteConfirm": "Delete the version from {date} from this chapter history?",
+    "deleted": "Version deleted from the history.",
+    "diffTitle": "Diff: version vs current chapter",
+    "diffHint": "Red = lines missing in this version, green = new lines in the chapter.",
+    "previewTitle": "Version preview",
+    "snapshotSaved": "Version saved.",
+    "loadFail": "Failed to load the version history.",
+    "saveFail": "Failed to save — try again.",
+    "actions": "Actions"
+  },
   "layout": {
     "leftClose": "Hide panel",
     "leftOpen": "Show panel",
@@ -708,7 +743,9 @@
     "statsHint": "Create scripts/uji-statistik.py — raw data stays untouched",
     "statsCreated": "Script created: {path}",
     "statsFail": "Failed to create the stats script",
-    "statsInstalled": "Installed: {path}"
+    "statsInstalled": "Installed: {path}",
+    "resultTitle": "Hasil analisis",
+    "insertResult": "Sisip ke bab"
   },
   "brand": {
     "name": "research-desk",
@@ -723,5 +760,18 @@
     "missingTitle": "Citations without entries",
     "unusedTitle": "Unused entries",
     "noUnused": "Every entry is used."
+  },
+  "insertResult": {
+    "title": "Sisip hasil analisis ke bab",
+    "source": "Dari: {name}",
+    "loading": "Memuat tabel…",
+    "noTables": "File ini belum punya tabel.",
+    "pickTable": "Pilih tabel",
+    "pickChapter": "Masuk ke bab",
+    "caption": "Table caption",
+    "untitled": "Tanpa judul",
+    "submit": "Sisip",
+    "done": "{number} sudah masuk ke bab.",
+    "fail": "Gagal menyisipkan tabel."
   }
 }

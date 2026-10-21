@@ -37,6 +37,27 @@ const SPACING_CSS: Record<string, string> = {
   '2': '2.35',
 };
 
+/**
+ * Simpan isi bab sebelum direvisi agen sebagai versi (reason 'agent').
+ * Isi lamanya gak ada lagi di disk — agen sudah menimpa file — jadi konten
+ * dikirim dari client.
+ */
+async function saveAgentVersion(
+  slug: string,
+  filePath: string,
+  content: string,
+): Promise<void> {
+  try {
+    await fetch(`/api/projects/${encodeURIComponent(slug)}/versions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: filePath, content, reason: 'agent' }),
+    });
+  } catch {
+    // diam — riwayat bukan hal kritis
+  }
+}
+
 export function ThesisEditor({
   slug,
   filePath,
@@ -303,6 +324,9 @@ function EditorSurface({
           if (before !== md) {
             const stats = countDiff(before, md);
             setReview({ before, after: md, added: stats.added, removed: stats.removed });
+            // Agen sudah menimpa file di disk → isi SEBELUM-nya dikirim dari
+            // client supaya jadi versi 'sebelum revisi agen'.
+            void saveAgentVersion(slug, filePath, normalizeCitationEscapes(before));
           }
         } catch {
           // diamkan — autosave nanti
@@ -317,6 +341,40 @@ function EditorSurface({
     return () => window.removeEventListener('workspace:agent-change', onAgentChange);
   }, [editor, slug, filePath, status, publishWords]);
 
+  // Versi dipulihkan dari panel Riwayat Versi → isi bab berubah di disk;
+  // ambil ulang tanpa banner review.
+  useEffect(() => {
+    const onRestored = (event: Event) => {
+      const changed = (event as CustomEvent<{ path?: string }>).detail?.path ?? '';
+      if (!changed || changed !== filePath) return;
+      let cancelled = false;
+      const refetch = async () => {
+        try {
+          if (!editor) return;
+          const res = await fetch(
+            `/api/projects/${encodeURIComponent(slug)}/file?path=${encodeURIComponent(filePath)}`,
+          );
+          const data = await res.json();
+          if (cancelled || !res.ok || !editor) return;
+          const md = (data.content ?? '') as string;
+          if (md === editor.getMarkdown()) return;
+          editor.commands.setContent(md, { emitUpdate: false });
+          applyCitationMarks(editor);
+          publishWords(editor);
+          setStatus('clean');
+        } catch {
+          // diamkan — autosave/restore berikutnya nutupin
+        }
+      };
+      void refetch();
+      return () => {
+        cancelled = true;
+      };
+    };
+    window.addEventListener('workspace:file-restored', onRestored);
+    return () => window.removeEventListener('workspace:file-restored', onRestored);
+  }, [editor, slug, filePath, publishWords]);
+
   const save = useCallback(async () => {
     if (!editor || editor.isDestroyed) return;
     // Escape `[@key]` → balik plain biar pandoc --citeproc kenal pas ekspor.
@@ -326,7 +384,8 @@ function EditorSurface({
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/file`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filePathRef.current, content: md }),
+        // reason 'edit' → isi bab yang lama disimpan sebagai versi sebelum ditimpa.
+        body: JSON.stringify({ path: filePathRef.current, content: md, reason: 'edit' }),
       });
       if (!res.ok) {
         setStatus('error');
@@ -353,7 +412,8 @@ function EditorSurface({
       const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/file`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filePathRef.current, content: before }),
+        // reason 'reject' → versi agen yang ditolak disimpan dulu sebagai cadangan.
+        body: JSON.stringify({ path: filePathRef.current, content: before, reason: 'reject' }),
       });
       if (!res.ok) {
         setStatus('error');

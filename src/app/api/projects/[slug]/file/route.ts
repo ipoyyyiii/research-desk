@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
-import { WorkspaceError, deleteFile, readTextFile, writeBinaryFile, writeTextFile } from '@/lib/workspace/files';
+import { deleteFile, readTextFile, writeBinaryFile, writeTextFile } from '@/lib/workspace/files';
+import { workspaceError as sharedWorkspaceError } from '@/lib/workspace/api-error';
+import { snapshotCurrent } from '@/lib/versions/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +41,23 @@ const putSchema = z.object({
   content: z.string().max(14 * 1024 * 1024),
   // 'base64' = tulis binary (xlsx/csv/tsv dari tab Excel); default = teks.
   encoding: z.enum(['text', 'base64']).optional(),
+  // Alasan snapshot versi: isi bab yang ada di disk disimpan dulu sebelum ditimpa.
+  // Kosong = tanpa riwayat (mis. simpan dari tab Word).
+  reason: z.enum(['edit', 'agent', 'analysis', 'restore', 'reject', 'manual']).optional(),
 });
+
+/** Simpan isi bab lama sebagai versi sebelum bab ditimpa (gagal = tak memblokir tulis). */
+async function snapshotBeforeWrite(
+  folder: string,
+  relative: string,
+  reason: 'edit' | 'agent' | 'analysis' | 'restore' | 'reject' | 'manual',
+): Promise<void> {
+  try {
+    await snapshotCurrent(folder, relative, reason);
+  } catch (error) {
+    console.error('[api/workspace/file] snapshot versi gagal:', error);
+  }
+}
 
 export async function PUT(
   request: Request,
@@ -59,10 +77,15 @@ export async function PUT(
     }
 
     try {
-      const mtime =
-        parsed.data.encoding === 'base64'
-          ? (await writeBinaryFile(folder, parsed.data.path, parsed.data.content)).mtime
-          : (await writeTextFile(folder, parsed.data.path, parsed.data.content)).mtime;
+      let mtime: number;
+      if (parsed.data.encoding === 'base64') {
+        mtime = (await writeBinaryFile(folder, parsed.data.path, parsed.data.content)).mtime;
+      } else {
+        if (parsed.data.reason) {
+          await snapshotBeforeWrite(folder, parsed.data.path, parsed.data.reason);
+        }
+        mtime = (await writeTextFile(folder, parsed.data.path, parsed.data.content)).mtime;
+      }
       return NextResponse.json({ mtime });
     } catch (error) {
       return workspaceError(error, 'Gagal menulis file');
@@ -91,19 +114,7 @@ export async function DELETE(
 }
 
 function workspaceError(error: unknown, fallback: string): NextResponse {
-  if (error instanceof WorkspaceError) {
-    const messages: Record<string, string> = {
-      INVALID_PATH: 'Path tidak valid',
-      PATH_OUT_OF_PROJECT: 'File di luar folder project',
-      FILE_NOT_FOUND: 'File tidak ditemukan',
-      FILE_TOO_BIG: 'File terlalu besar',
-      UNSUPPORTED_TYPE: 'Tipe file ini belum bisa dibuka',
-    };
-    return NextResponse.json(
-      { error: messages[error.code] ?? fallback, code: error.code },
-      { status: 400 },
-    );
-  }
-  console.error('[api/workspace/file] error:', error);
-  return NextResponse.json({ error: fallback }, { status: 500 });
+  const response = sharedWorkspaceError(error, fallback);
+  if (response.status === 500) console.error('[api/workspace/file] error:', error);
+  return response;
 }

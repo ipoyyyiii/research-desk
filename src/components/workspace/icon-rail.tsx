@@ -5,6 +5,7 @@ import {
   BookOpenText,
   Database,
   FolderClosed,
+  History,
   Images,
   ListTree,
   MessageSquareQuote,
@@ -22,6 +23,7 @@ export type LeftTab =
   | 'zotero'
   | 'matrix'
   | 'revision'
+  | 'versions'
   | 'figures'
   | 'data'
   | 'files';
@@ -35,6 +37,7 @@ const TABS: Array<{ id: LeftTab; icon: LucideIcon; labelKey: string }> = [
   { id: 'zotero', icon: BookMarked, labelKey: 'left.tabZotero' },
   { id: 'matrix', icon: TableProperties, labelKey: 'matrix.title' },
   { id: 'revision', icon: MessageSquareQuote, labelKey: 'revision.title' },
+  { id: 'versions', icon: History, labelKey: 'versions.title' },
   { id: 'figures', icon: Images, labelKey: 'views.figures' },
   { id: 'data', icon: Database, labelKey: 'views.data' },
   { id: 'files', icon: FolderClosed, labelKey: 'tabs.file' },

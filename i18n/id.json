@@ -580,6 +580,41 @@
     "chapterInvalid": "Path bab tidak valid.",
     "notFound": "Komentar tidak ditemukan."
   },
+  "versions": {
+    "title": "Riwayat Versi",
+    "searchPlaceholder": "Cari bab…",
+    "addAction": "Simpan versi sekarang",
+    "addTitle": "Simpan versi bab",
+    "pickerSearch": "Cari bab…",
+    "pickerEmpty": "Belum ada file .md di folder dokumen/.",
+    "emptyTitle": "Belum ada riwayat versi",
+    "emptyDesc": "Isi tiap bab di dokumen/ disimpan otomatis sebagai versi sebelum bab ditulis ulang.",
+    "noHistory": "Belum ada versi — riwayat tersimpan dari penulisan berikutnya.",
+    "chapterCount": "{n} versi",
+    "reasonEdit": "sebelum edit",
+    "reasonAgent": "sebelum revisi agen",
+    "reasonAnalysis": "sebelum sisip hasil analisis",
+    "reasonRestore": "sebelum restore",
+    "reasonReject": "sebelum tolak revisi",
+    "reasonManual": "versi manual",
+    "viewDiff": "Lihat diff",
+    "preview": "Pratinjau",
+    "restore": "Pulihkan",
+    "restoreTitle": "Pulihkan versi ini?",
+    "restoreConfirm": "Isi bab diganti dengan versi {date}? Isi bab sekarang disimpan dulu sebagai versi baru, jadi restore ini bisa dibatalkan.",
+    "restored": "Versi dipulihkan — isi bab sebelumnya disimpan sebagai versi baru.",
+    "deleteSnapshot": "Hapus versi",
+    "deleteTitle": "Hapus versi ini?",
+    "deleteConfirm": "Hapus versi {date} dari riwayat bab ini?",
+    "deleted": "Versi dihapus dari riwayat.",
+    "diffTitle": "Diff versi vs isi bab sekarang",
+    "diffHint": "Merah = baris yang hilang di versi ini, hijau = baris baru di bab sekarang.",
+    "previewTitle": "Pratinjau versi",
+    "snapshotSaved": "Versi tersimpan.",
+    "loadFail": "Gagal memuat riwayat versi.",
+    "saveFail": "Gagal menyimpan — coba lagi.",
+    "actions": "Aksi"
+  },
   "layout": {
     "leftClose": "Tutup panel",
     "leftOpen": "Buka panel",
@@ -708,7 +743,9 @@
     "statsHint": "Buat scripts/uji-statistik.py — data mentah tetap aman",
     "statsCreated": "Skrip dibuat: {path}",
     "statsFail": "Gagal membuat skrip statistik",
-    "statsInstalled": "Terpasang: {path}"
+    "statsInstalled": "Terpasang: {path}",
+    "resultTitle": "Hasil analisis",
+    "insertResult": "Sisip ke bab"
   },
   "brand": {
     "name": "research-desk",
@@ -723,5 +760,18 @@
     "missingTitle": "Sitasi tanpa entri",
     "unusedTitle": "Entri belum dipakai",
     "noUnused": "Semua entri kepakai."
+  },
+  "insertResult": {
+    "title": "Sisip hasil analisis ke bab",
+    "source": "Dari: {name}",
+    "loading": "Memuat tabel…",
+    "noTables": "File ini belum punya tabel.",
+    "pickTable": "Pilih tabel",
+    "pickChapter": "Masuk ke bab",
+    "caption": "Judul tabel",
+    "untitled": "Tanpa judul",
+    "submit": "Sisip",
+    "done": "{number} sudah masuk ke bab.",
+    "fail": "Gagal menyisipkan tabel."
   }
 }

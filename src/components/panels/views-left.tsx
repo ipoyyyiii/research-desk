@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { useT } from '@/lib/preferences';
 import { requestNewDocument } from '@/components/panels/new-doc-modal';
-import { Modal } from '@/components/ui';
+import { InsertResultModal } from '@/components/panels/insert-result-modal';
+import { Button, Modal } from '@/components/ui';
 
 // ── Views panel kiri berbasis TUJUAN (mental model beeblio) ───────────────────
 // Draf, Gambar, Data — semuanya memfilter isi tree (GET /api/projects/<slug>/tree)
@@ -653,8 +654,8 @@ export function FiguresView({ slug, entries }: ViewProps) {
 }
 
 /**
- * Data: baris badge ekstensi + nama + ukuran, klik → buka di tab baru. Plus
- * (unggah folder data/) pindah ke header row — selalu tampil; X di baris →
+ * Gambar: baris badge ekstensi + nama + ukuran, klik → buka di tab baru. Plus
+ * (unggah folder gambar/) pindah ke header row — selalu tampil; X di baris →
  * konfirmasi → hapus. Kosong → ss7; drag file OS tetap hidup via DropOverlay.
  */
 export function DataView({ slug, entries }: ViewProps) {
@@ -664,7 +665,17 @@ export function DataView({ slug, entries }: ViewProps) {
   const [query, setQuery] = useState('');
   const [statsBusy, setStatsBusy] = useState(false);
   const [statsMsg, setStatsMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
+  /** Laporan hasil analisis (folder hasil/) yang tabelnya mau disisipin ke bab. */
+  const [insertSource, setInsertSource] = useState<string | null>(null);
   const data = dataFiles(entries);
+  /** Laporan analisis (hasil/*.md) — tabelnya bisa disisipin ke draft. */
+  const results = useMemo(
+    () =>
+      entries
+        .filter((entry) => entry.type === 'file' && /^hasil\/.*\.md$/i.test(entry.path))
+        .sort(byName),
+    [entries],
+  );
   const installedStats = useMemo(
     () =>
       entries.find(
@@ -748,6 +759,37 @@ export function DataView({ slug, entries }: ViewProps) {
           </span>
         ) : null}
       </div>
+      {results.length > 0 && (
+        <div className="shrink-0 border-t border-border px-2 py-2">
+          <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+            {t('es.resultTitle')}
+          </p>
+          <ul className="space-y-0.5">
+            {results.map((file) => (
+              <li key={file.path} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setInsertSource(file.path)}
+                  title={t('es.insertResult')}
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted"
+                >
+                  <span className="shrink-0 rounded bg-muted px-1.5 text-[10px] font-mono uppercase text-muted-foreground">
+                    md
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-foreground">{file.name}</span>
+                </button>
+                <Button
+                  variant="outline"
+                  className="h-6 shrink-0 px-1.5 text-[10px]"
+                  onClick={() => setInsertSource(file.path)}
+                >
+                  {t('es.insertResult')}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="min-h-0 flex-1">
         {data.length === 0 ? (
           <EmptyState
@@ -801,6 +843,14 @@ export function DataView({ slug, entries }: ViewProps) {
         onCancel={del.cancelDelete}
         onConfirm={() => void del.performDelete()}
       />
+      {insertSource && (
+        <InsertResultModal
+          slug={slug}
+          sourcePath={insertSource}
+          onClose={() => setInsertSource(null)}
+          onDone={(message) => setStatsMsg({ text: message, tone: 'ok' })}
+        />
+      )}
     </section>
   );
 }

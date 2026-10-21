@@ -29,6 +29,7 @@ const SKIP_DIRS = new Set([
   '.next',
   '.turbo',
   '.cache',
+  '.riwayat',
 ]);
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB batas file teks editor
 const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.json', '.jsonc', '.csv', '.ris', '.bib', '.tex']);
@@ -121,7 +122,7 @@ export class WorkspaceError extends Error {
 }
 
 /** Resolve path relatif; lempar INVALID_PATH kalau mau keluar dari root (anti traversal). */
-function safeResolve(baseReal: string, relative: string): string {
+export function safeResolve(baseReal: string, relative: string): string {
   if (typeof relative !== 'string' || relative.length === 0 || relative.includes('\0')) {
     throw new WorkspaceError('INVALID_PATH');
   }
