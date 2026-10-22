@@ -99,7 +99,13 @@ export async function POST(request: Request) {
 
 type DisconnectBody = { integrationID?: string };
 
-/** Putus koneksi: hapus baris credential (bentuk tabel terverifikasi di v2.0.32). */
+/**
+ * Putus koneksi: hapus kredensial provider lewat API service OpenCode.
+ *
+ * Dulu route ini menembak langsung ke file SQLite milik OpenCode dengan path
+ * hardcoded — portabel cuma di satu mesin. SDK sudah menyediakan
+ * credential.list/remove, jadi pakai itu.
+ */
 export async function DELETE(request: Request) {
   try {
     const body = (await request.json()) as DisconnectBody;
@@ -114,18 +120,15 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const Database = (await import('better-sqlite3')).default as typeof import('better-sqlite3');
-    const db = new Database('/home/ubuntu/.local/share/opencode/opencode.db');
-    const info = db
-      .prepare('DELETE FROM credential WHERE integration_id = ?')
-      .run(integrationID);
-    db.close();
+    const client = await ensureServer();
+    const credentials = await client.credential.list();
+    const targets = credentials.filter((entry) => entry.integrationID === integrationID);
+    for (const entry of targets) {
+      await client.credential.remove({ credentialID: entry.id });
+    }
 
-    const providers = await (async () => {
-      const client = await ensureServer();
-      return ((await client.provider.list())?.data ?? []).map((p) => p.id);
-    })();
-    return NextResponse.json({ ok: true, removed: info.changes, providers });
+    const providers = ((await client.provider.list())?.data ?? []).map((p) => p.id);
+    return NextResponse.json({ ok: true, removed: targets.length, providers });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Gagal memutus koneksi provider';
     return NextResponse.json({ error: message }, { status: 500 });

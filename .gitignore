@@ -52,3 +52,15 @@ public/gridcraft/
 
 # CommandCode session tooling
 .commandcode/
+
+# --- catatan pribadi & tooling agent (JANGAN di-push) ---
+memory.md
+planning.md
+AGENTS.md
+opencode.jsonc
+skills-lock.json
+.agents/
+.opencode/
+.commandcode/
+tests/
+electron/

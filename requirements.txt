@@ -1,0 +1,13 @@
+# Dependensi Python untuk skrip analisis statistik di folder project
+# (scripts/uji-statistik.py). Pasang di venv DALAM folder project skripsi:
+#
+#   cd ~/Documents/skripsi
+#   python3 -m venv .venv
+#   .venv/bin/pip install -r /path/ke/vibe-research/requirements.txt
+#
+# Atau langsung: .venv/bin/pip install pandas scipy statsmodels openpyxl
+
+pandas>=2.2
+scipy>=1.11
+statsmodels>=0.14
+openpyxl>=3.1
