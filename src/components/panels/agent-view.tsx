@@ -15,6 +15,7 @@ import {
 } from '@/components/panels/agent-panel';
 import { Button } from '@/components/ui';
 import { useT } from '@/lib/preferences';
+import { turnFinished } from '@/lib/opencode/turn-state';
 
 type StreamEvent = { id?: string; type?: string; data?: Record<string, unknown> };
 
@@ -122,6 +123,8 @@ export function AgentView({
 }) {
   const t = useT();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  /** Kapan turn terakhir dikirim — dipakai watchdog buat mastiin turn selesai. */
+  const turnStartedAtRef = useRef(0);
   const [connected, setConnected] = useState<boolean | null>(null); // null = belum dicek
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -213,6 +216,42 @@ export function AgentView({
       cancelled = true;
     };
   }, [slug, mapHistory]);
+
+  /**
+   * Watchdog: matikan indikator "Ngetik..." kalau server sudah bilang turn
+   * selesai, walau event `session.idle` kelewat (stream putus / reconnect).
+   * Tanpa ini, satu event yg hilang = "Ngetik..." nyangkut selamanya.
+   */
+  useEffect(() => {
+    if (!busy) return undefined;
+    let cancelled = false;
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/ai/messages?slug=${encodeURIComponent(slug)}`);
+        const data = (await res.json().catch(() => null)) as Parameters<typeof mapHistory>[0] & {
+          messages?: Array<
+            Parameters<typeof mapHistory>[0]['messages'] extends Array<infer M>
+              ? M & { finished?: boolean; toolEvents?: Array<{ status?: string }> }
+              : never
+          >;
+        } | null;
+        if (cancelled || !data?.messages) return;
+        const decision = turnFinished(data.messages, turnStartedAtRef.current);
+        if (decision !== 'done') return;
+        setBusy(false);
+        // Stream SSE mungkin putus di tengah turn → teks responsnya gak pernah
+        // masuk. Server udah jadi sumber kebenaran sekarang, jadi muat ulang
+        // riwayat biar jawaban agent tetap tampil.
+        setMessages(mapHistory(data));
+      } catch {
+        /* server belum jawab — coba lagi nanti */
+      }
+    }, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [busy, slug, mapHistory]);
 
   const refreshUsage = useCallback(async () => {
     try {
@@ -760,6 +799,7 @@ export function AgentView({
       setSending(true);
       setBusy(true);
       assistantRef.current = null;
+      turnStartedAtRef.current = Date.now();
       setMessages((prev) => [...prev, { id: uid(), role: 'user', text: trimmed }]);
 
       try {

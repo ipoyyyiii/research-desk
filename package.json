@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack -H 127.0.0.1",
     "build": "next build",
     "start": "next start -H 0.0.0.0",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node tests/turn-state.test.mjs"
   },
   "dependencies": {
     "@opencode/client": "2.0.32",

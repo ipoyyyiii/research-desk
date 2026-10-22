@@ -25,6 +25,12 @@ export type HistoryMessage = {
   providerID?: string;
   /** Token per turn assistant; null kalau service gak ngasih data (jangan nipu). */
   tokens?: { input: number; output: number } | null;
+  /**
+   * Pesan assistant yang sudah selesai (ada `time.completed`). Pesan yang
+   * masih jalan belum punya completed → `false`. Dipakai buat memastikan
+   * indikator "Ngetik..." mati walau event `session.idle` kelewat.
+   */
+  finished: boolean;
   createdAt: number;
 };
 
@@ -207,6 +213,7 @@ function mapItem(item: RawItem, index: number): HistoryMessage | null {
     modelID: model?.id && typeof model.id === 'string' ? model.id : undefined,
     providerID: model?.providerID && typeof model.providerID === 'string' ? model.providerID : undefined,
     tokens: type === 'assistant' ? tokensOf(item) : null,
+    finished: typeof item.time?.completed === 'number',
     createdAt: item.time?.created ?? 0,
   };
 }
