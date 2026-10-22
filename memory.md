@@ -220,6 +220,27 @@ Tab baru di rail kiri (`matrix`, ikon `TableProperties` — jangan `Table2`, itu
 - **Skrip pasang**: `scripts/setup-semua.sh` (orkestrator) → `fetch-wordcraft.sh` + `fetch-gridcraft.sh` (versi diambil dari GitHub release terbaru, bisa dikunci `GRIDCRAFT_VER=…`) + pack font (`wordcraft-fontpack-v3.py`, butuh `fontTools` + `ttf-mscorefonts-installer`). Docs ada di `scripts/README.md`.
   - Catatan: `fetch-wordcraft.sh` versi lama masih hardcode `v0.8.0` → `fetch-gridcraft.sh` yg baru lebih rapi (API release + flatten zip).
 
+### 11.10 Pelajaran model ChatGPT (isi utang #2 dengan bukti) — SUDAH LULUS
+
+Utang "AI chat ↔ spreadsheet" **tutup** setelah credentials ChatGPT di-login ulang + model yang benar dipilih.
+
+**Akhirnya penyebabnya BUKAN entitlement akun, tapi MODEL yang dipilih:**
+- Katalog OpenCode nampilin **19 model `openai`** di picker, tapi akun Codex lu cuma punya akses ke sebagian kecil. Yang **dipakai**: `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-6-luna`. Yang **ditolak** (`not supported when using Codex with a ChatGPT account`): `gpt-6.1-sol`, `gpt-6-sol`, `gpt-5.5`, `gpt-5.3-codex-spark`, dll.
+- **App default ambil model katalog pertama** (`gpt-6.1-sol`) → itu sebabnya chat selalu ditolak walau model lain bisa.
+- ⚠️ `GET chatgpt.com/backend-api/codex/models` balas `{"models":[]}` → itu **false negative**, jangan dipakai buat diagnosis (gue sempat salah simpul "akun tanpa akses Codex").
+
+**Bukti E2E (LULUS ✓):** agent (`openai/gpt-5.6-luna`, effort max) baca `data/uji.xlsx` → jalanin `.venv/bin/python scripts/uji-statistik.py` → tulis `hasil/uji-laporan.md` (5.228 B) → angka cocok acuan independen (mean_x 34,52 · mean_y 61,07 · r 0,99 p<0,001 · grup A 64,92 · grup B 57,21 · uji-t t=0,770 p=0,4476) → **data mentah utuh** (sha256 `2ea0753e51e0bd9d` sama) → agent nyebut "Missing value yang dibuang: 0 baris" (nurutin aturan).
+
+**Upgrade diagnosa AI (commit ini):**
+- Dokter probe **model override user** dulu (bukan model katalog pertama).
+- Kalau model itu ditolak, dokter nyoba **sampai 10 model lain** di provider itu → kalau ada yang jalan, muncul tombol **"Pakai {model}"** (satu klik).
+- Timeout probe adaptif: probe pertama sebuah provider 90 detik (provider gratis harus **spawn proses**, call pertama bisa ~1 menit), sisanya 35 detik.
+
+**Gotcha lain:**
+- Device code OpenCode (`chatgpt-headless`) **expire ~5 menit** — CLI-nya exit sendiri. Makanya kodenya harus langsung dipakai; dari app ada tombol "Mulai ulang".
+- `opencode auth logout openai` **gagal di server** (butuh credential ID + TTY) → app sekarang lepas kredensial lewat API service (`client.credential.list()` + `credential.remove`).
+- Test agent WAJIB nunggu ≥60 detik buat call pertama model gratis; nunggu 15 detik =false negative.
+
 ### 11.9 Tier 2 item 7 + Tier 3 item 10 — Riwayat versi per bab & sisip hasil analisis (selesai)
 
 - **Riwayat versi** (`src/lib/versions/store.ts` + `src/components/panels/versions-panel.tsx` + route `/api/projects/[slug]/versions` + `/versions/restore`): snapshot isi bab disimpan **sebagai FILE** di `<project>/.riwayat/<bab-path-safe>/<timestamp>-<hash>.md` (+ sidecar `.json` berisi path/savedAt/reason/bytes/hash) — jadi riwayatnya ikut sama folder skripsi & bisa dibuka di luar app. Snapshot diambil **otomatis** sebelum isi bab ditimpa (route `file` PUT + jalur revisi agen) dengan `reason` (`edit`/`agent`/`analysis`/`restore`/`reject`/`manual`). Restore = tulis balik versi lama, **dan** versi sekarang disimpan dulu sebelum restore (jadi restore sendiri bisa dibalik). Panel: daftar versi per bab + badge jumlah, diff vs versi sekarang (pakai `computeLineDiff` yg sudah ada), restore + hapus (dengan konfirmasi). Folder `.riwayat` masuk `SKIP_DIRS` (gak muncul di tree & dossier).

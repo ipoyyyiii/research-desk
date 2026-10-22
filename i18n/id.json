@@ -182,6 +182,7 @@
     "capabilitiesNote": "Dipakai agent mulai chat berikutnya. Disimpan di config project (.opencode), bukan cloud.",
     "doctor": "Cek koneksi AI",
     "doctorReconnect": "Masuk ulang / ganti akun",
+    "doctorUseModel": "Pakai {model}",
     "doctorTitle": "Diagnosa koneksi AI",
     "doctorRunning": "Mencoba satu model per provider…",
     "doctorEmpty": "Gak ada provider buat dicek.",

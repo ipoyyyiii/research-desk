@@ -182,6 +182,7 @@
     "capabilitiesNote": "Applies from the next chat turn. Stored in project config (.opencode), not in the cloud.",
     "doctor": "Check AI connection",
     "doctorReconnect": "Sign in again / switch account",
+    "doctorUseModel": "Use {model}",
     "doctorTitle": "AI connection diagnosis",
     "doctorRunning": "Trying one model per provider…",
     "doctorEmpty": "No provider to check.",

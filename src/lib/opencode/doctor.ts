@@ -23,6 +23,8 @@ export type DoctorFinding = {
   modelID: string;
   status: DoctorStatus;
   message: string;
+  /** Model lain di provider ini yang ternyata bisa dipakai (kalau ketemu). */
+  workingModel?: string;
 };
 
 export type DoctorReport = {
@@ -81,61 +83,85 @@ async function readSessionOutcome(
   return { ok: false, message: 'Model gak memberi jawaban dalam batas waktu' };
 }
 
+async function probeModel(
+  client: OpenCodeClient,
+  probeDir: string,
+  providerID: string,
+  modelID: string,
+  timeoutMs = 35_000,
+): Promise<{ ok: boolean; message: string }> {
+  let sessionID: string | null = null;
+  try {
+    const created = await client.session.create({
+      title: 'diagnosa',
+      location: { directory: probeDir },
+    });
+    sessionID = (created as { data?: { id?: string }; id?: string }).data?.id ??
+      (created as { id?: string }).id ??
+      null;
+    if (!sessionID) return { ok: false, message: 'Gagal bikin sesi probe' };
+    await client.session.switchModel({
+      sessionID,
+      model: { providerID, id: modelID },
+    });
+    await client.session.prompt({ sessionID, text: 'kopi' });
+    return await readSessionOutcome(client, sessionID, timeoutMs);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) };
+  } finally {
+    if (sessionID) {
+      await client.session.remove({ sessionID }).catch(() => undefined);
+    }
+  }
+}
+
 export async function runDoctor(
   client: OpenCodeClient,
   candidates: Array<{ providerID: string; modelID: string }>,
+  alternatives: Record<string, string[]> = {},
 ): Promise<DoctorReport> {
   const probeDir = path.join(os.tmpdir(), 'research-desk-ai-probe');
   await fs.mkdir(probeDir, { recursive: true });
   const findings: DoctorFinding[] = [];
 
+  const probedProviders = new Set<string>();
   for (const candidate of candidates) {
-    let sessionID: string | null = null;
-    try {
-      const created = await client.session.create({
-        title: 'diagnosa',
-        location: { directory: probeDir },
-      });
-      sessionID = (created as { data?: { id?: string }; id?: string }).data?.id ??
-        (created as { id?: string }).id ??
-        null;
-      if (!sessionID) {
-        findings.push({
-          providerID: candidate.providerID,
-          label: LABELS[candidate.providerID] ?? candidate.providerID,
-          modelID: candidate.modelID,
-          status: 'error',
-          message: 'Gagal bikin sesi probe',
-        });
-        continue;
-      }
-      await client.session.switchModel({
-        sessionID,
-        model: { providerID: candidate.providerID, id: candidate.modelID },
-      });
-      await client.session.prompt({ sessionID, text: 'kopi' });
-      const outcome = await readSessionOutcome(client, sessionID, 45_000);
-      findings.push({
-        providerID: candidate.providerID,
-        label: LABELS[candidate.providerID] ?? candidate.providerID,
-        modelID: candidate.modelID,
-        status: outcome.ok ? 'ok' : classify(outcome.message),
-        message: outcome.message,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      findings.push({
-        providerID: candidate.providerID,
-        label: LABELS[candidate.providerID] ?? candidate.providerID,
-        modelID: candidate.modelID,
-        status: classify(message),
-        message,
-      });
-    } finally {
-      if (sessionID) {
-        await client.session.remove({ sessionID }).catch(() => undefined);
+    // Probe pertama sebuah provider boleh lama: provider gratis harus spawn
+    // proses dulu, call pertama bisa makan ~1 menit.
+    const firstProbe = !probedProviders.has(candidate.providerID);
+    probedProviders.add(candidate.providerID);
+    const outcome = await probeModel(
+      client,
+      probeDir,
+      candidate.providerID,
+      candidate.modelID,
+      firstProbe ? 90_000 : 35_000,
+    );
+    const status = outcome.ok ? 'ok' : classify(outcome.message);
+    const finding: DoctorFinding = {
+      providerID: candidate.providerID,
+      label: LABELS[candidate.providerID] ?? candidate.providerID,
+      modelID: candidate.modelID,
+      status,
+      message: outcome.message,
+    };
+
+    // Model yang ditolak ≠ semua model di provider itu ditolak. Coba beberapa
+    // model lain sampai ketemu yang bisa dipakai, biar user bisa langsung
+    // pindah ke model itu. Katalog ChatGPT urutannya panjang dan model yang
+    // kepakai bisa ada di urutan mana saja.
+    if (status === 'not-supported' || status === 'no-model') {
+      for (const modelID of (alternatives[candidate.providerID] ?? []).slice(0, 10)) {
+        if (modelID === candidate.modelID) continue;
+        const alt = await probeModel(client, probeDir, candidate.providerID, modelID);
+        if (alt.ok) {
+          finding.workingModel = modelID;
+          break;
+        }
       }
     }
+
+    findings.push(finding);
   }
 
   await fs.rm(probeDir, { recursive: true, force: true }).catch(() => undefined);

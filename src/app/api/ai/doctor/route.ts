@@ -28,14 +28,18 @@ export async function GET() {
       candidates.push({ providerID: override.providerID, modelID: override.modelID });
       seen.add(override.providerID);
     }
+    // Semua model tiap provider — dipakai buat nyari yang ternyata bisa dipakai.
+    const alternatives: Record<string, string[]> = {};
     for (const model of models) {
       if (!model?.providerID || !model?.id) continue;
+      const list = (alternatives[model.providerID] ??= []);
+      if (!list.includes(model.id)) list.push(model.id);
       if (seen.has(model.providerID)) continue;
       seen.add(model.providerID);
       candidates.push({ providerID: model.providerID, modelID: model.id });
     }
 
-    const report = await runDoctor(client, candidates);
+    const report = await runDoctor(client, candidates, alternatives);
     return NextResponse.json({ ...report, connected: auth.connected, providers: auth.providers });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Diagnosa gagal';

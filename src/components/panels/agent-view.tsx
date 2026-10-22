@@ -946,6 +946,13 @@ export function AgentView({
         connected={connected ?? false}
         onConnect={() => void connect('device', false, true)}
         onReconnect={() => void connect('device', false, true)}
+        onModelPicked={(providerID, modelID) => {
+          const entry = models
+            .flatMap((group) => group.models)
+            .find((model) => model.providerID === providerID && model.modelID === modelID);
+          if (entry) void selectModel(entry);
+          void refreshModels();
+        }}
         onDoctorResult={(usable) => {
           // Gak ada satu pun model yang bisa dipakai -> jangan ngaku "terhubung".
           if (!usable) setConnected(false);

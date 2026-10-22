@@ -36,6 +36,8 @@ type DoctorFinding = {
   modelID: string;
   status: 'ok' | 'free-limit' | 'not-supported' | 'no-model' | 'auth' | 'error';
   message: string;
+  /** Model lain di provider ini yang ternyata bisa dipakai. */
+  workingModel?: string;
 };
 type DoctorReport = {
   findings: DoctorFinding[];
@@ -80,6 +82,8 @@ export type AgentPanelProps = {
   onReconnect?: () => void;
   /** Hasil diagnosa: ada model yang bisa dipakai atau tidak. */
   onDoctorResult?: (usable: boolean) => void;
+  /** Model diganti dari modal diagnosa. */
+  onModelPicked?: (providerID: string, modelID: string) => void;
   /** Agent sedang mengerjakan sesuatu (tampilkan bubble "mengetik…"). */
   busy: boolean;
   /** Tutup panel kanan — dipanggil dari tombol arrow di header panel. */
@@ -271,6 +275,7 @@ export function AgentPanel({
   onConnect,
   onReconnect,
   onDoctorResult,
+  onModelPicked,
   busy,
   onCollapse,
   models,
@@ -309,6 +314,20 @@ export function AgentPanel({
   const capsRef = useRef<HTMLDivElement>(null);
   const sessionsRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const applyModel = async (providerID: string, modelID: string) => {
+    try {
+      await fetch('/api/ai/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerID, modelID }),
+      });
+      setDoctorOpen(false);
+      onModelPicked?.(providerID, modelID);
+    } catch {
+      /* diamkan: diagnosa tetap tampil */
+    }
+  };
 
   const runDoctor = async () => {
     setDoctorOpen(true);
@@ -802,6 +821,15 @@ export function AgentPanel({
                   <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">
                     {t(`ai.doctorFix.${finding.status}`)}
                   </p>
+                )}
+                {finding.workingModel && (
+                  <Button
+                    variant="outline"
+                    className="mt-1.5 h-6 px-2 text-[10px]"
+                    onClick={() => void applyModel(finding.providerID, finding.workingModel!)}
+                  >
+                    {t('ai.doctorUseModel', { model: finding.workingModel })}
+                  </Button>
                 )}
               </div>
             ))}
