@@ -220,6 +220,22 @@ Tab baru di rail kiri (`matrix`, ikon `TableProperties` — jangan `Table2`, itu
 - **Skrip pasang**: `scripts/setup-semua.sh` (orkestrator) → `fetch-wordcraft.sh` + `fetch-gridcraft.sh` (versi diambil dari GitHub release terbaru, bisa dikunci `GRIDCRAFT_VER=…`) + pack font (`wordcraft-fontpack-v3.py`, butuh `fontTools` + `ttf-mscorefonts-installer`). Docs ada di `scripts/README.md`.
   - Catatan: `fetch-wordcraft.sh` versi lama masih hardcode `v0.8.0` → `fetch-gridcraft.sh` yg baru lebih rapi (API release + flatten zip).
 
+### 11.11 Bug "Ngetik..." nyangkut + chat terkunci (sudah dibenerin)
+
+**Gejala (dari ss.png user):** indikator "Ngetik..." tetap nampil padahal turn-nya selesai, dan **tombol kirim mati** — user gak bisa nge-send apa-apa. Kalau stream SSE putus, **jawaban agent juga gak pernah muncul** (cuma token meter yang ke-refresh).
+
+**Akar masalah:** status `busy` cuma bergantung pada SATU event SSE (`session.idle`). Event itu bisa kelewat (EventSource reconnect, stream putus, event datang sebelum listener siap) → `busy` nyangkut permanen. Dan karena `canSend = !sending && !busy && ...` (src/components/panels/agent-composer.tsx), chat jadi terkunci total.
+
+**Fix (commit `14328b2`):**
+- `src/lib/opencode/turn-state.ts` — satu fungsi murni `turnFinished(messages, turnStartedAt)` yang menetapkan turn selesai dari riwayat server: `done` (ada balasan assistant SELESAI yang dibuat SETELAH turn mulai) · `running` (balasan belum selesai / ada tool yang jalan) · `unknown` (belum ada jejak balasan — model masih mikir / provider free cold-start, jangan simpulkan).
+- `src/lib/opencode/history.ts` — `HistoryMessage` nambah field `finished` (dari `time.completed`).
+- `src/components/panels/agent-view.tsx` — **watchdog**: selama `busy`, tiap 4 detik fetch `/api/ai/messages`; kalau `turnFinished` = `done` → `setBusy(false)` **+ muat ulang riwayat** (supaya jawaban agent tetap tampil walau SSE putus) → tombol kirim hidup lagi.
+- `tests/turn-state.test.mjs` + `npm test` (9 assertion) — penaga supaya bug yang sama gak terulang.
+
+**Bukti (Playwright, app prod):**
+- Skenario SSE MATI TOTAL (route intercept balas stream kosong): indikator nyangkut (kondisi bug keb reproduce) → **selesai ~6 detik**, jawaban agent **tampil** ("kopi"), tombol kirim hidup lagi saat draft diisi. Watchdog poll `/api/ai/messages` 4×.
+- Skenario normal (SSE hidup): indikator muncul → hilang ~16 detik, jawaban streaming normal. Nggak ada regresi.
+
 ### 11.10 Pelajaran model ChatGPT (isi utang #2 dengan bukti) — SUDAH LULUS
 
 Utang "AI chat ↔ spreadsheet" **tutup** setelah credentials ChatGPT di-login ulang + model yang benar dipilih.
