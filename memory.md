@@ -210,6 +210,7 @@ Tab baru di rail kiri (`matrix`, ikon `TableProperties` — jangan `Table2`, itu
 - Symlink `~/.agentmemory/secret` = Bearer token REST agentmemory. **REST-nya sempat mati total** (semua route 404) karena engine `iii` jalan tanpa worker agentmemory → fix: `CI=1 EMBEDDING_PROVIDER=local npx -y @agentmemory/agentmemory@latest` (start ulang). Data mentah tetap ada di `~/.local/share/agentmemory/state_store.db/mem%3Amemories.bin` (JSON polos + trailer biner — parse sampai `lastIndexOf('}')`).
 - Repo `~/.tier1-test` + `~/.local/share/agentmemory` = artefak tes; project test `probe-wc` (foldernya udah dihapus) **sudah dibersih** dari tabel `projects`, `tier1-test` sengaja dibiarin buat tes statistik lanjutan.
 - **`.commandcode/`** = folder tooling sesi CommandCode → sudah masuk `.gitignore` (jangan ikut commit).
+- **Commit message ke GitHub = Bahasa Inggris** (permintaan user 2026-10-22). Isi kodenya & komentar kode tetap boleh Bahasa Indonesia; yang Inggris cuma pesan commit. Fakta ini juga disimpan di taste sistem supaya berlaku lintas sesi.
 
 ### 11.7 Tier 3 — template ekspor + skrip pasang (selesai)
 
