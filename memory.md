@@ -221,6 +221,22 @@ Tab baru di rail kiri (`matrix`, ikon `TableProperties` — jangan `Table2`, itu
 - **Skrip pasang**: `scripts/setup-semua.sh` (orkestrator) → `fetch-wordcraft.sh` + `fetch-gridcraft.sh` (versi diambil dari GitHub release terbaru, bisa dikunci `GRIDCRAFT_VER=…`) + pack font (`wordcraft-fontpack-v3.py`, butuh `fontTools` + `ttf-mscorefonts-installer`). Docs ada di `scripts/README.md`.
   - Catatan: `fetch-wordcraft.sh` versi lama masih hardcode `v0.8.0` → `fetch-gridcraft.sh` yg baru lebih rapi (API release + flatten zip).
 
+### 11.12 Migrasi session setelah folder di-rename (WAJIB kalau rename lagi)
+
+**Gejala:** setelah folder app di-rename (`research-desk` → `vibe-research`), semua session "hilang" di `opencode` dan di CommandCode.
+
+**Sebab:** session disimpan **per-directory**:
+- OpenCode: kolom `directory` di tabel `session_v2` (opencode.db).
+- CommandCode: folder `~/.commandcode/projects/<cwd-di-slug>/` (path `/home/ubuntu/research-desk` → `home-ubuntu-research-desk`).
+
+**Yang dikerjakan (biar bisa diulang kalau rename lagi):**
+1. Backup DB dulu: `VACUUM INTO '/home/ubuntu/opencode-db-backup-before-rename.db'` (196 MB — boleh dihapus setelah yakin).
+2. `UPDATE session_v2 SET directory='/home/ubuntu/vibe-research' WHERE directory='/home/ubuntu/research-desk'` → **48 session** pindah, judul & isi utuh (termasuk "research-desk: setup repo + planning + memory").
+3. CommandCode: copy `~/.commandcode/projects/home-ubuntu-research-desk/*` → `home-ubuntu-vibe-research/`. Session yang masih JALAN pakai **hardlink** (`ln`) biar dua path nunjuk inode sama → tulisan tetap sinkron.
+4. `history.jsonl` (prompt history) global — tidak perlu diubah.
+
+**PENTING:** riwayat chat di DALAM app (`skripsi-ku`) **tidak kena** — itu terikat ke folder project skripsi (`~/Documents/skripsi`), bukan folder app. Tetap 2 session & 82 pesan.
+
 ### 11.11 Bug "Ngetik..." nyangkut + chat terkunci (sudah dibenerin)
 
 **Gejala (dari ss.png user):** indikator "Ngetik..." tetap nampil padahal turn-nya selesai, dan **tombol kirim mati** — user gak bisa nge-send apa-apa. Kalau stream SSE putus, **jawaban agent juga gak pernah muncul** (cuma token meter yang ke-refresh).
