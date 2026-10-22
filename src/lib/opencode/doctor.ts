@@ -120,7 +120,7 @@ export async function runDoctor(
   candidates: Array<{ providerID: string; modelID: string }>,
   alternatives: Record<string, string[]> = {},
 ): Promise<DoctorReport> {
-  const probeDir = path.join(os.tmpdir(), 'research-desk-ai-probe');
+  const probeDir = path.join(os.tmpdir(), 'vibe-research-ai-probe');
   await fs.mkdir(probeDir, { recursive: true });
   const findings: DoctorFinding[] = [];
 

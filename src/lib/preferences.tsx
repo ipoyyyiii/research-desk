@@ -44,9 +44,34 @@ interface PreferencesValue {
 
 const PreferencesContext = createContext<PreferencesValue | null>(null);
 
-const LOCALE_STORAGE_KEY = 'research-desk:locale';
-const THEME_STORAGE_KEY = 'research-desk:theme';
-const EFFORT_STORAGE_KEY = 'research-desk:effort';
+const LOCALE_STORAGE_KEY = 'vibe-research:locale';
+const THEME_STORAGE_KEY = 'vibe-research:theme';
+const EFFORT_STORAGE_KEY = 'vibe-research:effort';
+
+/**
+ * Key lama (saat app masih bernama "research-desk"). Dibaca satu kali saat
+ * key baru belum ada, lalu dihapus — biar pilihan bahasa/tema/effort user
+ * gak hilang pas nama app diganti.
+ */
+const LEGACY_STORAGE_KEYS: Array<[string, string]> = [
+  ['research-desk:locale', LOCALE_STORAGE_KEY],
+  ['research-desk:theme', THEME_STORAGE_KEY],
+  ['research-desk:effort', EFFORT_STORAGE_KEY],
+];
+
+function migrateLegacyStorage(): void {
+  try {
+    for (const [legacyKey, newKey] of LEGACY_STORAGE_KEYS) {
+      if (localStorage.getItem(newKey) !== null) continue;
+      const legacy = localStorage.getItem(legacyKey);
+      if (legacy === null) continue;
+      localStorage.setItem(newKey, legacy);
+      localStorage.removeItem(legacyKey);
+    }
+  } catch {
+    // storage penuh / tidak tersedia — default app yang dipakai
+  }
+}
 
 /** Nilai effort disimpan: 'auto' = bawaan; lainnya token variant (≤24 char) link. */
 function parseStoredEffort(raw: string): string | null {
@@ -69,6 +94,7 @@ export function PreferencesProvider({
 
   // Effort tidak punya initial dari server — pulihkan dari localStorage sekali di mount.
   useEffect(() => {
+    migrateLegacyStorage();
     try {
       const raw = localStorage.getItem(EFFORT_STORAGE_KEY);
       if (raw) setAiEffortState(parseStoredEffort(raw));

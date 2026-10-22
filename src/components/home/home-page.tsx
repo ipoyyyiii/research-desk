@@ -178,9 +178,9 @@ export function HomePage() {
               aria-hidden="true"
               className="flex size-8 items-center justify-center rounded-md bg-primary font-mono text-sm font-medium text-primary-foreground"
             >
-              R
+              V
             </span>
-            <span className="text-[15px] font-semibold tracking-tight">research-desk</span>
+            <span className="text-[15px] font-semibold tracking-tight">{t('brand.name')}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span aria-hidden="true" className="size-2 rounded-full bg-accent" />

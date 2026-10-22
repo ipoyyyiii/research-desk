@@ -2,14 +2,14 @@
 
 > File memori sesi. Kalau context hilang/session baru, BACA DULU file ini + `planning.md` sebelum kerja apapun di repo ini.
 > Last updated: 2026-10-21 (sesi lanjutan). Fase 0–5 + Tier 1 selesai; sesi ini nutup 2 "utang" tes Tier 1 dan nyiapin Tier 2 (matriks literatur).
-> Kode app = repo `/home/ubuntu/research-desk` (branch `main`, commit terakhir `d4c58d6` sebelum sesi ini).
+> Kode app = repo `/home/ubuntu/vibe-research` (branch `main`, commit terakhir `d4c58d6` sebelum sesi ini).
 
 ---
 
 ## 1. Profil user (konteks personal)
 
 - Nama: **Arrivo Arsa Mevano** — GitHub **`ipoyyyiii`** (user ID GitHub: `263784365`, email noreply: `263784365+ipoyyyiii@users.noreply.github.com`)
-- Target personal: sedang/nanti mengerjakan **skripsi** — App "research-desk" ini dibuat karena **TOOL untuk membantu mengerjakan skripsi-nya**, BUKAN topik skripsi-nya (awal sempat salah paham, sudah terklarifikasi)
+- Target personal: sedang/nanti mengerjakan **skripsi** — App "Vibe Research" ini dibuat karena **TOOL untuk membantu mengerjakan skripsi-nya**, BUKAN topik skripsi-nya (awal sempat salah paham, sudah terklarifikasi)
 - Pain point inti: mengerjakan skripsi = lompat-lompat platform (jurnal di sini, Word di sana, PPT, AI chat, cite manual) → makanya satu workspace
 - Punya akun **GPT Plus** — ingin pakai langganan itu sebagai AI (bukan beli API key). Sudah login "Sign in with ChatGPT"-style credit keOpenCode
 - Gaya komunikasi: santai (bahasa gaul "men/bro"), suka jawaban jujur dan detail
@@ -18,10 +18,10 @@
 
 ## 2. Repo & status pengerjaan
 
-- Repo app: `/home/ubuntu/research-desk/` — git `main`, `first commit 06089eb` (README)
-- Remote: `https://github.com/ipoyyyiii/research-desk.git` (push `-u origin main` SUKSES)
+- Repo app: `/home/ubuntu/vibe-research/` — git `main`, `first commit 06089eb` (README)
+- Remote: `git@github.com:ipoyyyiii/vibe-research.git` (push via SSH key)
 - Identity git: diset **local per repo** (user.name `Arrivo Arsa Mevano`, email noreply) — global masih kosong, machine default "Ubuntu@..." dipakai di repo lama
-- Session OpenCode sudah di-`session_move` ke `/home/ubuntu/research-desk`; user juga diarahkan membuka folder yang sama di VS Code
+- Session OpenCode sudah di-`session_move` ke `/home/ubuntu/vibe-research`; user juga diarahkan membuka folder yang sama di VS Code
 - **Status: FASE 0 BERES** (commit `2a00117`, sudah push): Node 24.22.0 + pnpm 12.14.0 · Next.js 15.5.28 (React 19.1, Tailwind 4.3.3, TS, src-dir, dev borong turbopack bind 127.0.0.1) · DB better-sqlite3 13 + Drizzle (projects, settings) di `data/app.db` · API `/api/projects` (GET list + POST attach dengan guard anti-traversal/symlink) · `/workspace` page attach + root redirect · `pnpm build` ✅ `pnpm lint` ✅ · folder demo `~/Documents/skripsi` sudah terpasang (subfolder baku dibuat)
 - **Gotcha fase 0** (biar gak kena lagi): pnpm 12 blokir postinstall native → allowlist di `pnpm-workspace.yaml` `onlyBuiltDependencies` + `pnpm approve-builds --all`; guard realpath jangan jalan sebelum mkdir (sudah difix di `src/lib/workspace/paths.ts`)
 - **FASE 1 BERES** (commit `c307d93`): layout 3-panel resizable (react-resizable-panels API baru: `Group/Panel/Separator`, ukuran pakai string %), Tiptap 3 + `@tiptap/markdown` (serialize = `editor.getMarkdown()`, opsi `markedOptions`), BubbleMenu import dari `@tiptap/react/menus`, file tree refetch-on-focus, autosave 800ms + ⌘S, i18n dictionary id/en + PreferencesProvider (locale persist ke DB settings), topbar + settings dialog + focus mode (Esc), API file/tree/documents/settings lengkap dengan guard anti-traversal+symlink. Build ✅ lint ✅ smoke test 7-tes hijau.
@@ -52,7 +52,7 @@
 
 | Keputusan | Alasan singkat |
 |---|---|
-| Repo baru `/home/ubuntu/research-desk` (BUKAN di socautomation) | pisah history, git bersih |
+| Repo baru `/home/ubuntu/vibe-research` (BUKAN di socautomation) | pisah history, git bersih |
 | AI = **OpenCode service** sebagai engine, app = frontend `@opencode/client` | user punya GPT Plus; OAuth langganan cuma berlaku untuk klien disetujui (OpenCode/Codex/ClaudeCode) — cara sah memakai langganan di app sendiri; bonus: tools bawaan (edit exact-match, sessions, events) gak perlu dibangun ulang |
 | Dokumen = **markdown per-bab** via Tiptap (`@tiptap/markdown`) | agent-editable & presisi (edit exact-match), diff bersih, tampilan tetap feel-Word (.md = invisible); menulis pengalaman tetap SAMA KAYA WORD, format tetap utuh ke DOCX |
 | Source-of-truth = md; **DOCX = export one-way** (`app → Word`) | round-trip docx lossy + agent edit docx rapuh; DOCX exported = final untuk submit |

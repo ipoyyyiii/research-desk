@@ -19,7 +19,12 @@ export type AgentCapabilities = { websearch: boolean; literature: boolean };
 
 const CAPS_DEFAULT: AgentCapabilities = { websearch: false, literature: false };
 
-/** Baca toggles dari opencode.json existing (aman kalau file belum ada). */
+/**
+ * Key `research-desk` di opencode.json project = NAMA FORMAT LAMA, sengaja
+ * dipertahankan. App sekarang bernama "Vibe Research", tapi key ini format
+ * data di disk: diganti, seluruh project yang toggle-nya udah tersimpan
+ * kehilangan setting-nya. Nama tampilan boleh berubah, key format tidak.
+ */
 export function readProjectCapabilities(folderPath: string): AgentCapabilities {
   try {
     const file = path.join(folderPath, '.opencode', 'opencode.json');
@@ -41,7 +46,7 @@ export function readProjectCapabilities(folderPath: string): AgentCapabilities {
 function capabilitiesBlock(caps: AgentCapabilities): string[] {
   const head = '<!-- research-desk:capabilities:start -->';
   const tail = '<!-- research-desk:capabilities:end -->';
-  const lines: string[] = [head, '## Kemampuan AI (dikelola research-desk)'];
+  const lines: string[] = [head, '## Kemampuan AI (dikelola Vibe Research)'];
   if (caps.literature) {
     lines.push(
       '- **Pencarian jurnal AKTIF.** Pakai tool shell/execute untuk HTTP GET ke API publik:',

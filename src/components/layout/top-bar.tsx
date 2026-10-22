@@ -49,7 +49,7 @@ export function TopBar({
             aria-hidden="true"
             className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary font-mono text-[13px] font-medium text-primary-foreground"
           >
-            R
+            V
           </span>
           <span className="whitespace-nowrap text-sm font-semibold tracking-tight">
             {t('brand.name')}

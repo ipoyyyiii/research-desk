@@ -9,10 +9,10 @@
 
 | Item | Status |
 |---|---|
-| Repo: `/home/ubuntu/research-desk/` (git `main`, `first commit 06089eb`) | ✅ BERES |
-| Remote GitHub: `ipoyyyiii/research-desk` (push sukses) | ✅ BERES |
+| Repo: `/home/ubuntu/vibe-research/` (git `main`, `first commit 06089eb`) | ✅ BERES |
+| Remote GitHub: `ipoyyyiii/vibe-research` (push sukses) | ✅ BERES |
 | Identitas commit nyambung akun (Arrivo Arsa Mevano · `263784365+ipoyyyiii@users.noreply.github.com`) | ✅ BERES |
-| Session OpenCode + VS Code → folder research-desk | ✅ BERES |
+| Session OpenCode + VS Code → folder vibe-research | ✅ BERES |
 | **Fase 0: Node 24.22 + pnpm 12.14 + scaffold Next.js 15.5.28 + DB + attach-folder** | ✅ **BERES** (commit `2a00117`) |
 | **Fase 1: layout 3-panel + Tiptap autosave→md + i18n id/en + file tree** | ✅ **BERES** (commit `c307d93`) |
 | **Fase 1 polish: ribbon ala-Word + gambar (upload/paste/drop→`gambar/`, serve via `/raw`, `.md` tetap relatif) + prefs tampilan + tabel/link/align** | ✅ **BERES** (commit `ce0472a`) |
@@ -28,7 +28,7 @@ Lingkungan mesin: Ubuntu di AWS (VS Code Remote SSH, user `ubuntu`). Akses brows
 
 | Aspek | Keputusan |
 |---|---|
-| Nama app | **research-desk** |
+| Nama app | **Vibe Research** (repo: `vibe-research`) |
 | Jenis | Web app **lokal single-user** (Next.js, bind `127.0.0.1:3000`) |
 | Bahasa UI | **Indonesia (default) + English** — toggle di topbar/settings, tersimpan di DB |
 | Dokumen sumber | **Markdown per-bab** (`bab1-pendahuluan.md`, …) — agent-editable; `.md` = invisible plumbing (kamu nulis dengan pengalaman ala-Word via Tiptap) |
@@ -109,7 +109,7 @@ Lingkungan mesin: Ubuntu di AWS (VS Code Remote SSH, user `ubuntu`). Akses brows
 ### 3.1 Struktur repo (kode app)
 
 ```
-/home/ubuntu/research-desk/
+/home/ubuntu/vibe-research/
 ├─ src/app/
 │  ├─ page.tsx                  → redirect /workspace
 │  ├─ workspace/page.tsx        → list project + [attach folder]
@@ -257,7 +257,7 @@ settings: { locale ("id"|"en"), theme, default_citation_style,
 
 ## 10. Keputusan terkunci (receipts)
 
-1. ✅ Nama: **research-desk** — repo sudah live di GitHub (`ipoyyyiii/research-desk`)
+1. ✅ Nama: **Vibe Research** — repo live di GitHub (`ipoyyyiii/vibe-research`)
 2. ✅ UI bilingual: **Indonesia (default) + English**
 3. ✅ Dokumen: **markdown per-bab**, feel-Word via Tiptap; `.md` invisible; tiga jalur input file
 4. ✅ Export: **pandoc DOCX/PDF**, one-way (app→Word), template standar skripsi Indonesia

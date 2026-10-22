@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "research-desk",
+  title: "Vibe Research",
   description: "Satu tempat untuk nulis skripsi + baca jurnal + tanya AI.",
 };
 

@@ -1,6 +1,8 @@
-# research-desk
+# Vibe Research
 
 > Satu tempat untuk nulis skripsi + baca jurnal + tanya AI.
+>
+> Repo GitHub: `ipoyyyiii/vibe-research`.
 
 Workspace lokal buat ngulis skripsi: naskah per-bab, literatur, data, dan
 asisten AI dalam satu aplikasi. Semua file nyimpan di disk (bukan di cloud),

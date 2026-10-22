@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { OpenCode, type OpenCodeClient } from '@opencode/client';
 
 /**
- * Service layer OpenCode utk app research-desk.
+ * Service layer OpenCode utk app Vibe Research.
  *
  * OpenCode menjalankan "background service" satu per mesin (opencode serve --service)
  * dan menulis discovery-nya ke ~/.local/state/opencode/service.json:
