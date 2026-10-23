@@ -124,6 +124,8 @@ export function ensureProjectAgentConfig(
             '(10) INSTALL SKILL (kalau user minta): bikin folder `<project>/.opencode/skills/<nama>/SKILL.md` — nama HARUS huruf kecil/angka/tanda hubung (tanpa spasi, maksimal 64 char) dan SAMA dengan nama foldernya; file diawali YAML frontmatter berisi `name:` + `description:` (maks 1024 char, spesifik) lalu isi instruksi. Skill itu muncul di tool `skill` untuk sesi baru; kalau belum muncul, sarankan user mulai sesi baru. ' +
             '(11) ADD MCP SERVER (kalau user minta): edit `.opencode/opencode.json` di project ini — BACA dulu isinya lalu gabungkan key `mcp` baru (JANGAN menimpa key lain; config ini juga menampung pengaturan research-desk). Format lokal: {"type":"local","command":["npx","-y","<paket>"],"enabled":true}; remote: {"type":"remote","url":"https://...","enabled":true}. MCP baru biasanya aktif untuk sesi baru; kalau tool-nya belum terlihat, sarankan user mulai sesi baru atau muat ulang app. ' +
             '(12) ANALISIS DATA & STATISTIK: data mentah di `data/` JANGAN PERNAH diubah/ditimpa — selalu baca saja; skrip reproduksibel ditulis di `scripts/`, hasil ke `hasil/` (baru dibuat kalau perlu). Skrip standar `scripts/uji-statistik.py` membaca xlsx/csv dan mencetak laporan markdown. Kalau dependency Python belum ada, sekali saja: `python3 -m venv .venv && .venv/bin/pip install pandas scipy statsmodels openpyxl`, lalu jalankan `.venv/bin/python scripts/uji-statistik.py --data data/<file>`. Laporkan angka NYATA dari output skrip; jangan mengarang hasil statistik, dan sebut jumlah data yang dibuang karena missing value. ' +
+            '(13) GAMBAR & PDF: berkas gambar (gambar/*.png|jpg|jpeg|webp) bisa DILIHAT langsung pakai tool read — lihat dulu isinya sebelum berkomentar. PDF di referensi/ boleh dibaca/diekstrak teksnya. Jangan pernah mengarang isi gambar atau PDF; kalau gagal dibaca, bilang gagal. ' +
+            '(14) NASKAH DI TAB WORD: file .md adalah versi kanonik. Perubahan yang belum disimpan di WordCraft belum ada di disk — kalau user bilang baru mengedit di tab Word, sarankan simpan (Save to chapter) dulu sebelum kamu menyunting file yang sama. ' +
             'Kemampuan web/jurnal ikuti blok "Kemampuan AI" di AGENTS.md — kalau dimatikan, jangan coba-coba.',
           // Tool `question` AKTIF (kartu pertanyaan implement, probe Lane C
           // 2026-10-19 di /tmp/opencode/question-probe): agent tool `question`
@@ -195,14 +197,45 @@ export async function buildDossier(opts: {
 
   try {
     const tree = await listTree(opts.folderRealPath);
-    const files = tree.filter((entry) => entry.type === 'file' && /\.(md|bib|ris|txt)$/i.test(entry.name));
-    if (files.length > 0) {
-      lines.push('Daftar dokumen/berkas teks:');
-      for (const file of files.slice(0, 40)) {
-        lines.push(`- ${file.path} (${formatSize(file.size)})`);
+    // Semua berkas yang bisa dipakai agent — bukan cuma teks. Agent harus tahu
+    // isi workspace-nya tanpa perlu nebak atau list folder sendiri.
+    const usable = tree.filter(
+      (entry) =>
+        entry.type === 'file' &&
+        /\.(md|bib|ris|txt|csv|tsv|xlsx|xls|json|py|ipynb|pdf|png|jpg|jpeg|webp|gif|docx|tex)$/i.test(
+          entry.name,
+        ),
+    );
+
+    if (usable.length > 0) {
+      const groups = new Map<string, Array<{ path: string; name: string; size: number }>>();
+      for (const file of usable) {
+        const top = file.path.includes('/') ? file.path.split('/')[0] : '(root)';
+        const list = groups.get(top) ?? [];
+        list.push({ path: file.path, name: file.name, size: file.size });
+        groups.set(top, list);
       }
-      if (files.length > 40) lines.push(`- … dan ${files.length - 40} berkas lain`);
+      lines.push('Isi workspace (dikelompokkan per folder):');
+      for (const [folder, files] of groups) {
+        const shown = files
+          .slice(0, 12)
+          .map((file) => `${file.name} (${formatSize(file.size)})`)
+          .join(', ');
+        const more = files.length > 12 ? `, … +${files.length - 12} lagi` : '';
+        lines.push(`- ${folder}/ [${files.length}]: ${shown}${more}`);
+      }
+    } else {
+      lines.push('Workspace masih kosong (belum ada berkas).');
     }
+    lines.push(
+      'Cara mengakses:',
+      '- dokumen/*.md = naskah bab: baca & edit langsung, pertahankan struktur heading dan marker [@key].',
+      '- data/*.xlsx|*.csv = data mentah: baca lewat Python (pandas/openpyxl), JANGAN diubah/ditimpa.',
+      '- gambar/*.png|*.jpg = bisa dilihat langsung (tool read); PDF di referensi/ bisa dibaca/ekstrak teksnya.',
+      '- scripts/ = skrip reproducible; hasil/ = laporan analisis; referensi/references.bib = daftar pustaka.',
+      '- File .docx di export/ adalah hasil ekspor satu arah — jangan dijadikan sumber edit.',
+      'Tiru gaya penulisan yang sudah ada di bab lain (panjang kalimat, istilah, cara mengutip); jangan mengubah gaya penulis.',
+    );
   } catch {
     lines.push('(Daftar berkas tidak tersedia)');
   }
