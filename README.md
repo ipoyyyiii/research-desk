@@ -1,5 +1,14 @@
 # Vibe Research
 
+<p align="center">
+  <img alt="Next.js 15.5" src="https://img.shields.io/badge/Next.js-15.5-black?style=flat-square">
+  <img alt="React 19.1" src="https://img.shields.io/badge/React-19.1-61dafb?style=flat-square">
+  <img alt="TypeScript 5" src="https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square">
+  <img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind_CSS-4-06b6d4?style=flat-square">
+  <img alt="SQLite with Drizzle" src="https://img.shields.io/badge/SQLite-Drizzle-003b57?style=flat-square">
+  <img alt="Node.js 24" src="https://img.shields.io/badge/Node.js-24-5fa04e?style=flat-square">
+</p>
+
 A local-first, single-user workspace for academic writing: chapter editing, literature search
 and citation management, data analysis, and an embedded AI assistant, operating on plain files
 inside a user-selected project directory.
