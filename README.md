@@ -1,4 +1,4 @@
-# Vibe Research
+<h1 align="center">Vibe Research</h1>
 
 <p align="center">
   <img alt="Next.js 15.5" src="https://img.shields.io/badge/Next.js-15.5-black?style=flat-square">
@@ -9,9 +9,11 @@
   <img alt="Node.js 24" src="https://img.shields.io/badge/Node.js-24-5fa04e?style=flat-square">
 </p>
 
-A local-first, single-user workspace for academic writing: chapter editing, literature search
-and citation management, data analysis, and an embedded AI assistant, operating on plain files
-inside a user-selected project directory.
+<p align="center">
+  A local-first, single-user workspace for academic writing: chapter editing, literature search<br>
+  and citation management, data analysis, and an embedded AI assistant, operating on plain files<br>
+  inside a user-selected project directory.
+</p>
 
 ---
 
