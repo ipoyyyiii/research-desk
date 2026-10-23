@@ -10,6 +10,7 @@ import {
   MessageSquareQuote,
   NotebookPen,
   Plus,
+  Upload,
   X,
 } from 'lucide-react';
 import { usePreferences, useT, type Locale } from '@/lib/preferences';
@@ -130,6 +131,9 @@ export function RevisionPanel({ slug }: { slug: string }) {
   const [pendingDelete, setPendingDelete] = useState<RevisionItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   /** Markdown hasil export — dibuka manual kalau clipboard browser gak bisa dipakai. */
   const [exportText, setExportText] = useState<string | null>(null);
   /** Item yang editor catatannya sedang dibuka. */
@@ -399,6 +403,46 @@ export function RevisionPanel({ slug }: { slug: string }) {
 
   const pickerItem = pickerItemId === null ? null : items.find((item) => item.id === pickerItemId) ?? null;
 
+  /** Impor anotasi dari .docx pembimbing (komentar + track changes). */
+  const importDocx = async (file: File) => {
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result ?? '');
+          resolve(result.slice(result.indexOf(',') + 1));
+        };
+        reader.onerror = () => reject(new Error('read'));
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/revisions/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, includeTrackChanges: true }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { items?: unknown[]; error?: string }
+        | null;
+      if (!res.ok) {
+        setImportMsg({ text: data?.error ?? t('revision.importFail'), tone: 'error' });
+        return;
+      }
+      const count = Array.isArray(data?.items) ? data.items.length : 0;
+      setImportMsg({
+        text: count > 0 ? t('revision.importDone', { n: count }) : t('revision.importEmpty'),
+        tone: count > 0 ? 'ok' : 'error',
+      });
+      await fetchItems();
+    } catch {
+      setImportMsg({ text: t('revision.importFail'), tone: 'error' });
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
+
   const filters: Array<{ value: Filter; label: string; count: number }> = [
     { value: 'all', label: t('revision.filterAll'), count: items.length },
     { value: 'todo', label: t('revision.statusTodo'), count: counts.todo },
@@ -447,6 +491,33 @@ export function RevisionPanel({ slug }: { slug: string }) {
           {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
           {t('revision.export')}
         </button>
+        <button
+          type="button"
+          onClick={() => importInputRef.current?.click()}
+          disabled={importing}
+          title={t('revision.importHint')}
+          className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {importing ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+          {t('revision.import')}
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".docx"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void importDocx(file);
+          }}
+        />
+        {importMsg && (
+          <span
+            className={`min-w-0 text-[11px] ${importMsg.tone === 'error' ? 'text-red-600' : 'text-muted-foreground'}`}
+          >
+            {importMsg.text}
+          </span>
+        )}
         <span className="min-w-0 text-[11px] text-muted-foreground">
           {t('revision.counts', {
             todo: counts.todo,

@@ -580,7 +580,12 @@
     "textMissing": "Comment text is required.",
     "empty": "No comments could be parsed.",
     "chapterInvalid": "Invalid chapter path.",
-    "notFound": "Comment not found."
+    "notFound": "Comment not found.",
+    "import": "Import .docx",
+    "importHint": "Pull supervisor comments from a .docx file",
+    "importDone": "{n} comments imported",
+    "importEmpty": "No comments found in that file",
+    "importFail": "Failed to import the .docx"
   },
   "versions": {
     "title": "Version History",
@@ -775,5 +780,61 @@
     "submit": "Sisip",
     "done": "{number} sudah masuk ke bab.",
     "fail": "Gagal menyisipkan tabel."
+  },
+  "thesisExport": {
+    "menu": "Full thesis",
+    "title": "Export full thesis",
+    "hint": "Combine every chapter with front matter, table of contents, lists and page numbers.",
+    "loading": "Loading project data…",
+    "loadFailed": "Could not load export data",
+    "fieldsTitle": "Thesis identity",
+    "field": {
+      "title": "Title",
+      "author": "Author",
+      "nim": "Student ID",
+      "program": "Study program",
+      "faculty": "Faculty",
+      "institution": "Institution",
+      "city": "City",
+      "year": "Year",
+      "supervisor1": "Supervisor I",
+      "supervisor2": "Supervisor II"
+    },
+    "save": "Save",
+    "saved": "Saved.",
+    "saveFailed": "Could not save identity.",
+    "chaptersTitle": "Chapters to export",
+    "chaptersHint": "Natural order: bab1, bab2, … bab10. Test/draft files are skipped.",
+    "selectAll": "Select all",
+    "selectNone": "Clear",
+    "noChapters": "No .md chapters in dokumen/ yet.",
+    "abstractIncluded": "Abstract from dokumen/abstrak.md is included in front matter.",
+    "noAbstract": "No dokumen/abstrak.md — abstract page skipped.",
+    "noBib": "references.bib is missing — citations stay as raw text.",
+    "formatTitle": "Format",
+    "format": {
+      "docx": "DOCX",
+      "pdf": "PDF",
+      "both": "DOCX + PDF"
+    },
+    "styleTitle": "Citation style",
+    "style": {
+      "apa": "APA",
+      "ieee": "IEEE"
+    },
+    "exporting": "Building document…",
+    "exportingShort": "Building…",
+    "export": "Export now",
+    "done": "Export complete.",
+    "open": "Open in panel",
+    "download": "Download",
+    "counts": "{chapters} chapters · {tables} tables · {figures} figures",
+    "pdfFailed": "PDF failed; the DOCX is still saved. {message}",
+    "docxFailed": "DOCX failed; the PDF is still saved. {message}",
+    "missingCitations": "Citations without bibliography entries: {keys}",
+    "unused": "{n} bibliography entries are unused",
+    "close": "Close",
+    "noChaptersSelected": "Select at least one chapter.",
+    "failed": "Export failed"
   }
 }

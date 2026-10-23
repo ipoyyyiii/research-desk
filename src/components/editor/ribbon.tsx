@@ -35,6 +35,7 @@ import type { BibEntry } from '@/lib/journals/bib';
 import type { JournalCard } from '@/lib/journals/types';
 import { applyCitationMarks, normalizeCitationEscapes } from '@/components/editor/citation-mark';
 import { applyQualityFixes, scanQuality, type QualityIssue } from '@/lib/document-quality';
+import { ThesisExportModal } from '@/components/editor/thesis-export-modal';
 
 // ── View prefs (tampilan editor saja — file .md gak ikut nyimpennya) ─────────
 const FONT_FAMILIES = [
@@ -231,6 +232,7 @@ export function Ribbon({
 
   // ── Ekspor DOCX (pandoc + citeproc) ───────────────────────────────────────
   const [exportOpen, setExportOpen] = useState(false);
+  const [thesisExportOpen, setThesisExportOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportResult, setExportResult] = useState<string | null>(null);
   const [exportSources, setExportSources] = useState<number | null>(null);
@@ -677,7 +679,18 @@ export function Ribbon({
             {exportBusy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
           </TBtn>
           {exportOpen && (
-            <div className="absolute right-0 top-8 z-40 w-40 rounded-md border border-border bg-card p-1 text-xs shadow-lg">
+            <div className="absolute right-0 top-8 z-40 w-48 rounded-md border border-border bg-card p-1 text-xs shadow-lg">
+              <button
+                type="button"
+                className="w-full cursor-pointer rounded px-2 py-1 text-left font-medium transition-colors hover:bg-muted"
+                onClick={() => {
+                  setExportOpen(false);
+                  setThesisExportOpen(true);
+                }}
+              >
+                {t('thesisExport.menu')}
+              </button>
+              <div className="my-1 h-px bg-border" />
               <button
                 type="button"
                 className="w-full cursor-pointer rounded px-2 py-1 text-left transition-colors hover:bg-muted"
@@ -790,6 +803,12 @@ export function Ribbon({
           </div>
         )}
       </Modal>
+
+      <ThesisExportModal
+        open={thesisExportOpen}
+        onClose={() => setThesisExportOpen(false)}
+        slug={slug}
+      />
 
       {/* Cek konsistensi sitasi ↔ pustaka (semua file .md project). */}
       <Modal open={checkOpen} onClose={() => setCheckOpen(false)} title={t('citeCheck.title')}>

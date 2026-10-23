@@ -580,7 +580,12 @@
     "textMissing": "Komentar wajib diisi.",
     "empty": "Tidak ada komentar yang bisa dibaca.",
     "chapterInvalid": "Path bab tidak valid.",
-    "notFound": "Komentar tidak ditemukan."
+    "notFound": "Komentar tidak ditemukan.",
+    "import": "Impor .docx",
+    "importHint": "Ambil komentar pembimbing dari file .docx",
+    "importDone": "{n} komentar diimpor",
+    "importEmpty": "Gak ada komentar di file itu",
+    "importFail": "Gagal mengimpor .docx"
   },
   "versions": {
     "title": "Riwayat Versi",
@@ -775,5 +780,61 @@
     "submit": "Sisip",
     "done": "{number} sudah masuk ke bab.",
     "fail": "Gagal menyisipkan tabel."
+  },
+  "thesisExport": {
+    "menu": "Skripsi lengkap",
+    "title": "Ekspor skripsi lengkap",
+    "hint": "Gabungkan semua bab dengan halaman depan, daftar isi, daftar tabel/gambar, dan nomor halaman.",
+    "loading": "Memuat data project…",
+    "loadFailed": "Gagal memuat data ekspor",
+    "fieldsTitle": "Identitas skripsi",
+    "field": {
+      "title": "Judul",
+      "author": "Nama penulis",
+      "nim": "NIM",
+      "program": "Program studi",
+      "faculty": "Fakultas",
+      "institution": "Institusi",
+      "city": "Kota",
+      "year": "Tahun",
+      "supervisor1": "Pembimbing I",
+      "supervisor2": "Pembimbing II"
+    },
+    "save": "Simpan",
+    "saved": "Tersimpan.",
+    "saveFailed": "Gagal menyimpan identitas.",
+    "chaptersTitle": "Bab yang diekspor",
+    "chaptersHint": "Urutan alami: bab1, bab2, … bab10. File uji/draf tidak ikut.",
+    "selectAll": "Pilih semua",
+    "selectNone": "Kosongkan",
+    "noChapters": "Belum ada bab .md di dokumen/.",
+    "abstractIncluded": "Abstrak dari dokumen/abstrak.md ikut di halaman depan.",
+    "noAbstract": "Belum ada dokumen/abstrak.md — halaman abstrak dilewati.",
+    "noBib": "references.bib belum ada — sitasi akan jadi teks mentah.",
+    "formatTitle": "Format",
+    "format": {
+      "docx": "DOCX",
+      "pdf": "PDF",
+      "both": "DOCX + PDF"
+    },
+    "styleTitle": "Gaya sitasi",
+    "style": {
+      "apa": "APA",
+      "ieee": "IEEE"
+    },
+    "exporting": "Menyusun dokumen…",
+    "exportingShort": "Menyusun…",
+    "export": "Ekspor sekarang",
+    "done": "Ekspor selesai.",
+    "open": "Buka di panel",
+    "download": "Unduh",
+    "counts": "{chapters} bab · {tables} tabel · {figures} gambar",
+    "pdfFailed": "PDF gagal dibuat; DOCX tetap aman. {message}",
+    "docxFailed": "DOCX gagal dibuat; PDF tetap aman. {message}",
+    "missingCitations": "Sitasi tanpa entri pustaka: {keys}",
+    "unused": "{n} entri pustaka belum dipakai",
+    "close": "Tutup",
+    "noChaptersSelected": "Pilih minimal satu bab.",
+    "failed": "Ekspor gagal"
   }
 }
