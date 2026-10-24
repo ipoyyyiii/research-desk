@@ -9,23 +9,76 @@ function asciiSanitize(input: string): string {
     .replace(/[^a-z0-9]/g, '');
 }
 
+/** Stopword umum (Inggris + Indonesia) yang dilewati saat mencari kata judul bermakna. */
+const TITLE_STOPWORDS = new Set([
+  'the', 'a', 'an', 'of', 'on', 'in', 'and', 'for', 'to',
+  'dan', 'di', 'ke', 'dari', 'pada', 'yang', 'untuk',
+]);
+
+/** Penanda "tanpa nama" yang bukan nama keluarga sungguhan. */
+const PLACEHOLDER_LASTNAMES = new Set([
+  'unknown', 'anonymous', 'anon', 'unnamed', 'none', 'null',
+]);
+
+/** Kata judul yang sudah disanitasi (kata kosong / tanda baca saja dibuang). */
+function titleWords(title: string): string[] {
+  return title
+    .split(/\s+/)
+    .map((word) => asciiSanitize(word))
+    .filter((word) => word !== '');
+}
+
+/** Kata pertama judul apa adanya — bagian `<kata>` pada key author+tahun. */
+function firstTitleWord(title: string): string {
+  return titleWords(title)[0] ?? 'untitled';
+}
+
+/** Kata judul pertama yang bermakna (stopword/angka dilewati) — pengganti nama author. */
+function firstMeaningfulTitleWord(title: string): string {
+  const words = titleWords(title);
+  return (
+    words.find((word) => !TITLE_STOPWORDS.has(word) && !/^\d+$/.test(word)) ??
+    words[0] ??
+    'untitled'
+  );
+}
+
+/**
+ * Nama keluarga tidak berguna kalau kosong, cuma penanda "tanpa nama"
+ * (unknown/anonymous), atau hanya inisial ("J.", "J. K."). Key dari nama seperti
+ * itu — mis. `unknown2019the` — tidak bisa diketik di sitasi `[@...]` dan jelek di
+ * daftar pustaka.
+ */
+function isUselessLastname(token: string): boolean {
+  const stripped = token.replace(/[.,;]/g, '').trim();
+  if (stripped === '') return true;
+
+  const sanitized = asciiSanitize(stripped);
+  if (sanitized === '' || PLACEHOLDER_LASTNAMES.has(sanitized)) return true;
+
+  // Inisial: semua bagian (dipisah spasi/titik) cuma satu huruf, mis. "J." / "J. K.".
+  const parts = token.split(/[\s.]+/).filter((part) => part !== '');
+  return parts.length > 0 && parts.every((part) => part.length === 1);
+}
+
 /**
  * BibTeX key: `<lastname-tanpa-spasi><year><kata-judul-pertama>` → contoh `huisman2018peer`.
+ * Bila author pertama tidak punya nama keluarga yang berguna, dipakai
+ * `<kata-judul-bermakna><year>` → mis. `impact2019`, bukan `unknown2019the`.
  * Kalau bentrok dengan existingKeys → suffix a/b/c, lalu angka.
  */
 export function generateBibKey(paper: JournalCard, existingKeys: string[]): string {
   const existing = new Set(existingKeys);
 
-  const rawLastname = (paper.authors[0] ?? '').trim().split(/\s+/).pop() ?? 'unknown';
-  const lastname = asciiSanitize(rawLastname) || 'unknown';
+  const rawLastname = (paper.authors[0] ?? '').trim().split(/\s+/).pop() ?? '';
   const yearPart = paper.year != null ? String(paper.year) : '';
-  const firstWord =
-    paper.title
-      .split(/\s+/)
-      .map((word) => asciiSanitize(word))
-      .find((word) => word !== '') ?? 'untitled';
 
-  const base = `${lastname}${yearPart}${firstWord}`;
+  // Author normal tetap author + tahun + kata judul (perilaku lama). Hanya saat
+  // nama author tidak berguna kita pakai kata judul bermakna + tahun, supaya key
+  // tetap pendek, gampang diketik di `[@...]`, dan tidak memuat "unknown".
+  const base = isUselessLastname(rawLastname)
+    ? `${firstMeaningfulTitleWord(paper.title)}${yearPart}`
+    : `${asciiSanitize(rawLastname)}${yearPart}${firstTitleWord(paper.title)}`;
 
   const candidates: string[] = [base];
   for (const suffix of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm']) {
@@ -47,7 +100,11 @@ export function bibEntry(paper: JournalCard, key: string): string {
   fields.push(`  title = {${paper.title}}`);
   if (paper.year != null) fields.push(`  year = {${paper.year}}`);
   if (paper.venue) fields.push(`  journal = {${paper.venue}}`);
-  if (paper.doi) fields.push(`  doi = {${paper.doi}}`);
+  if (paper.doi) {
+    // BibTeX `doi` harus DOI telanjang; pandoc/CSL menambahkan https://doi.org/ sendiri.
+    const doi = paper.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+    fields.push(`  doi = {${doi}}`);
+  }
   return `@article{${key},\n${fields.join(',\n')}\n}`;
 }
 

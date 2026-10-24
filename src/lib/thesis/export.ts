@@ -9,6 +9,7 @@ import { parseBib, type BibEntry } from '../journals/bib';
 import {
   ABSTRACT_PATH,
   discoverChapterPaths,
+  mergeChapterHeading,
   readChapterText,
   scanCaptions,
   splitAbstractMarkdown,
@@ -137,7 +138,9 @@ async function loadChapters(folder: string, requested?: string[]): Promise<Chapt
   const seenAnchors = new Set<string>();
   const chapters: ChapterFile[] = [];
   for (const chapterPath of paths) {
-    const markdown = await readChapterText(folder, chapterPath);
+    // Dua H1 di awal bab digabung sekali di sini, supaya jalur DOCX (TOC field)
+    // dan PDF (TOC HTML) sama-sama tidak menduplikasi entri bab di Daftar Isi.
+    const markdown = mergeChapterHeading(await readChapterText(folder, chapterPath));
     const scan = scanCaptions(markdown, seenAnchors);
     chapters.push({ path: chapterPath, markdown, tables: scan.tables, figures: scan.figures });
   }

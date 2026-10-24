@@ -9,6 +9,7 @@ import { LeftPanel } from '@/components/panels/left-panel';
 import { CenterPanel } from '@/components/panels/center-panel';
 import { ChatPanel } from '@/components/panels/chat-panel';
 import { IconRail, type LeftTab } from '@/components/workspace/icon-rail';
+import { readEditorPref, writeEditorPref } from '@/lib/workspace/editor-pref';
 
 // ── State tab panel tengah (sumber kebenaran satu-satunya) ───────────────────
 
@@ -292,9 +293,14 @@ export function WorkspaceShell({
 
   const refreshTree = () => setTreeVersion((v) => v + 1);
 
-  const openFileTab = (path: string) =>
+  const openFileTab = (path: string) => {
+    if (path.toLowerCase().endsWith('.md')) writeEditorPref(path, 'text');
     setCenter((prev) => (isSpreadsheetPath(path) ? openGridTabState(prev, path) : openFileTabState(prev, path)));
-  const openWordTab = (path: string) => setCenter((prev) => openWordTabState(prev, path));
+  };
+  const openWordTab = (path: string) => {
+    if (path.toLowerCase().endsWith('.md')) writeEditorPref(path, 'word');
+    setCenter((prev) => openWordTabState(prev, path));
+  };
   /** Klik dokumen: .md → tab Word; xlsx/csv/tsv → tab Excel; selainnya tab file
    * biasa. Juga dipakai listener event `workspace:doc-created` di bawah — dibikin
    * stabil (deps kosong, setCenter ref-stabil) biar listener gak re-bind tiap render. */
@@ -302,7 +308,9 @@ export function WorkspaceShell({
     (path: string) =>
       setCenter((prev) =>
         path.toLowerCase().endsWith('.md')
-          ? openWordTabState(prev, path)
+          ? readEditorPref(path) === 'text'
+            ? openFileTabState(prev, path)
+            : openWordTabState(prev, path)
           : isSpreadsheetPath(path)
             ? openGridTabState(prev, path)
             : openFileTabState(prev, path),

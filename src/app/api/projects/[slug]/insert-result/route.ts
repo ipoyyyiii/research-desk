@@ -17,6 +17,70 @@ async function resolveProjectFolder(slug: string): Promise<string | null> {
 }
 
 /**
+ * Variabel fokus dari laporan analisis, dibaca dari seksi regresinya.
+ * Dipakai buat menaikkan gambar yang relevan (scatter prediktor, diagnostik,
+ * sebaran y) ke atas daftar — tanpa ini daftar penuh histogram butir P1..Pn.
+ */
+function focusVariables(report: string): { target: string | null; predictors: string[] } {
+  const model = /Model:\s*`([^`]+)`\s*~\s*([^\n]+)/i.exec(report);
+  if (model) {
+    const predictors = [...model[2].matchAll(/`([^`]+)`/g)].map((m) => m[1].toLowerCase());
+    return { target: model[1].trim().toLowerCase(), predictors };
+  }
+  const heading = /Regresi[^\n]*\(`([^`]+)`\)/i.exec(report);
+  return { target: heading ? heading[1].trim().toLowerCase() : null, predictors: [] };
+}
+
+function figureRank(
+  figure: { path: string; alt: string; caption: string },
+  focus: { target: string | null; predictors: string[] },
+): number {
+  const haystack = `${figure.path} ${figure.alt} ${figure.caption}`.toLowerCase();
+  if (haystack.includes('scatter') && focus.predictors.some((name) => haystack.includes(name))) return 0;
+  if (haystack.includes('resid')) return 1;
+  if (haystack.includes('boxplot')) return 2;
+  if (focus.target && haystack.includes(focus.target)) return 3;
+  if (focus.predictors.some((name) => haystack.includes(name))) return 4;
+  return 5;
+}
+
+/**
+ * Sisipkan blok di akhir seksi sebuah heading (sebelum heading berikutnya
+ * dengan level sama/lebih tinggi). Tanpa heading yang cocok → di akhir file.
+ */
+function insertAfterHeading(content: string, headingText: string, block: string): string {
+  const lines = content.split('\n');
+  const wanted = headingText.trim().toLowerCase();
+  let start = -1;
+  let level = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = /^(#{1,6})\s+(.*)$/.exec(lines[i]);
+    if (!match) continue;
+    const text = match[2].replace(/[*_`]/g, '').replace(/^\d+[.)]\s*/, '').trim().toLowerCase();
+    if (text === wanted) {
+      start = i;
+      level = match[1].length;
+      break;
+    }
+  }
+  if (start < 0) {
+    const separator = content.endsWith('\n') ? '\n' : '\n\n';
+    return `${content}${separator}${block}`;
+  }
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const match = /^(#{1,6})\s+/.exec(lines[i]);
+    if (match && match[1].length <= level) {
+      end = i;
+      break;
+    }
+  }
+  const head = lines.slice(0, end).join('\n').replace(/\s+$/, '');
+  const tail = lines.slice(end).join('\n');
+  return tail.trim() ? `${head}\n\n${block}\n${tail}` : `${head}\n\n${block}`;
+}
+
+/**
  * GET  ?sourcePath=hasil/uji-laporan.md → daftar tabel di file itu.
  * POST { sourcePath, chapterPath, index?, caption? } → sisip tabel yang dipilih
  *      ke akhir bab, dengan nomor "Tabel 3.1" sesuai gaya penulisan skripsi.
@@ -40,7 +104,11 @@ export async function GET(
     }
     try {
       const { content } = await readTextFile(folder, sourcePath);
-      return NextResponse.json({ tables: extractTables(content), figures: extractFigures(content) });
+      const figures = extractFigures(content);
+      // Urutan tampil diprioritaskan, tapi `index` tetap posisi asli di file.
+      const focus = focusVariables(content);
+      const ordered = [...figures].sort((a, b) => figureRank(a, focus) - figureRank(b, focus));
+      return NextResponse.json({ tables: extractTables(content), figures: ordered, focus });
     } catch (error) {
       return workspaceError(error, 'Gagal membaca file hasil');
     }
@@ -57,6 +125,9 @@ const postSchema = z.object({
   caption: z.string().max(300).optional(),
   /** 'table' (default) atau 'figure' — gambar diberi nomor "Gambar N.M". */
   kind: z.enum(['table', 'figure']).optional(),
+  /** 'end' (default) menempel di akhir bab; 'afterHeading' di akhir seksi heading. */
+  position: z.enum(['end', 'afterHeading']).optional(),
+  heading: z.string().max(300).optional(),
 });
 
 export async function POST(
@@ -75,7 +146,7 @@ export async function POST(
         { status: 400 },
       );
     }
-    const { sourcePath, chapterPath, index, caption, kind } = parsed.data;
+    const { sourcePath, chapterPath, index, caption, kind, position, heading } = parsed.data;
 
     try {
       const source = await readTextFile(folder, sourcePath);
@@ -98,15 +169,17 @@ export async function POST(
         const existingFigs = (chapter.content.match(/^\*\*Gambar\s+\d+(?:\.\d+)?\*\*/gm) ?? []).length + 1;
         const number = babNumber ? `Gambar ${babNumber}.${existingFigs}` : `Gambar ${existingFigs}`;
 
-        const heading = caption?.trim() || figure.caption || figure.alt || number;
-        const block = `![${figure.alt || heading}](${figure.path})\n\n**${number}** ${heading}\n`;
+        const label = caption?.trim() || figure.caption || figure.alt || number;
+        const block = `![${figure.alt || label}](${figure.path})\n\n**${number}** ${label}\n`;
 
-        const separator = chapter.content.endsWith('\n') ? '\n' : '\n\n';
-        const next = `${chapter.content}${separator}${block}`;
+        const next =
+          position === 'afterHeading' && heading
+            ? insertAfterHeading(chapter.content, heading, block)
+            : `${chapter.content}${chapter.content.endsWith('\n') ? '' : '\n'}${chapter.content.endsWith('\n') ? '\n' : '\n\n'}${block}`;
         await snapshotCurrent(folder, chapterPath, 'analysis').catch(() => undefined);
         await writeTextFile(folder, chapterPath, next);
 
-        return NextResponse.json({ ok: true, number, heading, bytes: next.length });
+        return NextResponse.json({ ok: true, number, heading: label, bytes: next.length });
       }
 
       const tables = extractTables(source.content);
@@ -126,16 +199,18 @@ export async function POST(
       const existing = extractTables(chapter.content).length + 1;
       const number = babNumber ? `Tabel ${babNumber}.${existing}` : `Tabel ${existing}`;
 
-      const heading = caption?.trim() || table.caption || number;
-      const block = `**${number}** ${heading}\n\n${table.markdown}\n`;
+      const label = caption?.trim() || table.caption || number;
+      const block = `**${number}** ${label}\n\n${table.markdown}\n`;
 
-      const separator = chapter.content.endsWith('\n') ? '\n' : '\n\n';
-      const next = `${chapter.content}${separator}${block}`;
+      const next =
+        position === 'afterHeading' && heading
+          ? insertAfterHeading(chapter.content, heading, block)
+          : `${chapter.content}${chapter.content.endsWith('\n') ? '' : '\n'}${chapter.content.endsWith('\n') ? '\n' : '\n\n'}${block}`;
       // Simpan versi bab yang SEBELUM tabel disisipin, biar bisa dibalik.
       await snapshotCurrent(folder, chapterPath, 'analysis').catch(() => undefined);
       await writeTextFile(folder, chapterPath, next);
 
-      return NextResponse.json({ ok: true, number, heading, bytes: next.length });
+      return NextResponse.json({ ok: true, number, heading: label, bytes: next.length });
     } catch (error) {
       return workspaceError(error, 'Gagal menyisipkan tabel');
     }

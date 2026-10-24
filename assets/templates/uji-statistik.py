@@ -28,6 +28,14 @@ saat laporan dimasukkan ke bab). Nama file deterministik sehingga menjalankan
 ulang menimpa gambar lama, bukan menumpuk. Pakai `--no-figures` untuk melewati
 pembuatan grafik sama sekali, dan `--dpi` untuk mengatur resolusi.
 
+Default grafik dibuat secukupnya: histogram + Q-Q hanya untuk kolom `--y` dan
+`--x` (variabel yang benar-benar dibahas di Bab 4), bukan semua kolom numerik —
+dataset kuesioner dengan puluhan butir tidak lagi menghasilkan belasan PNG yang
+tidak dipakai. Tanpa `--y` tidak ada target yang jelas, jadi semua kolom numerik
+tetap digambar seperti dulu. Pakai `--figures-all` untuk memaksa semua kolom
+numerik. Diagnostik regresi (scatter prediktor, Q-Q residual, residual vs fitted,
+boxplot grup) tidak terpengaruh dan tetap dibuat seperti biasa.
+
 Dependensi: pandas, scipy, statsmodels, openpyxl.
 Opsional: matplotlib (hanya untuk grafik; tanpa itu laporan tetap berisi tabel).
 """
@@ -41,7 +49,7 @@ import sys
 import warnings
 from pathlib import Path
 
-VERSION = "1.1"
+VERSION = "1.2"
 
 INSTALL_HINT = """python3 -m venv .venv
 .venv/bin/pip install pandas scipy statsmodels openpyxl
@@ -608,7 +616,7 @@ def fig_qq(figures: "Figures", df: "pd.DataFrame", col: str) -> str:
 
 
 def figs_normality(figures: "Figures", df: "pd.DataFrame", cols: list[str]) -> str:
-    """Histogram + Q-Q untuk variabel yang dipakai di bagian deskriptif/normalitas."""
+    """Histogram + Q-Q untuk kolom yang dipilih (default: `--y` dan kolom `--x`)."""
     snippets = []
     for c in cols[: Figures.MAX_VARS]:
         snippets.append(fig_hist(figures, df, c))
@@ -1949,6 +1957,7 @@ def build_parser() -> argparse.ArgumentParser:
   uji-statistik.py --data sample.xlsx --items item1,item2,item3
   uji-statistik.py --data data.csv --paired sebelum,sesudah
   uji-statistik.py --data sample.xlsx --y prestasi --x motivasi --figures-dir gambar --dpi 200
+  uji-statistik.py --data sample.xlsx --y prestasi --x motivasi --figures-all
   uji-statistik.py --data sample.xlsx --no-figures
 """,
     )
@@ -1967,6 +1976,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dpi", type=int, default=150, help="resolusi grafik PNG (default: 150)")
     p.add_argument("--no-figures", action="store_true",
                    help="lewati pembuatan grafik; laporan hanya berisi tabel")
+    p.add_argument("--figures-all", action="store_true",
+                   help="gambar histogram + Q-Q untuk SEMUA kolom numerik "
+                        "(default: hanya --y dan --x)")
     p.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     return p
 
@@ -2033,6 +2045,15 @@ def main(argv=None) -> int:
     # kolom deskriptif: numerik, tapi buang kolom target grup bila sangat banyak level
     desc_cols = [c for c in num_cols if not (c == group and df[c].nunique() > 10)]
 
+    # Kolom yang diberi histogram + Q-Q. Default hanya `--y` + `--x` (yang dibahas
+    # di Bab 4) supaya dataset dengan banyak butir instrumen tidak menghasilkan
+    # puluhan PNG. Tanpa `--y` tidak ada target yang jelas → semua kolom numerik
+    # (perilaku lama). `--figures-all` memaksa perilaku lama itu.
+    if args.figures_all or not y:
+        fig_cols = list(desc_cols)
+    else:
+        fig_cols = [y] + [c for c in xs if c != y]
+
     rep = Report()
     rep.h1("Laporan Uji Statistik")
     rep.line(
@@ -2082,9 +2103,16 @@ def main(argv=None) -> int:
     # 3. Normalitas
     if desc_cols:
         body = sec_normality(df, desc_cols, args.alpha)
-        fig_block = figs_normality(figures, df, desc_cols)
+        fig_block = figs_normality(figures, df, fig_cols)
         if fig_block:
-            body += "\n\n**Grafik normalitas**\n\n" + fig_block
+            heading = "**Grafik normalitas**"
+            if fig_cols != desc_cols:
+                heading += (
+                    " (hanya "
+                    + ", ".join(f"`{c}`" for c in fig_cols)
+                    + "; pakai `--figures-all` untuk semua kolom numerik)"
+                )
+            body += "\n\n" + heading + "\n\n" + fig_block
         rep.section("Uji Normalitas (Shapiro-Wilk)", body)
 
     # 4. Korelasi

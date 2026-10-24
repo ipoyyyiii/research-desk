@@ -52,6 +52,11 @@ function valueOr(value: string, fallback = PLACEHOLDER): string {
   return escapeHtml(value.trim() || fallback);
 }
 
+/** "Fakultas Psikologi" → "Psikologi" supaya label "Fakultas" tidak dobel. */
+function facultyName(value: string): string {
+  return valueOr(value).replace(/^fakultas\b\s*/i, '');
+}
+
 /** Markdown isi (bab) untuk PDF; anchor caption disisipkan untuk target-counter. */
 export function buildPdfBodyMarkdown(chapters: PdfChapterInput[]): string {
   const parts = chapters.map((chapter, index) => {
@@ -123,7 +128,7 @@ function coverHtml(frontMatter: FrontMatter): string {
     `<p class="cover-author">${valueOr(frontMatter.author)}</p>` +
     `<p class="cover-meta">NIM ${valueOr(frontMatter.nim)}</p>` +
     `<p class="cover-meta">Program Studi ${valueOr(frontMatter.program)}</p>` +
-    `<p class="cover-meta">Fakultas ${valueOr(frontMatter.faculty)}</p>` +
+    `<p class="cover-meta">Fakultas ${facultyName(frontMatter.faculty)}</p>` +
     `<p class="cover-meta cover-institution">${valueOr(frontMatter.institution).toUpperCase()}</p>` +
     `<p class="cover-meta cover-place">${valueOr(frontMatter.city)}, ${valueOr(frontMatter.year)}</p>` +
     '</section>'
@@ -139,7 +144,7 @@ function statementHtml(frontMatter: FrontMatter): string {
     `<p class="identity">Nama: ${valueOr(frontMatter.author)}</p>` +
     `<p class="identity">NIM: ${valueOr(frontMatter.nim)}</p>` +
     `<p class="identity">Program Studi: ${valueOr(frontMatter.program)}</p>` +
-    `<p class="identity">Fakultas: ${valueOr(frontMatter.faculty)}</p>` +
+    `<p class="identity">Fakultas: ${facultyName(frontMatter.faculty)}</p>` +
     `<p class="statement-body">Menyatakan bahwa skripsi yang berjudul &quot;${title}&quot; ` +
     'adalah hasil karya saya sendiri, bukan plagiarisme, dan semua sumber yang dikutip telah ' +
     'disebutkan dalam daftar pustaka. Apabila di kemudian hari terbukti terdapat plagiarisme ' +

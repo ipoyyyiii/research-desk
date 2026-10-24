@@ -787,7 +787,11 @@
     "tabTables": "Tabel",
     "tabFigures": "Gambar",
     "pickFigure": "Pilih gambar",
-    "noFigures": "File ini belum punya gambar."
+    "noFigures": "File ini belum punya gambar.",
+    "position": "Posisi",
+    "positionEnd": "Di akhir bab",
+    "positionAfter": "Setelah heading",
+    "noHeadings": "Bab ini belum punya heading."
   },
   "thesisExport": {
     "menu": "Skripsi lengkap",

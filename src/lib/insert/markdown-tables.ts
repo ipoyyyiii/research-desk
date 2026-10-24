@@ -48,19 +48,32 @@ export function extractTables(markdown: string): MarkdownTable[] {
       j += 1;
     }
 
-    // Judul: heading terdekat di atas (### Uji-t ...) atau baris teks biasa.
+    // Judul tabel: caption eksplisit dulu, lalu heading seksi, lalu kosong.
+    // Sengaja TIDAK memungut baris prosa acak: catatan seperti "statistik
+    // dihitung pairwise" bukan judul tabel dan bikin caption salah di bab.
     let caption = '';
-    for (let k = i - 1; k >= 0 && k >= i - 6; k -= 1) {
+    for (let k = i - 1; k >= 0 && k >= i - 3; k -= 1) {
       const candidate = lines[k].trim();
       if (!candidate) continue;
-      const heading = candidate.match(/^#{1,6}\s+(.*)$/);
-      if (heading) {
-        caption = heading[1].trim();
+      const explicit = candidate.match(/^\*\*Tabel\s+[0-9]+(?:\.[0-9]+)*\.?\*\*\s*(.*)$/i);
+      if (explicit) {
+        caption = explicit[1].trim();
         break;
       }
-      if (!candidate.startsWith('|') && !candidate.startsWith('>')) {
-        caption = candidate.replace(/^[-*]\s*/, '').trim();
+      const bold = candidate.match(/^\*\*([^*]{3,80})\*\*$/);
+      if (bold) {
+        caption = bold[1].trim();
         break;
+      }
+      break; // ketemu teks biasa lebih dekat daripada heading -> jangan pungut
+    }
+    if (!caption) {
+      for (let k = i - 1; k >= 0 && k >= i - 6; k -= 1) {
+        const heading = lines[k].trim().match(/^#{1,6}\s+(.*)$/);
+        if (heading) {
+          caption = heading[1].trim();
+          break;
+        }
       }
     }
     // Nomor bagian dari laporan ("4. Korelasi Pearson") bukan bagian dari

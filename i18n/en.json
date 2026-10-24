@@ -787,7 +787,11 @@
     "tabTables": "Tables",
     "tabFigures": "Figures",
     "pickFigure": "Pick a figure",
-    "noFigures": "This file has no figures yet."
+    "noFigures": "This file has no figures yet.",
+    "position": "Position",
+    "positionEnd": "At end of chapter",
+    "positionAfter": "After heading",
+    "noHeadings": "This chapter has no headings yet."
   },
   "thesisExport": {
     "menu": "Full thesis",

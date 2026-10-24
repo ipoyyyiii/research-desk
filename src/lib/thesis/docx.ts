@@ -68,6 +68,11 @@ function valueOr(value: string, fallback = PLACEHOLDER): string {
   return value.trim() || fallback;
 }
 
+/** "Fakultas Psikologi" → "Psikologi" supaya label "Fakultas" tidak dobel. */
+function facultyName(value: string): string {
+  return valueOr(value).replace(/^fakultas\b\s*/i, '');
+}
+
 function coverXml(frontMatter: FrontMatter): string {
   return [
     paragraph('SKRIPSI', { align: 'center', bold: true, size: 28, before: 720, after: 480 }),
@@ -86,7 +91,7 @@ function coverXml(frontMatter: FrontMatter): string {
     paragraph(valueOr(frontMatter.author), { align: 'center', bold: true, after: 120 }),
     paragraph(`NIM ${valueOr(frontMatter.nim)}`, { align: 'center', after: 360 }),
     paragraph(`Program Studi ${valueOr(frontMatter.program)}`, { align: 'center', after: 0 }),
-    paragraph(`Fakultas ${valueOr(frontMatter.faculty)}`, { align: 'center', after: 0 }),
+    paragraph(`Fakultas ${facultyName(frontMatter.faculty)}`, { align: 'center', after: 0 }),
     paragraph(valueOr(frontMatter.institution).toUpperCase(), {
       align: 'center',
       bold: true,
@@ -108,7 +113,7 @@ function statementXml(frontMatter: FrontMatter): string {
     paragraph(`Nama: ${valueOr(frontMatter.author)}`, { align: 'left', after: 60 }),
     paragraph(`NIM: ${valueOr(frontMatter.nim)}`, { align: 'left', after: 60 }),
     paragraph(`Program Studi: ${valueOr(frontMatter.program)}`, { align: 'left', after: 60 }),
-    paragraph(`Fakultas: ${valueOr(frontMatter.faculty)}`, { align: 'left', after: 240 }),
+    paragraph(`Fakultas: ${facultyName(frontMatter.faculty)}`, { align: 'left', after: 240 }),
     paragraph(
       `Menyatakan bahwa skripsi yang berjudul "${title}" adalah hasil karya saya sendiri, bukan plagiarisme, dan semua sumber yang dikutip telah disebutkan dalam daftar pustaka. Apabila di kemudian hari terbukti terdapat plagiarisme dalam skripsi ini, saya bersedia menerima sanksi sesuai ketentuan yang berlaku.`,
       { align: 'left', after: 180 },

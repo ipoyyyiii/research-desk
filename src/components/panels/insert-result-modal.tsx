@@ -52,6 +52,9 @@ export function InsertResultModal({
   const [chapterPath, setChapterPath] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [position, setPosition] = useState<'end' | 'afterHeading'>('end');
+  const [heading, setHeading] = useState('');
+  const [headings, setHeadings] = useState<Array<{ level: number; text: string }>>([]);
 
   useEffect(() => {
     let alive = true;
@@ -75,10 +78,13 @@ export function InsertResultModal({
       try {
         const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/tree`);
         const data = (await res.json().catch(() => null)) as
-          | { entries?: Array<{ path: string; name: string; type: string }> }
+          | {
+              entries?: Array<{ path: string; name: string; type: string }>;
+              tree?: Array<{ path: string; name: string; type: string }>;
+            }
           | null;
         if (!alive) return;
-        const list = (data?.entries ?? [])
+        const list = (data?.tree ?? data?.entries ?? [])
           .filter((entry) => entry.type === 'file' && /^dokumen\/.*\.md$/i.test(entry.path))
           .map((entry) => ({ path: entry.path, name: entry.name }));
         setChapters(list);
@@ -91,6 +97,39 @@ export function InsertResultModal({
       alive = false;
     };
   }, [slug, sourcePath]);
+
+  // Daftar heading bab tujuan: dipakai buat memilih titik sisip.
+  useEffect(() => {
+    if (!chapterPath) {
+      setHeadings([]);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/projects/${encodeURIComponent(slug)}/file?path=${encodeURIComponent(chapterPath)}`,
+        );
+        const data = (await res.json().catch(() => null)) as { content?: string } | null;
+        if (!alive) return;
+        const found = String(data?.content ?? '')
+          .split(/\r?\n/)
+          .map((line) => /^(#{1,6})\s+(.*)$/.exec(line))
+          .filter((match): match is RegExpExecArray => match !== null)
+          .map((match) => ({
+            level: match[1].length,
+            text: match[2].replace(/[*_`]/g, '').trim(),
+          }));
+        setHeadings(found);
+        setHeading((current) => current || (found[0]?.text ?? ''));
+      } catch {
+        if (alive) setHeadings([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [slug, chapterPath]);
 
   const submit = async () => {
     if (!chapterPath) return;
@@ -106,6 +145,8 @@ export function InsertResultModal({
           kind,
           index: kind === 'figure' ? figureIndex : tableIndex,
           caption,
+          position,
+          heading: position === 'afterHeading' ? heading : undefined,
         }),
       });
       const data = (await res.json().catch(() => null)) as
@@ -247,6 +288,33 @@ export function InsertResultModal({
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {chapters.length > 0 && (
+          <div className="space-y-1">
+            <p className="font-medium">{t('insertResult.position')}</p>
+            <SegmentedGroup
+              active={position}
+              onSelect={(value) => setPosition(value === 'afterHeading' ? 'afterHeading' : 'end')}
+              options={[
+                { value: 'end', label: t('insertResult.positionEnd') },
+                { value: 'afterHeading', label: t('insertResult.positionAfter'), disabled: headings.length === 0 },
+              ]}
+            />
+            {position === 'afterHeading' && headings.length > 0 && (
+              <select
+                value={heading}
+                onChange={(event) => setHeading(event.target.value)}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+              >
+                {headings.map((item) => (
+                  <option key={`${item.level}-${item.text}`} value={item.text}>
+                    {`${'#'.repeat(item.level)} ${item.text}`}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         )}
 
