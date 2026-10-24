@@ -28,6 +28,18 @@ import { Ribbon, readViewPrefs, uploadProjectImage, type ViewPrefs } from './rib
 
 type SaveStatus = 'clean' | 'dirty' | 'saving' | 'error';
 
+/**
+ * Isi editor dari STRING MARKDOWN.
+ *
+ * `setContent(string)` di TipTap memperlakukan string sebagai HTML — markdown
+ * mentah jadi satu paragraf berisi "#"/"##" literal, lalu autosave menulis
+ * balik dokumen yang sudah rusak (heading & paragraf lebur). Jadi string
+ * selalu diparse lewat markdown extension dulu, baru masuk sebagai JSON.
+ */
+function applyMarkdown(target: Editor, markdown: string): void {
+  target.commands.setContent(markdown, { emitUpdate: false, contentType: 'markdown' });
+}
+
 const AUTOSAVE_DELAY_MS = 800;
 
 /** Spasi baris pilihan user → multiplier CSS di kertas (tampilan saja). */
@@ -176,9 +188,10 @@ function EditorSurface({
       TableHeader,
       TableCell,
     ],
-    content: initialMarkdown,
-    // Konten awal bisa mengandung `[@key]` mentah → ubah jadi chip sebelum ditulis.
+    content: '',
+    // Konten awal = markdown (bukan HTML) → parse dulu, baru chip sitasi.
     onCreate: ({ editor: created }) => {
+      applyMarkdown(created, initialMarkdown);
       applyCitationMarks(created);
     },
     editorProps: {
@@ -316,7 +329,7 @@ function EditorSurface({
           const md = (data.content ?? '') as string;
           const current = editor.getMarkdown();
           if (md === current) return;
-          editor.commands.setContent(md, { emitUpdate: false });
+          applyMarkdown(editor, md);
           // Agent gak ngerti chip → `[@key]` mentah dari file: chip-kan lagi.
           applyCitationMarks(editor);
           setStatus('clean');
@@ -358,7 +371,7 @@ function EditorSurface({
           if (cancelled || !res.ok || !editor) return;
           const md = (data.content ?? '') as string;
           if (md === editor.getMarkdown()) return;
-          editor.commands.setContent(md, { emitUpdate: false });
+          applyMarkdown(editor, md);
           applyCitationMarks(editor);
           publishWords(editor);
           setStatus('clean');
@@ -420,7 +433,7 @@ function EditorSurface({
         setReview({ before, after, added, removed });
         return;
       }
-      editor.commands.setContent(before, { emitUpdate: false });
+      applyMarkdown(editor, before);
       applyCitationMarks(editor);
       publishWords(editor);
       setStatus('clean');

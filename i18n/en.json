@@ -752,7 +752,11 @@
     "statsFail": "Failed to create the stats script",
     "statsInstalled": "Installed: {path}",
     "resultTitle": "Hasil analisis",
-    "insertResult": "Sisip ke bab"
+    "insertResult": "Sisip ke bab",
+    "instrumentAction": "Create instrument",
+    "instrumentHint": "Create P1..Pn columns in data/ plus an instrument sheet in dokumen/",
+    "instrumentDone": "{csv} + {md} created",
+    "instrumentFail": "Failed to create the instrument template"
   },
   "brand": {
     "name": "Vibe Research",
@@ -840,5 +844,16 @@
     "close": "Close",
     "noChaptersSelected": "Select at least one chapter.",
     "failed": "Export failed"
+  },
+  "topbar": {
+    "export": "Export",
+    "fullThesis": "Full thesis (DOCX/PDF)",
+    "progress": "Progress report",
+    "backup": "Back up project (.zip)",
+    "progressLoading": "Building the report…",
+    "progressCopy": "Copy",
+    "progressFail": "Failed to build the report",
+    "copied": "Copied ✓",
+    "close": "Close"
   }
 }

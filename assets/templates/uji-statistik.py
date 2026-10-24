@@ -7,13 +7,19 @@ Mencakup: deskriptif, normalitas Shapiro-Wilk, korelasi Pearson & Spearman,
 uji-t independen / Welch, one-way ANOVA (+ Welch ANOVA & Tukey HSD),
 uji-t berpasangan, regresi linear berganda, uji asumsi klasik (normalitas
 residual, multikolinearitas, heteroskedastisitas Glejser, linearitas,
-autokorelasi Durbin-Watson), dan Cronbach's alpha.
+autokorelasi Durbin-Watson), Cronbach's alpha, serta validitas butir
+(r-hitung dibanding r-tabel dua sisi pada df = n − 2).
 
 Contoh:
     python uji-statistik.py --data sample.xlsx
     python uji-statistik.py --data sample.xlsx --group kelompok
     python uji-statistik.py --data sample.xlsx --y prestasi --x motivasi,dukungan_orangtua
     python uji-statistik.py --data sample.xlsx --items item1,item2,item3 --out hasil.md
+
+`--items` tidak hanya menghitung Cronbach's alpha: tiap butir juga diuji
+validitasnya dengan membandingkan r-hitung (corrected item-total) terhadap
+r-tabel dua sisi untuk df = n − 2 pada `--alpha` (default 0.05), lalu diberi
+verdict **valid** / tidak valid beserta ringkasan jumlah butir yang valid.
 
 Grafik (PNG) ditulis ke folder `--figures-dir` (default: `gambar/`) dan
 disisipkan ke laporan sebagai `![alt](gambar/...)` + baris caption
@@ -1746,20 +1752,65 @@ def alpha_label(a: float) -> str:
     return "tidak dapat diterima"
 
 
+def r_tabel_of(n: int, alpha: float):
+    """r-tabel dua sisi untuk uji korelasi: df = n − 2, t* = t_{α/2, df}.
+
+    r_tabel = t* / sqrt(df + t*²). Mengembalikan ``(r_tabel, df, t*)``, atau
+    ``None`` bila df < 1 (n < 3) sehingga r-tabel tidak bisa dihitung.
+    """
+    df = int(n) - 2
+    if df < 1:
+        return None
+    try:
+        t_star = float(st.t.ppf(1 - alpha / 2, df))
+    except Exception:
+        return None
+    if not math.isfinite(t_star):
+        return None
+    return (float(t_star / math.sqrt(df + t_star * t_star)), df, t_star)
+
+
+def valid_verdict(r_hitung: float, r_tabel: float) -> str:
+    """Verdict validitas butir, gaya sama dengan `verdict`: tebal bila memenuhi."""
+    if r_hitung is None or r_tabel is None:
+        return "–"
+    if math.isnan(r_hitung) or math.isnan(r_tabel):
+        return "–"
+    return "**valid**" if r_hitung > r_tabel else "tidak valid"
+
+
 def sec_cronbach(df: "pd.DataFrame", items: list[str], alpha: float) -> str:
     sub, dropped, detail = drop_missing(df, items)
     n = len(sub)
     k = len(items)
+    if k < 2:
+        return (
+            f"_Validitas butir dan Cronbach's alpha butuh minimal 2 item; "
+            f"hanya {k} item diberikan._"
+        )
     if n < 3:
-        return f"_Data lengkap untuk item hanya {n} baris; butuh ≥ 3._"
+        return (
+            f"_Data lengkap untuk item hanya {n} baris; butuh ≥ 3. Validitas butir "
+            f"(r-tabel dengan df = n − 2) dan Cronbach's alpha tidak bisa dihitung._"
+        )
 
     zero = [c for c in items if sub[c].nunique() < 2]
     if zero:
         return (
-            "_Cronbach's alpha tidak bisa dihitung: item tanpa variasi (konstan): "
+            "_Cronbach's alpha dan validitas butir tidak bisa dihitung: item tanpa "
+            "variasi (konstan): "
             + ", ".join(f"`{c}`" for c in zero)
             + "._"
         )
+
+    rtab = r_tabel_of(n, alpha)
+    if rtab is None:
+        return (
+            f"_Validitas butir tidak bisa dihitung: df = n − 2 = {n - 2} < 1 "
+            f"(butuh ≥ 3 responden lengkap)._\n\n"
+            f"_Cronbach's alpha juga tidak bermakna untuk n = {n}._"
+        )
+    r_tabel, df_r, t_star = rtab
 
     a = alpha_of(sub)
     item_var = sub.var(ddof=1)
@@ -1775,6 +1826,8 @@ def sec_cronbach(df: "pd.DataFrame", items: list[str], alpha: float) -> str:
         a_std = float("nan")
 
     rows = []
+    verdicts = []
+    invalid = []
     for c in items:
         rest = total - sub[c]
         try:
@@ -1782,19 +1835,60 @@ def sec_cronbach(df: "pd.DataFrame", items: list[str], alpha: float) -> str:
         except Exception:
             r_it = float("nan")
         a_del = alpha_of(sub.drop(columns=[c]))
+        v = valid_verdict(r_it, r_tabel)
+        verdicts.append(v)
+        if v == "tidak valid":
+            invalid.append(c)
         rows.append([
-            f"`{c}`", fmt(sub[c].mean()), fmt(sub[c].std(ddof=1)), fmt(r_it, 3), fmt(a_del, 3),
+            f"`{c}`", fmt(sub[c].mean()), fmt(sub[c].std(ddof=1)),
+            fmt(r_it, 3), fmt(r_tabel, 3), fmt(a_del, 3), v,
         ])
+    n_valid = sum(1 for v in verdicts if v == "**valid**")
 
     body = [
         f"Jumlah item: **{k}** · n responden lengkap: **{n}**.",
         "",
         drop_note(dropped, detail),
+        f"**r-tabel** (uji dua sisi, α = {alpha:g}): df = n − 2 = **{df_r}**; "
+        f"t* = t({alpha / 2:g}; {df_r}) = {fmt(t_star, 3)}; "
+        f"r-tabel = t* / √(df + t*²) = **{fmt(r_tabel, 3)}**. "
+        "Butir dinyatakan **valid** bila r-hitung > r-tabel. Kolom r-hitung adalah "
+        "*corrected item-total r* (skor butir dikeluarkan dari skor total), bukan "
+        "korelasi butir dengan total yang masih memuat dirinya sendiri.",
+        "",
         md_table(
-            ["Item", "Mean", "SD", "Corrected item-total r", "Alpha jika item dihapus"],
+            [
+                "Item", "Mean", "SD", "r-hitung (corrected item-total)",
+                "r-tabel", "Alpha jika item dihapus", "Validitas",
+            ],
             rows,
-            "lrrrr",
+            "lrrrrrl",
         ),
+        "",
+        f"**Validitas butir:** **{n_valid} dari {k}** butir valid "
+        f"(r-hitung > r-tabel = {fmt(r_tabel, 3)}; df = {df_r}; α = {alpha:g}).",
+    ]
+    if invalid:
+        body.append(
+            "\n**Saran validitas:** "
+            + ", ".join(f"`{c}`" for c in invalid)
+            + " belum valid, jadi sebaiknya direvisi atau dibuang **sebelum** "
+            "menghitung reliabilitas — butir yang tidak valid tetap menurunkan mutu "
+            "instrumen meski alpha terlihat tinggi. Membuang butir mengubah alpha: "
+            "bandingkan nilai pada kolom **Alpha jika item dihapus** di tabel atas "
+            "untuk melihat dampak tiap butir sebelum memutuskan."
+        )
+    elif n_valid == k:
+        body.append(
+            "Semua butir valid; tidak ada butir yang perlu direvisi atau dibuang "
+            "sebelum uji reliabilitas."
+        )
+    if n_valid + len(invalid) < k:
+        body.append(
+            f"_{k - n_valid - len(invalid)} butir tidak bisa dinilai karena r-hitung "
+            "tidak terdefinisi (variasi skor nol)._"
+        )
+    body += [
         "",
         md_table(
             ["Statistik", "Nilai", "Pembacaan"],
@@ -1830,7 +1924,9 @@ def sec_cronbach(df: "pd.DataFrame", items: list[str], alpha: float) -> str:
     body.append(
         "\n_Alpha mengukur konsistensi internal, bukan validitas. Butuh ≥ 3 item "
         "agar nilai alpha bermakna; item dengan skala berbeda arah (reverse-scored) "
-        "harus dibalik dulu sebelum dihitung._"
+        "harus dibalik dulu sebelum dihitung. Validitas butir di atas adalah "
+        "validitas internal berbasis korelasi item-total; validitas isi dan konstruk "
+        "tetap butuh pertimbangan ahli dan tidak bisa digantikan angka r-tabel._"
     )
     return "\n".join(body)
 
@@ -1863,7 +1959,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--y", default=None, help="kolom target regresi")
     p.add_argument("--x", default=None, help="kolom prediktor, dipisah koma")
     p.add_argument("--group", default=None, help="kolom kategorikal untuk uji beda kelompok")
-    p.add_argument("--items", default=None, help="item skala (>=2), dipisah koma, untuk Cronbach's alpha")
+    p.add_argument("--items", default=None,
+                   help="item skala (>=2), dipisah koma, untuk validitas butir & Cronbach's alpha")
     p.add_argument("--paired", default=None, help="dua kolom untuk paired t-test: kolA,kolB")
     p.add_argument("--figures-dir", default="gambar",
                    help="folder keluaran grafik PNG, relatif ke folder project (default: gambar)")
@@ -2027,9 +2124,12 @@ def main(argv=None) -> int:
             rep.section(f"Regresi Linear Berganda (`{y}`)", body)
             rep.section("Uji Asumsi Klasik", sec_assumption(ctx, args.alpha, figures))
 
-    # 8. Cronbach
+    # 8. Cronbach + validitas butir
     if items:
-        rep.section("Reliabilitas (Cronbach's Alpha)", sec_cronbach(df, items, args.alpha))
+        rep.section(
+            "Validitas Butir & Reliabilitas (Cronbach's Alpha)",
+            sec_cronbach(df, items, args.alpha),
+        )
 
     bullets = [
         "- Semua analisis memakai **listwise deletion** per bagian: baris yang punya missing "

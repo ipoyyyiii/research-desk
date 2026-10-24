@@ -752,7 +752,11 @@
     "statsFail": "Gagal membuat skrip statistik",
     "statsInstalled": "Terpasang: {path}",
     "resultTitle": "Hasil analisis",
-    "insertResult": "Sisip ke bab"
+    "insertResult": "Sisip ke bab",
+    "instrumentAction": "Buat instrumen",
+    "instrumentHint": "Buat kolom P1..Pn di data/ + lembar instrumen di dokumen/",
+    "instrumentDone": "{csv} + {md} dibuat",
+    "instrumentFail": "Gagal membuat template instrumen"
   },
   "brand": {
     "name": "Vibe Research",
@@ -840,5 +844,16 @@
     "close": "Tutup",
     "noChaptersSelected": "Pilih minimal satu bab.",
     "failed": "Ekspor gagal"
+  },
+  "topbar": {
+    "export": "Export",
+    "fullThesis": "Skripsi lengkap (DOCX/PDF)",
+    "progress": "Laporan progres",
+    "backup": "Backup project (.zip)",
+    "progressLoading": "Menyusun laporan…",
+    "progressCopy": "Salin",
+    "progressFail": "Gagal menyusun laporan",
+    "copied": "Tersalin ✓",
+    "close": "Tutup"
   }
 }

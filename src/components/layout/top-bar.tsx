@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FilePlus2, Columns2, MessagesSquare } from 'lucide-react';
+import { FilePlus2, Columns2, Download, Loader2, MessagesSquare } from 'lucide-react';
 import { useT } from '@/lib/preferences';
-import { Button, IconButton, StatusDot } from '@/components/ui';
+import { Button, IconButton, Modal, StatusDot } from '@/components/ui';
 import { NewDocModal, requestNewDocument } from '@/components/panels/new-doc-modal';
+import { ThesisExportModal } from '@/components/editor/thesis-export-modal';
 
 /**
  * Bar atas brand ala homepage: mark "R" navy + wordmark `research-desk` —
@@ -33,6 +35,58 @@ export function TopBar({
 }) {
   const router = useRouter();
   const t = useT();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [thesisOpen, setThesisOpen] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [progressBusy, setProgressBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onClick = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [menuOpen]);
+
+  const downloadBackup = () => {
+    setMenuOpen(false);
+    window.location.href = `/api/projects/${encodeURIComponent(projectSlug)}/backup`;
+  };
+
+  const openProgress = async () => {
+    setMenuOpen(false);
+    setProgressOpen(true);
+    if (progress) return;
+    setProgressBusy(true);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectSlug)}/progress`);
+      const data = (await res.json().catch(() => null)) as { markdown?: string; error?: string } | null;
+      if (!res.ok || !data?.markdown) {
+        setProgress(data?.error ?? t('topbar.progressFail'));
+        return;
+      }
+      setProgress(data.markdown);
+    } catch {
+      setProgress(t('topbar.progressFail'));
+    } finally {
+      setProgressBusy(false);
+    }
+  };
+
+  const copyProgress = async () => {
+    if (!progress) return;
+    try {
+      await navigator.clipboard.writeText(progress);
+      setMessage(t('topbar.copied'));
+      window.setTimeout(() => setMessage(null), 2500);
+    } catch {
+      setMessage(t('topbar.progressFail'));
+    }
+  };
 
   return (
     <header className="flex h-11 items-center justify-between border-b border-neutral-200 px-3 dark:border-neutral-800">
@@ -66,10 +120,47 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Export menu — aktif di fase 4 */}
-        <Button variant="ghost" disabled title="Fase 4">
-          Export ▾
-        </Button>
+        {/* Menu project: ekspor skripsi lengkap, laporan progres, backup */}
+        <div ref={menuRef} className="relative">
+          <Button
+            variant="ghost"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            title={t('topbar.export')}
+          >
+            {t('topbar.export')} ▾
+          </Button>
+          {menuOpen && (
+            <div className="absolute right-0 top-9 z-50 w-56 rounded-md border border-border bg-card p-1 text-xs shadow-lg">
+              <button
+                type="button"
+                className="w-full cursor-pointer rounded px-2 py-1.5 text-left font-medium transition-colors hover:bg-muted"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setThesisOpen(true);
+                }}
+              >
+                {t('topbar.fullThesis')}
+              </button>
+              <button
+                type="button"
+                className="w-full cursor-pointer rounded px-2 py-1.5 text-left transition-colors hover:bg-muted"
+                onClick={() => void openProgress()}
+              >
+                {t('topbar.progress')}
+              </button>
+              <div className="my-1 h-px bg-border" />
+              <button
+                type="button"
+                className="flex w-full cursor-pointer items-center gap-1.5 rounded px-2 py-1.5 text-left transition-colors hover:bg-muted"
+                onClick={downloadBackup}
+              >
+                <Download size={12} />
+                {t('topbar.backup')}
+              </button>
+            </div>
+          )}
+        </div>
         <IconButton onClick={onToggleFocusMode} title="Focus mode (Esc)" className={focusMode ? 'text-blue-500' : ''}>
           <Columns2 size={15} />
         </IconButton>
@@ -94,6 +185,33 @@ export function TopBar({
       {/* Dialog dokumen baru — pindah ke new-doc-modal (shared: bisa dipanggil
           lewat event dari panel lain). */}
       <NewDocModal slug={projectSlug} />
+
+      <ThesisExportModal open={thesisOpen} onClose={() => setThesisOpen(false)} slug={projectSlug} />
+
+      <Modal open={progressOpen} onClose={() => setProgressOpen(false)} title={t('topbar.progress')} wide>
+        <div className="space-y-3 text-xs">
+          {progressBusy && (
+            <p className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 size={13} className="animate-spin" />
+              {t('topbar.progressLoading')}
+            </p>
+          )}
+          {!progressBusy && progress && (
+            <pre className="max-h-[60vh] overflow-auto rounded-md border border-border bg-muted/40 p-2 font-mono text-[11px] whitespace-pre-wrap">
+              {progress}
+            </pre>
+          )}
+          {message && <p className="text-muted-foreground">{message}</p>}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="outline" className="h-7 px-2 text-[11px]" onClick={() => void copyProgress()}>
+              {t('topbar.progressCopy')}
+            </Button>
+            <Button variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setProgressOpen(false)}>
+              {t('topbar.close')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </header>
   );
 }

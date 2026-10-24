@@ -665,6 +665,7 @@ export function DataView({ slug, entries }: ViewProps) {
   const [query, setQuery] = useState('');
   const [statsBusy, setStatsBusy] = useState(false);
   const [statsMsg, setStatsMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
+  const [instrumentBusy, setInstrumentBusy] = useState(false);
   /** Laporan hasil analisis (folder hasil/) yang tabelnya mau disisipin ke bab. */
   const [insertSource, setInsertSource] = useState<string | null>(null);
   const data = dataFiles(entries);
@@ -716,6 +717,35 @@ export function DataView({ slug, entries }: ViewProps) {
     }
   };
 
+  /** Buat template instrumen (kolom P1..Pn + lembar instrumen). */
+  const createInstrument = async () => {
+    setInstrumentBusy(true);
+    setStatsMsg(null);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(slug)}/instrument-template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | { csv?: string; md?: string; error?: string }
+        | null;
+      if (!res.ok || !payload?.csv) {
+        setStatsMsg({ text: payload?.error ?? t('es.instrumentFail'), tone: 'error' });
+        return;
+      }
+      setStatsMsg({
+        text: t('es.instrumentDone', { csv: payload.csv, md: payload.md ?? '' }),
+        tone: 'ok',
+      });
+      window.dispatchEvent(new CustomEvent('workspace:tree-refresh'));
+    } catch {
+      setStatsMsg({ text: t('es.instrumentFail'), tone: 'error' });
+    } finally {
+      setInstrumentBusy(false);
+    }
+  };
+
   return (
     <section
       className="relative flex min-h-full flex-col"
@@ -744,6 +774,16 @@ export function DataView({ slug, entries }: ViewProps) {
         >
           {statsBusy ? <Loader2 size={12} className="animate-spin" /> : <Sigma size={12} />}
           {t('es.statsAction')}
+        </button>
+        <button
+          type="button"
+          onClick={() => void createInstrument()}
+          disabled={instrumentBusy}
+          title={t('es.instrumentHint')}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {instrumentBusy ? <Loader2 size={12} className="animate-spin" /> : <Sigma size={12} />}
+          {t('es.instrumentAction')}
         </button>
         {statsMsg ? (
           <span
