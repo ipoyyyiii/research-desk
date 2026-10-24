@@ -769,17 +769,21 @@
     "noUnused": "Every entry is used."
   },
   "insertResult": {
-    "title": "Sisip hasil analisis ke bab",
-    "source": "Dari: {name}",
-    "loading": "Memuat tabel…",
-    "noTables": "File ini belum punya tabel.",
-    "pickTable": "Pilih tabel",
-    "pickChapter": "Masuk ke bab",
+    "title": "Insert an analysis result into a chapter",
+    "source": "From: {name}",
+    "loading": "Loading tables…",
+    "noTables": "This file has no tables yet.",
+    "pickTable": "Pick a table",
+    "pickChapter": "Insert into chapter",
     "caption": "Table caption",
-    "untitled": "Tanpa judul",
-    "submit": "Sisip",
-    "done": "{number} sudah masuk ke bab.",
-    "fail": "Gagal menyisipkan tabel."
+    "untitled": "Untitled",
+    "submit": "Insert",
+    "done": "{number} was added to the chapter.",
+    "fail": "Failed to insert the content.",
+    "tabTables": "Tables",
+    "tabFigures": "Figures",
+    "pickFigure": "Pick a figure",
+    "noFigures": "This file has no figures yet."
   },
   "thesisExport": {
     "menu": "Full thesis",

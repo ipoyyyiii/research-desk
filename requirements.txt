@@ -11,3 +11,6 @@ pandas>=2.2
 scipy>=1.11
 statsmodels>=0.14
 openpyxl>=3.1
+# Grafik PNG dari scripts/uji-statistik.py (opsional: tanpa ini laporan tetap
+# berisi tabel, hanya grafik yang dilewati).
+matplotlib>=3.8

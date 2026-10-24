@@ -779,7 +779,11 @@
     "untitled": "Tanpa judul",
     "submit": "Sisip",
     "done": "{number} sudah masuk ke bab.",
-    "fail": "Gagal menyisipkan tabel."
+    "fail": "Gagal menyisipkan tabel.",
+    "tabTables": "Tabel",
+    "tabFigures": "Gambar",
+    "pickFigure": "Pilih gambar",
+    "noFigures": "File ini belum punya gambar."
   },
   "thesisExport": {
     "menu": "Skripsi lengkap",

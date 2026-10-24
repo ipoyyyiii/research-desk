@@ -7,6 +7,7 @@ import { readTextFile, writeTextFile } from '@/lib/workspace/files';
 import { workspaceError } from '@/lib/workspace/api-error';
 import { snapshotCurrent } from '@/lib/versions/store';
 import { chapterNumber, extractTables } from '@/lib/insert/markdown-tables';
+import { extractFigures } from '@/lib/insert/markdown-figures';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +40,7 @@ export async function GET(
     }
     try {
       const { content } = await readTextFile(folder, sourcePath);
-      return NextResponse.json({ tables: extractTables(content) });
+      return NextResponse.json({ tables: extractTables(content), figures: extractFigures(content) });
     } catch (error) {
       return workspaceError(error, 'Gagal membaca file hasil');
     }
@@ -54,6 +55,8 @@ const postSchema = z.object({
   chapterPath: z.string().min(1).max(500),
   index: z.number().int().min(0).optional(),
   caption: z.string().max(300).optional(),
+  /** 'table' (default) atau 'figure' — gambar diberi nomor "Gambar N.M". */
+  kind: z.enum(['table', 'figure']).optional(),
 });
 
 export async function POST(
@@ -72,10 +75,40 @@ export async function POST(
         { status: 400 },
       );
     }
-    const { sourcePath, chapterPath, index, caption } = parsed.data;
+    const { sourcePath, chapterPath, index, caption, kind } = parsed.data;
 
     try {
       const source = await readTextFile(folder, sourcePath);
+
+      if (kind === 'figure') {
+        const figures = extractFigures(source.content);
+        if (figures.length === 0) {
+          return NextResponse.json(
+            { error: 'File ini gak punya gambar buat disisipin' },
+            { status: 400 },
+          );
+        }
+        const figure = figures[index ?? 0];
+        if (!figure) {
+          return NextResponse.json({ error: 'Gambar gak ditemukan' }, { status: 404 });
+        }
+
+        const chapter = await readTextFile(folder, chapterPath);
+        const babNumber = chapterNumber(chapterPath, chapter.content);
+        const existingFigs = (chapter.content.match(/^\*\*Gambar\s+\d+(?:\.\d+)?\*\*/gm) ?? []).length + 1;
+        const number = babNumber ? `Gambar ${babNumber}.${existingFigs}` : `Gambar ${existingFigs}`;
+
+        const heading = caption?.trim() || figure.caption || figure.alt || number;
+        const block = `![${figure.alt || heading}](${figure.path})\n\n**${number}** ${heading}\n`;
+
+        const separator = chapter.content.endsWith('\n') ? '\n' : '\n\n';
+        const next = `${chapter.content}${separator}${block}`;
+        await snapshotCurrent(folder, chapterPath, 'analysis').catch(() => undefined);
+        await writeTextFile(folder, chapterPath, next);
+
+        return NextResponse.json({ ok: true, number, heading, bytes: next.length });
+      }
+
       const tables = extractTables(source.content);
       if (tables.length === 0) {
         return NextResponse.json(
